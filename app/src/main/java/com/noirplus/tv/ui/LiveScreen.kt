@@ -33,6 +33,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -95,6 +98,8 @@ fun LiveContent() {
     if (allCats.isEmpty()) return Message(error?.let { "No se pudo cargar: $it" } ?: "No hay canales en directo en tu lista")
 
     val d = LocalDims.current
+    val gridFr = remember { FocusRequester() }
+    val gridReady = !channels.isNullOrEmpty()
     val grid: @Composable (Modifier) -> Unit = { mod ->
         val list = channels
         when {
@@ -103,9 +108,9 @@ fun LiveContent() {
             else -> key(selected) {
                 LazyVerticalGrid(
                     columns = if (d.compact) GridCells.Adaptive(104.dp) else GridCells.Adaptive(150.dp),
-                    modifier = mod.focusRestorer(),
+                    modifier = mod.focusRequester(gridFr).focusRestorer(),
                     contentPadding = PaddingValues(
-                        start = if (d.compact) d.edge else 0.dp, top = 6.dp, end = d.edge, bottom = 40.dp
+                        start = if (d.compact) d.edge else 0.dp, top = 6.dp, end = d.edge, bottom = d.bottomPad
                     ),
                     horizontalArrangement = Arrangement.spacedBy(d.gap),
                     verticalArrangement = Arrangement.spacedBy(d.gap),
@@ -156,7 +161,14 @@ fun LiveContent() {
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             itemsIndexed(allCats, key = { i, c -> "$i:${c.id}" }) { _, c ->
-                CategoryItem(c.name, selected = c.id == selected, memKey = "livecat/${c.id}") { selected = c.id }
+                CategoryItem(
+                    c.name,
+                    selected = c.id == selected,
+                    memKey = "livecat/${c.id}",
+                    modifier = Modifier.focusProperties {
+                        right = if (gridReady) gridFr else FocusRequester.Cancel
+                    },
+                ) { selected = c.id }
             }
         }
         Spacer(Modifier.width(24.dp))
@@ -188,9 +200,9 @@ private fun CategoryChip(name: String, selected: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun CategoryItem(name: String, selected: Boolean, memKey: String, onFocus: () -> Unit) {
+private fun CategoryItem(name: String, selected: Boolean, memKey: String, modifier: Modifier = Modifier, onFocus: () -> Unit) {
     Focusable(
-        Modifier.fillMaxWidth(),
+        modifier.fillMaxWidth(),
         key = memKey,
         shape = RoundedCornerShape(8.dp),
         focusScale = 1f,
@@ -240,7 +252,7 @@ private fun ChannelCard(
             onLongClick = onLongClick,
             onClick = onClick,
         ) {
-            Box(Modifier.fillMaxSize().background(Col.Surface2))
+            Box(Modifier.fillMaxSize().background(Col.Surface))
             Text(
                 ch.name, Modifier.align(Alignment.Center).padding(8.dp),
                 color = Col.Sub, fontSize = 12.sp, textAlign = TextAlign.Center, maxLines = 3,

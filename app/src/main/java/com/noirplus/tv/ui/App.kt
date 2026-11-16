@@ -24,6 +24,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import com.noirplus.tv.data.Item
+import com.noirplus.tv.data.Kind
 import com.noirplus.tv.data.PlayRequest
 import com.noirplus.tv.data.Repo
 import kotlinx.coroutines.delay
@@ -33,6 +34,7 @@ sealed interface Screen {
     data object Main : Screen
     data class Detail(val item: Item) : Screen
     data class Player(val req: PlayRequest) : Screen
+    data class Category(val kind: Kind, val cat: com.noirplus.tv.data.Category) : Screen
 }
 
 class Nav(initial: Screen) {
@@ -62,6 +64,7 @@ private fun keyOf(s: Screen): String = when (s) {
     Screen.Main -> "main"
     is Screen.Detail -> "detail:" + s.item.key
     is Screen.Player -> "player:" + s.req.key
+    is Screen.Category -> "cat:" + s.kind.name + ":" + s.cat.id
 }
 
 @Composable
@@ -115,6 +118,7 @@ fun App() {
                             Screen.Main -> MainScreen()
                             is Screen.Detail -> DetailScreen(screen.item)
                             is Screen.Player -> PlayerScreen(screen.req)
+                            is Screen.Category -> CategoryScreen(screen.kind, screen.cat)
                         }
                     }
                 }

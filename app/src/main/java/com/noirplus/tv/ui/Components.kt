@@ -2,6 +2,8 @@ package com.noirplus.tv.ui
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.AnimationSpec
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -15,6 +17,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.BringIntoViewSpec
+import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -30,13 +36,18 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -61,6 +72,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -76,6 +88,8 @@ import com.noirplus.tv.data.Kind
 import com.noirplus.tv.data.Repo
 import kotlinx.coroutines.delay
 import java.util.Locale
+import kotlin.math.absoluteValue
+import kotlin.math.roundToInt
 
 /** Paleta sobria tipo Apple TV: negros, grises y blanco. */
 object Col {
@@ -113,7 +127,7 @@ val LocalFocusMemory = staticCompositionLocalOf { FocusMemory() }
 fun Focusable(
     modifier: Modifier = Modifier,
     key: String? = null,
-    shape: Shape = RoundedCornerShape(12.dp),
+    shape: Shape = CardShape,
     focusScale: Float = 1.1f,
     border: Boolean = false,
     focusRequester: FocusRequester? = null,
@@ -235,17 +249,58 @@ fun ActionButton(
 }
 
 @Composable
-fun SectionTitle(text: String) {
-    Text(
-        text,
-        color = Col.Text,
-        fontSize = 19.sp,
-        fontWeight = FontWeight.SemiBold,
-        letterSpacing = (-0.2).sp,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-        modifier = Modifier.padding(start = edge, top = 10.dp, end = edge),
-    )
+fun SectionTitle(text: String, onSeeAll: (() -> Unit)? = null) {
+    Row(Modifier.fillMaxWidth().padding(start = edge, top = 10.dp, end = edge), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text,
+            color = Col.Text,
+            fontSize = if (LocalDims.current.compact) 17.sp else 19.sp,
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = (-0.2).sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        if (onSeeAll != null) {
+            Text(
+                "Ver todo",
+                color = Col.Sub, fontSize = 13.sp, fontWeight = FontWeight.Medium,
+                modifier = Modifier.clip(RoundedCornerShape(50)).clickable { onSeeAll() }.padding(horizontal = 8.dp, vertical = 4.dp),
+            )
+        }
+    }
+}
+
+/** Géneros en botoncitos de bordes redondeados. */
+@Composable
+fun GenreChips(genre: String?, modifier: Modifier = Modifier, max: Int = 4) {
+    val list = genre?.split(',', '/', '|', ';')?.map { it.trim() }?.filter { it.isNotEmpty() }?.distinct()?.take(max) ?: return
+    if (list.isEmpty()) return
+    Row(modifier, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        list.forEach { g ->
+            Text(
+                g,
+                Modifier
+                    .clip(RoundedCornerShape(50))
+                    .background(Color.White.copy(alpha = 0.08f))
+                    .border(0.8.dp, Color.White.copy(alpha = 0.28f), RoundedCornerShape(50))
+                    .padding(horizontal = 10.dp, vertical = 4.dp),
+                color = Col.Text, fontSize = 11.sp, fontWeight = FontWeight.Medium, maxLines = 1,
+            )
+        }
+    }
+}
+
+/** 5 estrellas a partir de una nota sobre 10. */
+@Composable
+fun StarRow(rating: String?, size: Dp = 18.dp, modifier: Modifier = Modifier) {
+    val r = parseRating(rating) ?: return
+    val full = (r / 2f).roundToInt()
+    Row(modifier, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        repeat(5) { i ->
+            Icon(Icons.Filled.Star, null, tint = if (i < full) Col.Star else Col.Sub.copy(alpha = 0.45f), modifier = Modifier.size(size))
+        }
+    }
 }
 
 @Composable
@@ -270,7 +325,7 @@ fun RowPlaceholder() {
         horizontalArrangement = Arrangement.spacedBy(d.gap),
     ) {
         repeat(8) {
-            Box(Modifier.width(d.poster).aspectRatio(2f / 3f).clip(RoundedCornerShape(12.dp)).background(Col.Surface))
+            Box(Modifier.width(d.poster).aspectRatio(2f / 3f).clip(CardShape).background(Col.Surface))
         }
     }
 }
@@ -316,10 +371,11 @@ fun PosterCard(
     item: Item,
     memKey: String,
     width: Dp = LocalDims.current.poster,
+    fill: Boolean = false,
     onFocus: () -> Unit,
     onClick: () -> Unit,
 ) {
-    Column(Modifier.width(width)) {
+    Column(if (fill) Modifier.fillMaxWidth() else Modifier.width(width)) {
         Focusable(Modifier.fillMaxWidth().aspectRatio(2f / 3f), key = memKey, onFocus = onFocus, onClick = onClick) { focused ->
             Box(Modifier.fillMaxSize().background(Col.Surface))
             Text(
@@ -335,7 +391,7 @@ fun PosterCard(
                     modifier = Modifier.fillMaxSize().then(if (item.kind == Kind.LIVE) Modifier.padding(14.dp) else Modifier),
                 )
             }
-            Box(Modifier.matchParentSize().border(1.dp, if (focused) Color.Transparent else Col.Hairline, RoundedCornerShape(12.dp)))
+            Box(Modifier.matchParentSize().border(1.dp, if (focused) Color.Transparent else Col.Hairline, CardShape))
             RatingPill(item.rating, Modifier.align(Alignment.TopEnd).padding(6.dp))
         }
         Text(
@@ -373,7 +429,7 @@ fun WideCard(
                     Box(Modifier.fillMaxHeight().fillMaxWidth(progress).clip(RoundedCornerShape(50)).background(Color.White))
                 }
             }
-            Box(Modifier.matchParentSize().border(1.dp, if (focused) Color.Transparent else Col.Hairline, RoundedCornerShape(12.dp)))
+            Box(Modifier.matchParentSize().border(1.dp, if (focused) Color.Transparent else Col.Hairline, CardShape))
         }
         Text(
             title,
@@ -419,7 +475,8 @@ fun CategoryRow(
     }
     if (list != null && list.isEmpty()) return
     Column {
-        SectionTitle(titlePrefix + cat.name)
+        val tv = LocalDims.current.tv
+        SectionTitle(titlePrefix + cat.name, onSeeAll = if (!tv && !list.isNullOrEmpty()) ({ nav.push(Screen.Category(kind, cat)) }) else null)
         if (list == null) RowPlaceholder()
         else PosterRow("${kind.name}-${cat.id}", list, onFocus) { nav.push(Screen.Detail(it)) }
     }
@@ -471,7 +528,12 @@ fun HeroArea(item: Item?, emptyTitle: String, emptySubtitle: String) {
         }
         Box(
             Modifier.matchParentSize().background(
-                Brush.verticalGradient((if (d.compact) 0.25f else 0.55f) to Color.Transparent, 1f to Col.Bg)
+                Brush.verticalGradient(
+                    0f to Color.Transparent,
+                    (if (d.compact) 0.25f else 0.45f) to Color.Transparent,
+                    0.8f to Col.Bg.copy(alpha = 0.55f),
+                    1f to Col.Bg,
+                )
             )
         )
         AnimatedContent(
@@ -497,10 +559,11 @@ fun HeroArea(item: Item?, emptyTitle: String, emptySubtitle: String) {
                     MetaLine(
                         year = details?.year ?: it0.year,
                         rating = details?.rating ?: it0.rating,
-                        genre = details?.genre,
+                        genre = null,
                         duration = if (d.compact) null else details?.duration,
                         modifier = Modifier.padding(top = 8.dp),
                     )
+                    GenreChips(details?.genre, Modifier.padding(top = 8.dp))
                     val plot = details?.plot ?: it0.plot
                     if (plot != null) {
                         Text(plot, color = Col.Text.copy(alpha = 0.85f), fontSize = 13.sp, maxLines = if (d.compact) 2 else 3,
@@ -531,5 +594,90 @@ fun Backdrop(url: String?) {
             )
         }
         Box(Modifier.fillMaxSize().background(Brush.verticalGradient((if (compact) 0.15f else 0.45f) to Color.Transparent, 1f to Col.Bg)))
+    }
+}
+
+/**
+ * Desplazamiento de filas en TV: al bajar a una fila, la anterior se queda asomando arriba
+ * (un ~15 %), y en horizontal la carátula enfocada queda fija cerca del margen.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+class PeekSpec(private val leadPx: Float) : BringIntoViewSpec {
+    @Suppress("OVERRIDE_DEPRECATION", "DEPRECATION")
+    override val scrollAnimationSpec: AnimationSpec<Float> = tween(420, easing = FastOutSlowInEasing)
+
+    override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float {
+        if (size >= containerSize) return offset
+        return offset - leadPx
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun TvRowScroll(content: @Composable () -> Unit) {
+    val d = LocalDims.current
+    if (!d.tv) {
+        content()
+        return
+    }
+    val px = with(LocalDensity.current) { 80.dp.toPx() }
+    val spec = remember(px) { PeekSpec(px) }
+    CompositionLocalProvider(LocalBringIntoViewSpec provides spec) { content() }
+}
+
+/** Portada deslizable del móvil (estilo plataformas de streaming). */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun FeaturedPager(items: List<Item>) {
+    val nav = LocalNav.current
+    if (items.isEmpty()) {
+        Box(Modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 8.dp).aspectRatio(4f / 3.2f).clip(RoundedCornerShape(8.dp)).background(Col.Surface))
+        return
+    }
+    val pager = rememberPagerState(pageCount = { items.size })
+    HorizontalPager(
+        state = pager,
+        contentPadding = PaddingValues(horizontal = 28.dp),
+        pageSpacing = 12.dp,
+        modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 6.dp),
+    ) { page ->
+        val item = items[page]
+        val off = ((pager.currentPage - page) + pager.currentPageOffsetFraction).absoluteValue.coerceIn(0f, 1f)
+        FeaturedCard(
+            item,
+            Modifier.graphicsLayer {
+                val sc = 1f - 0.07f * off
+                scaleX = sc
+                scaleY = sc
+                alpha = 1f - 0.4f * off
+            },
+        ) { nav.push(Screen.Detail(item)) }
+    }
+}
+
+@Composable
+private fun FeaturedCard(item: Item, modifier: Modifier, onClick: () -> Unit) {
+    val src = Repo.source
+    val details by produceState<Details?>(null, item.key) {
+        value = runCatching {
+            if (item.kind == Kind.MOVIE) src?.movieDetails(item) else src?.seriesDetails(item)?.details
+        }.getOrNull()
+    }
+    Box(
+        modifier.fillMaxWidth().aspectRatio(4f / 3.2f).clip(RoundedCornerShape(8.dp)).background(Col.Surface)
+            .border(0.5.dp, Col.Hairline, RoundedCornerShape(8.dp)).clickable { onClick() }
+    ) {
+        AsyncImage(model = details?.backdrop ?: item.image, contentDescription = item.name, contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize())
+        Box(Modifier.matchParentSize().background(Brush.verticalGradient(0.4f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.88f))))
+        Column(Modifier.align(Alignment.BottomStart).padding(16.dp)) {
+            Text(item.name, fontFamily = InterDisplay, fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White,
+                maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 27.sp, letterSpacing = (-0.6).sp)
+            Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                RatingPill(details?.rating ?: item.rating)
+                (details?.year ?: item.year)?.let { Text(it, color = Col.Sub, fontSize = 12.sp) }
+            }
+            GenreChips(details?.genre, Modifier.padding(top = 8.dp), max = 3)
+        }
     }
 }

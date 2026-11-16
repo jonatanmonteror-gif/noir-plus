@@ -109,7 +109,7 @@ fun SearchContent() {
             else -> LazyVerticalGrid(
                 columns = GridCells.Adaptive(LocalDims.current.poster),
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(start = edge, end = edge, top = 16.dp, bottom = 40.dp),
+                contentPadding = PaddingValues(start = edge, end = edge, top = 16.dp, bottom = LocalDims.current.bottomPad),
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
@@ -142,7 +142,7 @@ fun SettingsContent() {
     val format = remember(changes) { prefs.liveFormat }
 
     Column(
-        Modifier.fillMaxSize().padding(horizontal = edge, vertical = 16.dp).verticalScroll(rememberScrollState()),
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = edge, end = edge, top = 16.dp, bottom = LocalDims.current.bottomPad),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Text("Cuenta", color = Col.Text, fontSize = 20.sp, fontWeight = FontWeight.Bold)
