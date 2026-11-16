@@ -38,8 +38,8 @@ import androidx.compose.ui.unit.sp
 import com.noirplus.tv.data.Kind
 import com.noirplus.tv.data.M3uSource
 import com.noirplus.tv.data.Repo
-import com.noirplus.tv.data.XtreamSource
-import com.noirplus.tv.data.normalizeServer
+import com.noirplus.tv.data.friendlyError
+import com.noirplus.tv.data.xtreamLoginAuto
 import com.noirplus.tv.data.xtreamFromM3u
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -71,14 +71,14 @@ fun SetupScreen() {
             try {
                 if (mode == "xtream") {
                     require(server.isNotBlank() && user.isNotBlank() && pass.isNotBlank()) { "Rellena servidor, usuario y contraseña" }
-                    XtreamSource(server, user.trim(), pass.trim()).login()
-                    prefs.saveXtream(normalizeServer(server), user.trim(), pass.trim())
+                    val ok = xtreamLoginAuto(server, user.trim(), pass.trim())
+                    prefs.saveXtream(ok, user.trim(), pass.trim())
                 } else {
                     require(m3u.isNotBlank()) { "Escribe la URL de tu lista M3U" }
                     val x = xtreamFromM3u(m3u)
                     if (x != null) {
-                        XtreamSource(x.first, x.second, x.third).login()
-                        prefs.saveXtream(x.first, x.second, x.third)
+                        val ok = xtreamLoginAuto(x.first, x.second, x.third)
+                        prefs.saveXtream(ok, x.second, x.third)
                     } else {
                         M3uSource(m3u.trim()).categories(Kind.LIVE)
                         prefs.saveM3u(m3u.trim())
@@ -87,7 +87,7 @@ fun SetupScreen() {
                 Repo.rebuild()
                 nav.reset(Screen.Main)
             } catch (t: Throwable) {
-                error = t.message ?: "No se ha podido conectar"
+                error = friendlyError(t)
             } finally {
                 loading = false
             }

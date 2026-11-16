@@ -40,6 +40,40 @@ fun xtreamFromM3u(url: String): Triple<String, String, String>? {
     return Triple("${u.scheme}://${u.host}$port", user, pass)
 }
 
+/**
+ * Prueba el login; si el servidor se escribió con https:// pero ese puerto no usa cifrado
+ * (error TLS/SSL), reintenta con http://. Devuelve la dirección que ha funcionado.
+ */
+suspend fun xtreamLoginAuto(server: String, user: String, pass: String): String {
+    val base = normalizeServer(server)
+    try {
+        XtreamSource(base, user, pass).login()
+        return base
+    } catch (e: Exception) {
+        val tls = e is javax.net.ssl.SSLException ||
+            (e.message ?: "").contains("TLS", true) || (e.message ?: "").contains("SSL", true)
+        if (base.startsWith("https://", true) && tls) {
+            val alt = "http://" + base.substring(8)
+            XtreamSource(alt, user, pass).login()
+            return alt
+        }
+        throw e
+    }
+}
+
+/** Traduce errores técnicos de red a algo entendible. */
+fun friendlyError(t: Throwable): String {
+    val m = t.message ?: ""
+    return when {
+        t is java.net.UnknownHostException -> "No se encuentra el servidor. Revisa la dirección."
+        t is java.net.SocketTimeoutException -> "El servidor no responde. Revisa la dirección y el puerto."
+        t is java.net.ConnectException -> "No se puede conectar con el servidor. Revisa el puerto."
+        t is javax.net.ssl.SSLException || m.contains("TLS", true) -> "Error de conexión segura. Prueba a poner http:// en lugar de https://."
+        m.isNotBlank() -> m
+        else -> "No se ha podido conectar"
+    }
+}
+
 class XtreamSource(
     server: String,
     private val user: String,
