@@ -35,6 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
@@ -62,15 +63,18 @@ import com.noirplus.tv.data.Kind
 import com.noirplus.tv.data.Repo
 import kotlinx.coroutines.delay
 
+/** Paleta sobria tipo Apple TV: negros, grises y blanco. */
 object Col {
-    val Bg = Color(0xFF0A0A0F)
-    val Surface = Color(0xFF16161E)
-    val Surface2 = Color(0xFF23232E)
-    val Accent = Color(0xFF8B5CF6)
-    val Accent2 = Color(0xFFEC4899)
-    val Text = Color(0xFFF4F4F5)
-    val Sub = Color(0xFFA1A1AA)
-    val Error = Color(0xFFF87171)
+    val Bg = Color(0xFF000000)
+    val Surface = Color(0xFF1C1C1E)
+    val Surface2 = Color(0xFF2C2C2E)
+    val Accent = Color(0xFFFFFFFF)
+    val Accent2 = Color(0xFF8E8E93)
+    val Text = Color(0xFFFFFFFF)
+    val Sub = Color(0xFF8E8E93)
+    val Error = Color(0xFFFF6961)
+    val Glass = Color(0x33FFFFFF)
+    val GlassStrong = Color(0x55FFFFFF)
 }
 
 /** Recuerda qué tarjeta tenía el foco para devolverlo al volver atrás. */
@@ -86,9 +90,9 @@ val LocalFocusMemory = staticCompositionLocalOf { FocusMemory() }
 fun Focusable(
     modifier: Modifier = Modifier,
     key: String? = null,
-    shape: Shape = RoundedCornerShape(10.dp),
-    focusScale: Float = 1.08f,
-    border: Boolean = true,
+    shape: Shape = RoundedCornerShape(12.dp),
+    focusScale: Float = 1.1f,
+    border: Boolean = false,
     focusRequester: FocusRequester? = null,
     onFocus: () -> Unit = {},
     onLongClick: (() -> Unit)? = null,
@@ -146,7 +150,8 @@ fun Focusable(
                     else -> false
                 }
             }
-            .then(if (focused && border) Modifier.border(3.dp, Color.White, shape) else Modifier)
+            .shadow(if (focused && focusScale > 1f) 24.dp else 0.dp, shape, clip = false)
+            .then(if (focused && border) Modifier.border(2.dp, Color.White, shape) else Modifier)
             .clip(shape)
             .clickable(interactionSource = interaction, indication = null) { onClick() },
     ) {
@@ -157,8 +162,8 @@ fun Focusable(
 @Composable
 fun Logo(size: Int = 24) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Text("NOIR", color = Col.Text, fontWeight = FontWeight.Black, fontSize = size.sp, letterSpacing = (size / 8).sp)
-        Text("+", color = Col.Accent, fontWeight = FontWeight.Black, fontSize = (size * 1.15f).sp)
+        Text("Noir", color = Col.Text, fontWeight = FontWeight.SemiBold, fontSize = size.sp, letterSpacing = (-0.5).sp)
+        Text("+", color = Col.Text, fontWeight = FontWeight.Medium, fontSize = size.sp)
     }
 }
 
@@ -179,11 +184,11 @@ fun ActionButton(
                 .background(
                     when {
                         focused -> Color.White
-                        primary -> Col.Accent
-                        else -> Col.Surface2
+                        primary -> Col.GlassStrong
+                        else -> Col.Glass
                     }
                 )
-                .padding(horizontal = 22.dp, vertical = 10.dp),
+                .padding(horizontal = 26.dp, vertical = 11.dp),
             color = if (focused) Color.Black else Col.Text,
             fontWeight = FontWeight.SemiBold,
             fontSize = 15.sp,
@@ -196,8 +201,9 @@ fun SectionTitle(text: String) {
     Text(
         text,
         color = Col.Text,
-        fontSize = 17.sp,
+        fontSize = 19.sp,
         fontWeight = FontWeight.SemiBold,
+        letterSpacing = (-0.2).sp,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
         modifier = Modifier.padding(start = 48.dp, top = 10.dp, end = 48.dp),
@@ -232,11 +238,11 @@ fun RatingBadge(rating: String?, modifier: Modifier = Modifier) {
         "★ " + String.format("%.1f", r),
         modifier
             .padding(6.dp)
-            .background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(6.dp))
+            .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(6.dp))
             .padding(horizontal = 6.dp, vertical = 2.dp),
-        color = Color(0xFFFACC15),
+        color = Color.White,
         fontSize = 11.sp,
-        fontWeight = FontWeight.Bold,
+        fontWeight = FontWeight.SemiBold,
     )
 }
 
@@ -357,7 +363,7 @@ fun HeroArea(item: Item?, emptyTitle: String, emptySubtitle: String) {
         } else {
             Box(
                 Modifier.align(Alignment.TopEnd).fillMaxHeight().fillMaxWidth(0.62f)
-                    .background(Brush.linearGradient(listOf(Col.Accent.copy(alpha = 0.45f), Col.Accent2.copy(alpha = 0.25f))))
+                    .background(Brush.linearGradient(listOf(Col.Surface2, Col.Bg)))
             )
         }
         Box(
@@ -368,11 +374,11 @@ fun HeroArea(item: Item?, emptyTitle: String, emptySubtitle: String) {
         Box(Modifier.matchParentSize().background(Brush.verticalGradient(0.55f to Color.Transparent, 1f to Col.Bg)))
         Column(Modifier.padding(start = 48.dp, top = 8.dp, end = 24.dp).fillMaxWidth(0.55f)) {
             if (item == null) {
-                Text(emptyTitle, fontSize = 30.sp, fontWeight = FontWeight.Bold, color = Col.Text)
+                Text(emptyTitle, fontSize = 34.sp, fontWeight = FontWeight.Bold, color = Col.Text, letterSpacing = (-0.8).sp)
                 Text(emptySubtitle, fontSize = 14.sp, color = Col.Sub, modifier = Modifier.padding(top = 6.dp))
             } else {
-                Text(item.name, fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Col.Text, maxLines = 2,
-                    overflow = TextOverflow.Ellipsis, lineHeight = 32.sp)
+                Text(item.name, fontSize = 32.sp, fontWeight = FontWeight.Bold, color = Col.Text, maxLines = 2,
+                    overflow = TextOverflow.Ellipsis, lineHeight = 36.sp, letterSpacing = (-0.8).sp)
                 val rating = (details?.rating ?: item.rating)?.replace(',', '.')?.toFloatOrNull()?.takeIf { it > 0f }
                 val meta = listOfNotNull(
                     details?.year ?: item.year,

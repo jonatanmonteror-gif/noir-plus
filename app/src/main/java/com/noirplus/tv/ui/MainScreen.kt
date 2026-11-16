@@ -76,12 +76,16 @@ fun MainScreen() {
                 .focusRestorer(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Logo()
-            Spacer(Modifier.width(32.dp))
-            Tab.entries.forEach { t ->
-                TabItem(t.label, selected = t == tab, requester = requesters.getValue(t), onFocus = { tab = t })
-                Spacer(Modifier.width(6.dp))
+            Box(Modifier.weight(1f)) { Logo(22) }
+            Row(
+                Modifier.background(Col.Surface.copy(alpha = 0.85f), RoundedCornerShape(50)).padding(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Tab.entries.forEach { t ->
+                    TabItem(t.label, selected = t == tab, requester = requesters.getValue(t), onFocus = { tab = t })
+                }
             }
+            Spacer(Modifier.weight(1f))
         }
         Box(Modifier.weight(1f).fillMaxWidth()) {
             when (shown) {
@@ -107,25 +111,26 @@ private fun TabItem(label: String, selected: Boolean, requester: FocusRequester,
         onFocus = onFocus,
         onClick = {},
     ) { focused ->
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                label,
-                Modifier
-                    .background(if (focused) Color.White else Color.Transparent, RoundedCornerShape(50))
-                    .padding(horizontal = 16.dp, vertical = 7.dp),
-                color = when {
-                    focused -> Color.Black
-                    selected -> Col.Text
-                    else -> Col.Sub
-                },
-                fontWeight = if (selected || focused) FontWeight.Bold else FontWeight.Normal,
-                fontSize = 16.sp,
-            )
-            Box(
-                Modifier.width(18.dp).height(3.dp)
-                    .background(if (selected && !focused) Col.Accent else Color.Transparent, RoundedCornerShape(2.dp))
-            )
-        }
+        Text(
+            label,
+            Modifier
+                .background(
+                    when {
+                        focused -> Color.White
+                        selected -> Col.Surface2
+                        else -> Color.Transparent
+                    },
+                    RoundedCornerShape(50),
+                )
+                .padding(horizontal = 18.dp, vertical = 7.dp),
+            color = when {
+                focused -> Color.Black
+                selected -> Col.Text
+                else -> Col.Sub
+            },
+            fontWeight = FontWeight.Medium,
+            fontSize = 15.sp,
+        )
     }
 }
 

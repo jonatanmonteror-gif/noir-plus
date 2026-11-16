@@ -93,8 +93,8 @@ fun SearchContent() {
                 focusManager.moveFocus(FocusDirection.Down)
             }),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = Col.Accent,
-                unfocusedBorderColor = Col.Sub,
+                focusedBorderColor = Col.Text,
+                unfocusedBorderColor = Col.Surface2,
                 focusedTextColor = Col.Text,
                 unfocusedTextColor = Col.Text,
                 cursorColor = Col.Accent,

@@ -51,8 +51,8 @@ fun DetailScreen(item: Item) {
 
 @Composable
 private fun InfoBlock(item: Item, details: Details?) {
-    Text(item.name, color = Col.Text, fontSize = 34.sp, fontWeight = FontWeight.Bold, maxLines = 2,
-        overflow = TextOverflow.Ellipsis, lineHeight = 38.sp)
+    Text(item.name, color = Col.Text, fontSize = 38.sp, fontWeight = FontWeight.Bold, maxLines = 2,
+        overflow = TextOverflow.Ellipsis, lineHeight = 42.sp, letterSpacing = (-1).sp)
     val rating = (details?.rating ?: item.rating)?.replace(',', '.')?.toFloatOrNull()?.takeIf { it > 0f }
     val meta = listOfNotNull(
         details?.year ?: item.year,
@@ -257,8 +257,8 @@ private fun SeasonChip(label: String, selected: Boolean, memKey: String, onFocus
                 .background(
                     when {
                         focused -> Color.White
-                        selected -> Col.Accent
-                        else -> Col.Surface2
+                        selected -> Col.GlassStrong
+                        else -> Col.Glass
                     }
                 )
                 .padding(horizontal = 16.dp, vertical = 7.dp),

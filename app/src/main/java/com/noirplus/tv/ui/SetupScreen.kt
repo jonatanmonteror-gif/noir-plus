@@ -27,6 +27,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -98,13 +99,13 @@ fun SetupScreen() {
             Modifier
                 .weight(1f)
                 .fillMaxHeight()
-                .background(Brush.verticalGradient(listOf(Col.Accent.copy(alpha = 0.35f), Col.Bg)))
+                .background(Brush.verticalGradient(listOf(Col.Surface, Col.Bg)))
                 .padding(56.dp),
             verticalArrangement = Arrangement.Center,
         ) {
             Logo(40)
             Spacer(Modifier.height(20.dp))
-            Text("Tu contenido, en tu tele.", color = Col.Text, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+            Text("Tu contenido, en tu tele.", color = Col.Text, fontSize = 30.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.6).sp)
             Text(
                 "Introduce los datos que te ha dado tu proveedor. Se guardan solo en esta TV.\n\n" +
                     "Xtream Codes: servidor (con puerto), usuario y contraseña.\n" +
@@ -154,8 +155,8 @@ private fun Field(
         visualTransformation = if (password) PasswordVisualTransformation() else VisualTransformation.None,
         keyboardOptions = KeyboardOptions(keyboardType = type, imeAction = ImeAction.Next),
         colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = Col.Accent,
-            unfocusedBorderColor = Col.Sub,
+            focusedBorderColor = Color.White,
+            unfocusedBorderColor = Col.Surface2,
             focusedTextColor = Col.Text,
             unfocusedTextColor = Col.Text,
             focusedLabelColor = Col.Accent,

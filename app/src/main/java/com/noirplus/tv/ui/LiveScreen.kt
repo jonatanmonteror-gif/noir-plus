@@ -166,7 +166,7 @@ private fun CategoryItem(name: String, selected: Boolean, memKey: String, onFocu
                 .background(
                     when {
                         focused -> Color.White
-                        selected -> Col.Surface2
+                        selected -> Col.Surface
                         else -> Color.Transparent
                     }
                 )
@@ -218,7 +218,7 @@ private fun ChannelCard(
                 color = Col.Sub, fontSize = 11.sp,
             )
             if (isFav) {
-                Text("★", Modifier.align(Alignment.TopEnd).padding(6.dp), color = Color(0xFFFACC15), fontSize = 14.sp)
+                Text("★", Modifier.align(Alignment.TopEnd).padding(6.dp), color = Color.White, fontSize = 14.sp)
             }
         }
         Text(

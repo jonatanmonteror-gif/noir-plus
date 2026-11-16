@@ -68,7 +68,8 @@ fun App() {
             surface = Col.Surface,
             onSurface = Col.Text,
             onBackground = Col.Text,
-        )
+        ),
+        typography = interTypography(),
     ) {
         CompositionLocalProvider(LocalNav provides nav, LocalFocusMemory provides mem) {
             val top = nav.top
