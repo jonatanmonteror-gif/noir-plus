@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
@@ -93,7 +94,62 @@ fun LiveContent() {
     if (cats == null) return Loading()
     if (allCats.isEmpty()) return Message(error?.let { "No se pudo cargar: $it" } ?: "No hay canales en directo en tu lista")
 
-    Row(Modifier.fillMaxSize().padding(start = 48.dp, top = 12.dp)) {
+    val d = LocalDims.current
+    val grid: @Composable (Modifier) -> Unit = { mod ->
+        val list = channels
+        when {
+            list == null -> Loading(mod)
+            list.isEmpty() -> Message("No hay canales en esta categoría", mod)
+            else -> key(selected) {
+                LazyVerticalGrid(
+                    columns = if (d.compact) GridCells.Adaptive(104.dp) else GridCells.Adaptive(150.dp),
+                    modifier = mod.focusRestorer(),
+                    contentPadding = PaddingValues(
+                        start = if (d.compact) d.edge else 0.dp, top = 6.dp, end = d.edge, bottom = 40.dp
+                    ),
+                    horizontalArrangement = Arrangement.spacedBy(d.gap),
+                    verticalArrangement = Arrangement.spacedBy(d.gap),
+                ) {
+                    itemsIndexed(list, key = { i, ch -> "$i:${ch.key}" }) { i, ch ->
+                        ChannelCard(
+                            ch,
+                            number = i + 1,
+                            isFav = ch.key in favKeys,
+                            memKey = "live/${selected}/${ch.key}",
+                            onLongClick = { prefs.toggleFavorite(ch) },
+                        ) {
+                            nav.push(
+                                Screen.Player(
+                                    PlayRequest(url = src.streamUrl(ch), title = ch.name, key = ch.key, image = ch.image,
+                                        isLive = true, channels = list, channelIndex = i)
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+    val hint = if (d.tv) "OK para ver  ·  Mantén OK pulsado para añadir o quitar de favoritos"
+    else "Toca para ver  ·  Mantén pulsado para añadir o quitar de favoritos"
+
+    if (d.compact) {
+        Column(Modifier.fillMaxSize().padding(top = 8.dp)) {
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = d.edge),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                itemsIndexed(allCats, key = { i, c -> "$i:${c.id}" }) { _, c ->
+                    CategoryChip(c.name, selected = c.id == selected) { selected = c.id }
+                }
+            }
+            Text(hint, color = Col.Sub, fontSize = 12.sp, modifier = Modifier.padding(horizontal = d.edge, vertical = 10.dp))
+            grid(Modifier.fillMaxSize())
+        }
+        return
+    }
+
+    Row(Modifier.fillMaxSize().padding(start = d.edge, top = 12.dp)) {
         LazyColumn(
             Modifier.width(240.dp).fillMaxHeight().focusRestorer(),
             contentPadding = PaddingValues(bottom = 32.dp),
@@ -109,42 +165,25 @@ fun LiveContent() {
                 allCats.firstOrNull { it.id == selected }?.name ?: "",
                 color = Col.Text, fontSize = 20.sp, fontWeight = FontWeight.Bold, maxLines = 1,
             )
-            Text(
-                "OK para ver  ·  Mantén OK pulsado para añadir o quitar de favoritos",
-                color = Col.Sub, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp, bottom = 8.dp),
-            )
-            val list = channels
-            when {
-                list == null -> Loading()
-                list.isEmpty() -> Message("No hay canales en esta categoría")
-                else -> key(selected) {
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(4),
-                        modifier = Modifier.fillMaxSize().focusRestorer(),
-                        contentPadding = PaddingValues(top = 6.dp, end = 48.dp, bottom = 40.dp),
-                        horizontalArrangement = Arrangement.spacedBy(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(14.dp),
-                    ) {
-                        itemsIndexed(list, key = { i, ch -> "$i:${ch.key}" }) { i, ch ->
-                            ChannelCard(
-                                ch,
-                                number = i + 1,
-                                isFav = ch.key in favKeys,
-                                memKey = "live/${selected}/${ch.key}",
-                                onLongClick = { prefs.toggleFavorite(ch) },
-                            ) {
-                                nav.push(
-                                    Screen.Player(
-                                        PlayRequest(url = src.streamUrl(ch), title = ch.name, key = ch.key, image = ch.image,
-                                            isLive = true, channels = list, channelIndex = i)
-                                    )
-                                )
-                            }
-                        }
-                    }
-                }
-            }
+            Text(hint, color = Col.Sub, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp, bottom = 8.dp))
+            grid(Modifier.fillMaxSize())
         }
+    }
+}
+
+@Composable
+private fun CategoryChip(name: String, selected: Boolean, onClick: () -> Unit) {
+    Focusable(shape = RoundedCornerShape(50), focusScale = 1f, onClick = onClick) { focused ->
+        Text(
+            name,
+            Modifier
+                .background(if (selected || focused) Color.White else Col.Surface2)
+                .padding(horizontal = 14.dp, vertical = 7.dp),
+            color = if (selected || focused) Color.Black else Col.Text,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+        )
     }
 }
 
@@ -218,7 +257,7 @@ private fun ChannelCard(
                 color = Col.Sub, fontSize = 11.sp,
             )
             if (isFav) {
-                Text("★", Modifier.align(Alignment.TopEnd).padding(6.dp), color = Color.White, fontSize = 14.sp)
+                Text("★", Modifier.align(Alignment.TopEnd).padding(6.dp), color = Col.Star, fontSize = 14.sp)
             }
         }
         Text(

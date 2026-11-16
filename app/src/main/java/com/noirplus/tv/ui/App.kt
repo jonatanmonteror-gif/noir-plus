@@ -1,6 +1,11 @@
 package com.noirplus.tv.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,6 +19,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import com.noirplus.tv.data.Item
 import com.noirplus.tv.data.PlayRequest
 import com.noirplus.tv.data.Repo
@@ -60,6 +69,16 @@ fun App() {
     val nav = remember { Nav(if (Repo.prefs.hasAccount()) Screen.Main else Screen.Setup) }
     val mem = remember { FocusMemory() }
     val holder = rememberSaveableStateHolder()
+    val ctx = LocalContext.current
+    val isTv = remember { isTvDevice(ctx) }
+    val conf = LocalConfiguration.current
+    val dims = when {
+        isTv -> TvDims
+        conf.screenWidthDp < 600 -> PhoneDims
+        else -> TabletDims
+    }
+    val base = LocalDensity.current
+    val density = if (isTv) Density(base.density * TV_SCALE, base.fontScale) else base
 
     MaterialTheme(
         colorScheme = darkColorScheme(
@@ -71,19 +90,32 @@ fun App() {
         ),
         typography = interTypography(),
     ) {
-        CompositionLocalProvider(LocalNav provides nav, LocalFocusMemory provides mem) {
+        CompositionLocalProvider(
+            LocalNav provides nav,
+            LocalFocusMemory provides mem,
+            LocalDims provides dims,
+            LocalDensity provides density,
+        ) {
             val top = nav.top
             BackHandler(enabled = nav.stack.size > 1) {
                 mem.restore = true
                 nav.pop()
             }
-            Box(Modifier.fillMaxSize().background(Col.Bg)) {
-                holder.SaveableStateProvider(keyOf(top)) {
-                    when (top) {
-                        Screen.Setup -> SetupScreen()
-                        Screen.Main -> MainScreen()
-                        is Screen.Detail -> DetailScreen(top.item)
-                        is Screen.Player -> PlayerScreen(top.req)
+            AnimatedContent(
+                targetState = top,
+                contentKey = { keyOf(it) },
+                transitionSpec = { fadeIn(tween(220, delayMillis = 60)) togetherWith fadeOut(tween(140)) },
+                modifier = Modifier.fillMaxSize().background(Col.Bg),
+                label = "screens",
+            ) { screen ->
+                Box(Modifier.fillMaxSize().background(Col.Bg)) {
+                    holder.SaveableStateProvider(keyOf(screen)) {
+                        when (screen) {
+                            Screen.Setup -> SetupScreen()
+                            Screen.Main -> MainScreen()
+                            is Screen.Detail -> DetailScreen(screen.item)
+                            is Screen.Player -> PlayerScreen(screen.req)
+                        }
                     }
                 }
             }

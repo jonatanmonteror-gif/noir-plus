@@ -94,47 +94,64 @@ fun SetupScreen() {
         }
     }
 
+    val d = LocalDims.current
+    val intro: @Composable () -> Unit = {
+        Logo(if (d.compact) 32 else 40)
+        Spacer(Modifier.height(if (d.compact) 14.dp else 20.dp))
+        Text("Tu contenido, en tu tele.", color = Col.Text, fontFamily = InterDisplay, fontSize = if (d.compact) 26.sp else 30.sp,
+            fontWeight = FontWeight.Bold, letterSpacing = (-0.6).sp)
+        Text(
+            "Introduce los datos que te ha dado tu proveedor. Se guardan solo en este dispositivo.\n\n" +
+                "Xtream Codes: servidor (con puerto), usuario y contraseña.\n" +
+                "Lista M3U: pega la URL completa (http://...).",
+            color = Col.Sub, fontSize = 14.sp, lineHeight = 20.sp, modifier = Modifier.padding(top = 10.dp),
+        )
+    }
+    val form: @Composable () -> Unit = {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            ActionButton("Xtream Codes", primary = mode == "xtream", focusRequester = firstFr) { mode = "xtream" }
+            ActionButton("Lista M3U", primary = mode == "m3u") { mode = "m3u" }
+        }
+        if (mode == "xtream") {
+            Field("Servidor (ej. http://midominio.com:8080)", server, KeyboardType.Uri) { server = it }
+            Field("Usuario", user, KeyboardType.Text) { user = it }
+            Field("Contraseña", pass, KeyboardType.Password, password = true) { pass = it }
+        } else {
+            Field("URL de la lista M3U", m3u, KeyboardType.Uri) { m3u = it }
+        }
+        error?.let { Text(it, color = Col.Error, fontSize = 14.sp) }
+        ActionButton(if (loading) "Conectando…" else "Conectar", primary = true) { connect() }
+    }
+
+    if (d.compact) {
+        Column(
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = d.edge + 4.dp, vertical = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Column { intro() }
+            Spacer(Modifier.height(8.dp))
+            form()
+        }
+        return
+    }
+
     Row(Modifier.fillMaxSize()) {
         Column(
             Modifier
                 .weight(1f)
                 .fillMaxHeight()
                 .background(Brush.verticalGradient(listOf(Col.Surface, Col.Bg)))
-                .padding(56.dp),
+                .padding(d.edge + 8.dp),
             verticalArrangement = Arrangement.Center,
-        ) {
-            Logo(40)
-            Spacer(Modifier.height(20.dp))
-            Text("Tu contenido, en tu tele.", color = Col.Text, fontSize = 30.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.6).sp)
-            Text(
-                "Introduce los datos que te ha dado tu proveedor. Se guardan solo en esta TV.\n\n" +
-                    "Xtream Codes: servidor (con puerto), usuario y contraseña.\n" +
-                    "Lista M3U: pega la URL completa (http://...).",
-                color = Col.Sub, fontSize = 14.sp, lineHeight = 20.sp, modifier = Modifier.padding(top = 10.dp),
-            )
-        }
+        ) { intro() }
         Column(
             Modifier
                 .weight(1f)
                 .fillMaxHeight()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 56.dp, vertical = 48.dp),
+                .padding(horizontal = d.edge + 8.dp, vertical = d.edge),
             verticalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                ActionButton("Xtream Codes", primary = mode == "xtream", focusRequester = firstFr) { mode = "xtream" }
-                ActionButton("Lista M3U", primary = mode == "m3u") { mode = "m3u" }
-            }
-            if (mode == "xtream") {
-                Field("Servidor (ej. http://midominio.com:8080)", server, KeyboardType.Uri) { server = it }
-                Field("Usuario", user, KeyboardType.Text) { user = it }
-                Field("Contraseña", pass, KeyboardType.Password, password = true) { pass = it }
-            } else {
-                Field("URL de la lista M3U", m3u, KeyboardType.Uri) { m3u = it }
-            }
-            error?.let { Text(it, color = Col.Error, fontSize = 14.sp) }
-            ActionButton(if (loading) "Conectando…" else "Conectar", primary = true) { connect() }
-        }
+        ) { form() }
     }
 }
 

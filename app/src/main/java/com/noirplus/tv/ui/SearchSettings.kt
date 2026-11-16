@@ -6,12 +6,14 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -86,7 +88,7 @@ fun SearchContent() {
             onValueChange = { query = it },
             singleLine = true,
             placeholder = { Text("Busca películas, series o canales") },
-            modifier = Modifier.padding(horizontal = 48.dp).width(560.dp),
+            modifier = Modifier.padding(horizontal = edge).then(if (LocalDims.current.compact) Modifier.fillMaxWidth() else Modifier.width(560.dp)),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
             keyboardActions = KeyboardActions(onSearch = {
                 keyboard?.hide()
@@ -105,14 +107,14 @@ fun SearchContent() {
             loading -> Message("Preparando el buscador… (la primera vez tarda un poco)")
             results.isEmpty() -> Message("Sin resultados para «${query.trim()}»")
             else -> LazyVerticalGrid(
-                columns = GridCells.Adaptive(118.dp),
+                columns = GridCells.Adaptive(LocalDims.current.poster),
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(start = 48.dp, end = 48.dp, top = 16.dp, bottom = 40.dp),
+                contentPadding = PaddingValues(start = edge, end = edge, top = 16.dp, bottom = 40.dp),
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 itemsIndexed(results, key = { i, r -> "$i:${r.key}" }) { _, item ->
-                    PosterCard(item, memKey = "search/${item.key}", width = 118.dp, onFocus = {}) {
+                    PosterCard(item, memKey = "search/${item.key}", width = LocalDims.current.poster, onFocus = {}) {
                         if (item.kind == Kind.LIVE) {
                             val lives = results.filter { it.kind == Kind.LIVE }
                             nav.push(
@@ -140,7 +142,7 @@ fun SettingsContent() {
     val format = remember(changes) { prefs.liveFormat }
 
     Column(
-        Modifier.fillMaxSize().padding(horizontal = 48.dp, vertical = 16.dp).verticalScroll(rememberScrollState()),
+        Modifier.fillMaxSize().padding(horizontal = edge, vertical = 16.dp).verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Text("Cuenta", color = Col.Text, fontSize = 20.sp, fontWeight = FontWeight.Bold)
@@ -149,7 +151,7 @@ fun SettingsContent() {
             color = Col.Sub, fontSize = 14.sp,
         )
         Text(info ?: "Comprobando cuenta…", color = Col.Sub, fontSize = 14.sp)
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             ActionButton("Recargar contenido") { Repo.rebuild() }
             ActionButton("Cambiar de lista") {
                 prefs.clearAccount()
@@ -160,7 +162,7 @@ fun SettingsContent() {
 
         Spacer(Modifier.height(12.dp))
         Text("Reproducción", color = Col.Text, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             ActionButton("Formato de canales: " + if (format == "ts") "TS" else "HLS") {
                 prefs.liveFormat = if (prefs.liveFormat == "ts") "m3u8" else "ts"
             }

@@ -1,6 +1,15 @@
 package com.noirplus.tv.ui
 
 import android.view.KeyEvent
+import android.content.Context
+import android.content.pm.ActivityInfo
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C as MC
+import androidx.media3.exoplayer.DefaultLoadControl
+import androidx.media3.exoplayer.DefaultRenderersFactory
+import androidx.media3.exoplayer.upstream.DefaultBandwidthMeter
 import android.view.View
 import androidx.annotation.OptIn
 import androidx.compose.foundation.background
@@ -69,15 +78,15 @@ fun PlayerScreen(req: PlayRequest) {
     val backConsumed = remember { booleanArrayOf(false) }
     val viewRef = remember { arrayOfNulls<PlayerView>(1) }
 
-    val exo = remember {
-        val http = DefaultHttpDataSource.Factory()
-            .setUserAgent(Http.UA)
-            .setAllowCrossProtocolRedirects(true)
-            .setConnectTimeoutMs(20_000)
-            .setReadTimeoutMs(20_000)
-        ExoPlayer.Builder(ctx)
-            .setMediaSourceFactory(DefaultMediaSourceFactory(DefaultDataSource.Factory(ctx, http)))
-            .build()
+    val dims = LocalDims.current
+    val exo = remember { buildPlayer(ctx, req.isLive) }
+
+    // En el móvil el reproductor se pone en horizontal y vuelve a como estaba al salir.
+    DisposableEffect(Unit) {
+        val act = ctx.findActivity()
+        val prev = act?.requestedOrientation
+        if (!dims.tv) act?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        onDispose { if (!dims.tv && prev != null) act?.requestedOrientation = prev }
     }
 
     fun save() {
@@ -211,6 +220,7 @@ fun PlayerScreen(req: PlayRequest) {
                     player = exo
                     useController = !req.isLive
                     keepScreenOn = true
+                    setKeepContentOnPlayerReset(true)
                     setShowBuffering(PlayerView.SHOW_BUFFERING_ALWAYS)
                     controllerShowTimeoutMs = 4000
                     isFocusable = true
@@ -233,9 +243,18 @@ fun PlayerScreen(req: PlayRequest) {
                     .align(Alignment.TopStart)
                     .fillMaxWidth()
                     .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.8f), Color.Transparent)))
-                    .padding(horizontal = 48.dp, vertical = 28.dp),
+                    .padding(horizontal = edge, vertical = 28.dp),
                 color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold, maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+            )
+        }
+
+        // Táctil (móvil): tocar la pantalla muestra/oculta la información del canal
+        if (req.isLive && !dims.tv) {
+            Box(
+                Modifier.fillMaxSize().clickable(
+                    interactionSource = remember { MutableInteractionSource() }, indication = null,
+                ) { infoVisible = !infoVisible }
             )
         }
 
@@ -246,7 +265,7 @@ fun PlayerScreen(req: PlayRequest) {
                     .align(Alignment.BottomStart)
                     .fillMaxWidth()
                     .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.9f))))
-                    .padding(horizontal = 48.dp, vertical = 28.dp),
+                    .padding(horizontal = edge, vertical = 28.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 val img = channel?.image ?: req.image
@@ -261,10 +280,18 @@ fun PlayerScreen(req: PlayRequest) {
                         color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold, maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    Text(
-                        if (channels.size > 1) "▲ ▼  Cambiar de canal   ·   OK  Mostrar/ocultar   ·   Atrás  Salir" else "Atrás  Salir",
-                        color = Col.Sub, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp),
-                    )
+                    if (dims.tv) {
+                        Text(
+                            if (channels.size > 1) "▲ ▼  Cambiar de canal   ·   OK  Mostrar/ocultar   ·   Atrás  Salir" else "Atrás  Salir",
+                            color = Col.Sub, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp),
+                        )
+                    }
+                }
+                if (!dims.tv && channels.size > 1) {
+                    Spacer(Modifier.weight(1f))
+                    ActionButton("◀  Anterior") { index = (index - 1 + channels.size) % channels.size }
+                    Spacer(Modifier.width(10.dp))
+                    ActionButton("Siguiente  ▶") { index = (index + 1) % channels.size }
                 }
             }
         }
@@ -282,4 +309,50 @@ fun PlayerScreen(req: PlayRequest) {
             }
         }
     }
+}
+
+/**
+ * Reproductor ajustado para la mejor calidad posible sin sobrecargar la TV:
+ * - Empieza con una estimación de ancho de banda alta (arranca en buena calidad en HLS adaptativo).
+ * - Búfer moderado: arranque rápido y pocos cortes sin gastar memoria de más.
+ * - Si un decodificador por hardware falla, prueba otro automáticamente.
+ * - Audio y subtítulos en español por defecto si el contenido los tiene.
+ */
+@OptIn(UnstableApi::class)
+private fun buildPlayer(ctx: Context, live: Boolean): ExoPlayer {
+    val http = DefaultHttpDataSource.Factory()
+        .setUserAgent(Http.UA)
+        .setAllowCrossProtocolRedirects(true)
+        .setConnectTimeoutMs(15_000)
+        .setReadTimeoutMs(20_000)
+    val renderers = DefaultRenderersFactory(ctx).setEnableDecoderFallback(true)
+    val bandwidth = DefaultBandwidthMeter.Builder(ctx).setInitialBitrateEstimate(12_000_000L).build()
+    val load = DefaultLoadControl.Builder()
+        .setBufferDurationsMs(
+            if (live) 8_000 else 15_000,
+            if (live) 30_000 else 50_000,
+            1_200,
+            2_500,
+        )
+        .setPrioritizeTimeOverSizeThresholds(true)
+        .build()
+    val audio = AudioAttributes.Builder()
+        .setUsage(MC.USAGE_MEDIA)
+        .setContentType(MC.AUDIO_CONTENT_TYPE_MOVIE)
+        .build()
+    val player = ExoPlayer.Builder(ctx, renderers)
+        .setMediaSourceFactory(DefaultMediaSourceFactory(DefaultDataSource.Factory(ctx, http)))
+        .setBandwidthMeter(bandwidth)
+        .setLoadControl(load)
+        .setAudioAttributes(audio, true)
+        .setHandleAudioBecomingNoisy(true)
+        .setSeekBackIncrementMs(10_000)
+        .setSeekForwardIncrementMs(10_000)
+        .build()
+    player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+        .setPreferredAudioLanguages("es", "spa", "cat")
+        .setPreferredTextLanguages("es", "spa")
+        .build()
+    player.videoScalingMode = MC.VIDEO_SCALING_MODE_SCALE_TO_FIT
+    return player
 }

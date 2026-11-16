@@ -1,6 +1,9 @@
 package com.noirplus.tv.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -51,16 +54,16 @@ fun DetailScreen(item: Item) {
 
 @Composable
 private fun InfoBlock(item: Item, details: Details?) {
-    Text(item.name, color = Col.Text, fontSize = 38.sp, fontWeight = FontWeight.Bold, maxLines = 2,
-        overflow = TextOverflow.Ellipsis, lineHeight = 42.sp, letterSpacing = (-1).sp)
-    val rating = (details?.rating ?: item.rating)?.replace(',', '.')?.toFloatOrNull()?.takeIf { it > 0f }
-    val meta = listOfNotNull(
-        details?.year ?: item.year,
-        rating?.let { "★ " + String.format("%.1f", it) },
-        details?.duration,
-        details?.genre,
-    ).joinToString("   ·   ")
-    if (meta.isNotEmpty()) Text(meta, color = Col.Sub, fontSize = 14.sp, maxLines = 1, modifier = Modifier.padding(top = 8.dp))
+    val compact = LocalDims.current.compact
+    Text(item.name, color = Col.Text, fontFamily = InterDisplay, fontSize = if (compact) 28.sp else 38.sp, fontWeight = FontWeight.Bold,
+        maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = if (compact) 32.sp else 42.sp, letterSpacing = (-1).sp)
+    MetaLine(
+        year = details?.year ?: item.year,
+        rating = details?.rating ?: item.rating,
+        genre = details?.genre,
+        duration = details?.duration,
+        modifier = Modifier.padding(top = 10.dp),
+    )
     val plot = details?.plot ?: item.plot
     if (plot != null) {
         Text(plot, color = Col.Text.copy(alpha = 0.88f), fontSize = 14.sp, lineHeight = 20.sp, maxLines = 4,
@@ -104,12 +107,16 @@ private fun MovieDetail(item: Item) {
         )
     }
 
+    val d = LocalDims.current
     Box(Modifier.fillMaxSize().onFocusChanged { hasFocus = it.hasFocus }) {
         Backdrop(details?.backdrop ?: item.image)
-        Column(Modifier.fillMaxWidth(0.58f).padding(start = 56.dp, top = 56.dp, end = 24.dp)) {
+        Column(
+            Modifier.fillMaxWidth(if (d.compact) 1f else 0.58f).verticalScroll(rememberScrollState())
+                .padding(start = d.edge + 8.dp, top = if (d.compact) 190.dp else (d.edge + 8.dp), end = if (d.compact) d.edge else 24.dp, bottom = 32.dp)
+        ) {
             InfoBlock(item, details)
             Spacer(Modifier.height(24.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (progress != null) {
                     ActionButton("▶  Continuar (${fmt(progress.position)})", primary = true, key = "d-play", focusRequester = playFr) {
                         play(progress.position)
@@ -170,13 +177,14 @@ private fun SeriesDetail(item: Item) {
         )
     }
 
+    val d = LocalDims.current
     Box(Modifier.fillMaxSize().onFocusChanged { hasFocus = it.hasFocus }) {
         Backdrop(sd?.details?.backdrop ?: item.image)
-        Column(Modifier.fillMaxSize().padding(top = 36.dp)) {
-            Column(Modifier.fillMaxWidth(0.6f).padding(start = 56.dp, end = 24.dp)) {
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(top = if (d.compact) 170.dp else 36.dp, bottom = 24.dp)) {
+            Column(Modifier.fillMaxWidth(if (d.compact) 1f else 0.6f).padding(start = d.edge + 8.dp, end = if (d.compact) d.edge else 24.dp)) {
                 InfoBlock(item, sd?.details)
                 Spacer(Modifier.height(18.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     val first = sd?.seasons?.values?.firstOrNull()?.firstOrNull()
                     when {
                         last != null -> ActionButton("▶  Continuar  ·  ${last.title.substringAfterLast("· ")}", primary = true,
@@ -197,12 +205,12 @@ private fun SeriesDetail(item: Item) {
             }
             Spacer(Modifier.height(14.dp))
             when {
-                sd == null && !failed -> Text("Cargando episodios…", color = Col.Sub, modifier = Modifier.padding(start = 56.dp))
-                sd == null || seasons.isEmpty() -> Text("No hay episodios disponibles", color = Col.Sub, modifier = Modifier.padding(start = 56.dp))
+                sd == null && !failed -> Text("Cargando episodios…", color = Col.Sub, modifier = Modifier.padding(start = (d.edge + 8.dp)))
+                sd == null || seasons.isEmpty() -> Text("No hay episodios disponibles", color = Col.Sub, modifier = Modifier.padding(start = (d.edge + 8.dp)))
                 else -> {
                     LazyRow(
                         Modifier.focusRestorer(),
-                        contentPadding = PaddingValues(horizontal = 56.dp, vertical = 6.dp),
+                        contentPadding = PaddingValues(horizontal = (d.edge + 8.dp), vertical = 6.dp),
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
                         items(seasons, key = { it }) { s ->
@@ -212,7 +220,7 @@ private fun SeriesDetail(item: Item) {
                     LazyRow(
                         Modifier.focusRestorer(),
                         state = rememberLazyListState(),
-                        contentPadding = PaddingValues(horizontal = 56.dp, vertical = 12.dp),
+                        contentPadding = PaddingValues(horizontal = (d.edge + 8.dp), vertical = 12.dp),
                         horizontalArrangement = Arrangement.spacedBy(14.dp),
                     ) {
                         items(episodes, key = { it.id }) { ep ->
@@ -222,7 +230,7 @@ private fun SeriesDetail(item: Item) {
                                 image = ep.image ?: item.image,
                                 progress = p?.fraction,
                                 memKey = "ep/${ep.id}",
-                                width = 196.dp,
+                                
                             ) { playEpisode(ep, p?.position ?: 0L) }
                         }
                     }
