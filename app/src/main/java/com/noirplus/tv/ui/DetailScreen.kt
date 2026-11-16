@@ -1,4 +1,4 @@
-package com.nexotv.app.ui
+package com.noirplus.tv.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -35,13 +35,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.nexotv.app.data.Details
-import com.nexotv.app.data.Episode
-import com.nexotv.app.data.Item
-import com.nexotv.app.data.Kind
-import com.nexotv.app.data.PlayRequest
-import com.nexotv.app.data.Repo
-import com.nexotv.app.data.SeriesDetails
+import com.noirplus.tv.data.Details
+import com.noirplus.tv.data.Episode
+import com.noirplus.tv.data.Item
+import com.noirplus.tv.data.Kind
+import com.noirplus.tv.data.PlayRequest
+import com.noirplus.tv.data.Repo
+import com.noirplus.tv.data.SeriesDetails
 import kotlinx.coroutines.delay
 
 @Composable

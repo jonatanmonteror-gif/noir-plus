@@ -1,4 +1,4 @@
-package com.nexotv.app.data
+package com.noirplus.tv.data
 
 import android.content.Context
 import androidx.compose.runtime.mutableIntStateOf
@@ -31,7 +31,7 @@ data class Progress(
 }
 
 class Prefs(ctx: Context) {
-    private val sp = ctx.getSharedPreferences("nexotv", Context.MODE_PRIVATE)
+    private val sp = ctx.getSharedPreferences("noirplus", Context.MODE_PRIVATE)
 
     /** Se incrementa con cada cambio para que la interfaz se refresque. */
     val changes = mutableIntStateOf(0)

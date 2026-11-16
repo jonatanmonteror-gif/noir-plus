@@ -1,4 +1,4 @@
-package com.nexotv.app.data
+package com.noirplus.tv.data
 
 import org.json.JSONArray
 import org.json.JSONObject

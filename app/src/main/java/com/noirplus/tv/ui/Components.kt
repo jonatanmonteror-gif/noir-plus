@@ -1,4 +1,4 @@
-package com.nexotv.app.ui
+package com.noirplus.tv.ui
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
@@ -55,11 +55,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
-import com.nexotv.app.data.Category
-import com.nexotv.app.data.Details
-import com.nexotv.app.data.Item
-import com.nexotv.app.data.Kind
-import com.nexotv.app.data.Repo
+import com.noirplus.tv.data.Category
+import com.noirplus.tv.data.Details
+import com.noirplus.tv.data.Item
+import com.noirplus.tv.data.Kind
+import com.noirplus.tv.data.Repo
 import kotlinx.coroutines.delay
 
 object Col {
@@ -157,8 +157,8 @@ fun Focusable(
 @Composable
 fun Logo(size: Int = 24) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Text("NEXO", color = Col.Accent, fontWeight = FontWeight.Black, fontSize = size.sp, letterSpacing = 2.sp)
-        Text(" TV", color = Col.Text, fontWeight = FontWeight.Light, fontSize = size.sp)
+        Text("NOIR", color = Col.Text, fontWeight = FontWeight.Black, fontSize = size.sp, letterSpacing = (size / 8).sp)
+        Text("+", color = Col.Accent, fontWeight = FontWeight.Black, fontSize = (size * 1.15f).sp)
     }
 }
 

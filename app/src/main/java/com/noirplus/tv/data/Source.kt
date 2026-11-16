@@ -1,4 +1,4 @@
-package com.nexotv.app.data
+package com.noirplus.tv.data
 
 import android.net.Uri
 import kotlinx.coroutines.Dispatchers

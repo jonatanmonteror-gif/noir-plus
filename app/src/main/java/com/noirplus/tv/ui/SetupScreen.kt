@@ -1,4 +1,4 @@
-package com.nexotv.app.ui
+package com.noirplus.tv.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -34,12 +34,12 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.nexotv.app.data.Kind
-import com.nexotv.app.data.M3uSource
-import com.nexotv.app.data.Repo
-import com.nexotv.app.data.XtreamSource
-import com.nexotv.app.data.normalizeServer
-import com.nexotv.app.data.xtreamFromM3u
+import com.noirplus.tv.data.Kind
+import com.noirplus.tv.data.M3uSource
+import com.noirplus.tv.data.Repo
+import com.noirplus.tv.data.XtreamSource
+import com.noirplus.tv.data.normalizeServer
+import com.noirplus.tv.data.xtreamFromM3u
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 

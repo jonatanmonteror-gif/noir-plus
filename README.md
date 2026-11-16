@@ -1,4 +1,4 @@
-# Nexo TV
+# Noir+
 
 Reproductor IPTV para Android TV / Google TV con interfaz tipo Netflix/HBO:
 **Inicio · Directo · Películas · Series · Buscar · Ajustes**.
@@ -20,7 +20,7 @@ Cada vez que se sube código a la rama `main`, GitHub Actions compila el APK y l
 El enlace a la última versión es siempre el mismo:
 
 ```
-https://github.com/USUARIO/REPO/releases/latest/download/NexoTV.apk
+https://github.com/USUARIO/REPO/releases/latest/download/NoirPlus.apk
 ```
 
 > El repositorio tiene que ser **público** para que la TV pueda descargar el APK.

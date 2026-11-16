@@ -1,4 +1,4 @@
-package com.nexotv.app.ui
+package com.noirplus.tv.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -38,11 +38,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.nexotv.app.data.Category
-import com.nexotv.app.data.Item
-import com.nexotv.app.data.Kind
-import com.nexotv.app.data.PlayRequest
-import com.nexotv.app.data.Repo
+import com.noirplus.tv.data.Category
+import com.noirplus.tv.data.Item
+import com.noirplus.tv.data.Kind
+import com.noirplus.tv.data.PlayRequest
+import com.noirplus.tv.data.Repo
 import kotlinx.coroutines.delay
 
 enum class Tab(val label: String) {

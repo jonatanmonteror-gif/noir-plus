@@ -1,4 +1,4 @@
-package com.nexotv.app.ui
+package com.noirplus.tv.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -35,11 +35,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.nexotv.app.BuildConfig
-import com.nexotv.app.data.Item
-import com.nexotv.app.data.Kind
-import com.nexotv.app.data.PlayRequest
-import com.nexotv.app.data.Repo
+import com.noirplus.tv.BuildConfig
+import com.noirplus.tv.data.Item
+import com.noirplus.tv.data.Kind
+import com.noirplus.tv.data.PlayRequest
+import com.noirplus.tv.data.Repo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -172,6 +172,6 @@ fun SettingsContent() {
         )
 
         Spacer(Modifier.height(12.dp))
-        Text("Nexo TV  ·  versión ${BuildConfig.VERSION_NAME}", color = Col.Sub, fontSize = 13.sp)
+        Text("Noir+  ·  versión ${BuildConfig.VERSION_NAME}", color = Col.Sub, fontSize = 13.sp)
     }
 }

@@ -7,11 +7,11 @@ plugins {
 val buildNumber = (System.getenv("VERSION_CODE") ?: "1").toInt()
 
 android {
-    namespace = "com.nexotv.app"
+    namespace = "com.noirplus.tv"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.nexotv.app"
+        applicationId = "com.noirplus.tv"
         minSdk = 21
         targetSdk = 34
         versionCode = buildNumber

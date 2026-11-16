@@ -1,4 +1,4 @@
-package com.nexotv.app.ui
+package com.noirplus.tv.ui
 
 import android.view.KeyEvent
 import android.view.View
@@ -44,11 +44,11 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
-import com.nexotv.app.MainActivity
-import com.nexotv.app.data.Http
-import com.nexotv.app.data.PlayRequest
-import com.nexotv.app.data.Progress
-import com.nexotv.app.data.Repo
+import com.noirplus.tv.MainActivity
+import com.noirplus.tv.data.Http
+import com.noirplus.tv.data.PlayRequest
+import com.noirplus.tv.data.Progress
+import com.noirplus.tv.data.Repo
 import kotlinx.coroutines.delay
 
 @OptIn(UnstableApi::class)

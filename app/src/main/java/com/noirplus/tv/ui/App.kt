@@ -1,4 +1,4 @@
-package com.nexotv.app.ui
+package com.noirplus.tv.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -14,9 +14,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
-import com.nexotv.app.data.Item
-import com.nexotv.app.data.PlayRequest
-import com.nexotv.app.data.Repo
+import com.noirplus.tv.data.Item
+import com.noirplus.tv.data.PlayRequest
+import com.noirplus.tv.data.Repo
 import kotlinx.coroutines.delay
 
 sealed interface Screen {

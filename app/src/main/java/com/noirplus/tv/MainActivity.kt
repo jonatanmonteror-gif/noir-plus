@@ -1,11 +1,11 @@
-package com.nexotv.app
+package com.noirplus.tv
 
 import android.os.Bundle
 import android.view.KeyEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import com.nexotv.app.data.Repo
-import com.nexotv.app.ui.App
+import com.noirplus.tv.data.Repo
+import com.noirplus.tv.ui.App
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
