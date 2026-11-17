@@ -111,57 +111,52 @@ object Tmdb {
 
     private val catalogs = ConcurrentHashMap<String, Catalog>()
 
-    // --- Catálogo preparado cada día en GitHub (un solo archivo pequeño por tipo) ---
-    private const val BUNDLE_URL = "https://github.com/jonatanmonteror-gif/noir-plus/releases/download/catalog/catalog-"
-    private val bundleLock = kotlinx.coroutines.sync.Mutex()
-    private val bundleTried = ConcurrentHashMap<String, Boolean>()
+    // --- Catálogo preparado cada día en GitHub: un archivo pequeño por plataforma ---
+    private const val CAT_URL = "https://github.com/jonatanmonteror-gif/noir-plus/releases/download/catalog/"
+    private val SLUGS = mapOf(
+        "Netflix" to "netflix", "Disney+" to "disney", "Max" to "max", "Prime Video" to "prime", "Apple TV+" to "apple",
+        "Movistar Plus+" to "movistar", "SkyShowtime" to "skyshowtime", "Filmin" to "filmin",
+    )
+    /** Se carga una plataforma cada vez (así la tele nunca se queda sin memoria). */
+    private val loadLock = kotlinx.coroutines.sync.Mutex()
 
     /**
-     * Descarga (como mucho una vez al día) el catálogo ya preparado de todas las plataformas y lo deja en memoria.
-     * Si falla, la app sigue con el método antiguo (consultas a TMDB).
+     * Descarga (como mucho una vez al día) el archivo ya preparado de una plataforma y lo lee línea a línea,
+     * guardando solo lo imprescindible. Devuelve null si no hay archivo (sin conexión, etc.).
      */
-    private suspend fun loadBundle(type: String): Boolean = bundleLock.withLock {
-        if (catalogs.keys.any { it.startsWith("$type:") } && bundleTried[type] == true) return@withLock true
-        val dir = file?.parentFile ?: return@withLock false
-        val f = File(dir, "tmdb_bundle_$type.json.gz")
+    private suspend fun loadPrepared(type: String, group: String): Catalog? = withContext(Dispatchers.IO) {
+        val slug = SLUGS[group] ?: return@withContext null
+        val dir = file?.parentFile ?: return@withContext null
+        val name = "cat-$type-$slug.tsv.gz"
+        val f = File(dir, name)
         val fresh = f.exists() && System.currentTimeMillis() - f.lastModified() < 24L * 3600 * 1000
-        if (!fresh && bundleTried[type] != true) {
-            runCatching {
-                withContext(Dispatchers.IO) {
-                    val req = Request.Builder().url("$BUNDLE_URL$type.json.gz").header("User-Agent", Http.UA).build()
-                    Http.client.newCall(req).execute().use { r ->
-                        if (r.isSuccessful) {
-                            val tmp = File(dir, "tmdb_bundle_$type.tmp")
-                            r.body?.byteStream()?.use { input -> tmp.outputStream().use { input.copyTo(it) } }
-                            if (tmp.length() > 0) { f.delete(); tmp.renameTo(f) }
-                        }
-                    }
+        if (!fresh) runCatching {
+            val req = Request.Builder().url(CAT_URL + name).header("User-Agent", Http.UA).build()
+            Http.client.newCall(req).execute().use { r ->
+                if (r.isSuccessful) {
+                    val tmp = File(dir, "$name.tmp")
+                    r.body?.byteStream()?.use { input -> tmp.outputStream().use { input.copyTo(it) } }
+                    if (tmp.length() > 0) { f.delete(); tmp.renameTo(f) }
                 }
             }
         }
-        bundleTried[type] = true
-        if (!f.exists()) return@withLock false
+        if (!f.exists()) return@withContext null
         runCatching {
-            withContext(Dispatchers.IO) {
-                val text = java.util.zip.GZIPInputStream(f.inputStream()).bufferedReader().use { it.readText() }
-                val g = JSONObject(text).getJSONObject("g")
-                for (group in g.keys()) {
-                    val arr = g.getJSONArray(group)
-                    val entries = HashMap<String, Entry>(arr.length() * 2)
-                    val titles = HashMap<String, MutableList<String>>(arr.length() * 3)
-                    for (i in 0 until arr.length()) {
-                        val e = arr.getJSONArray(i)
-                        val id = e.optString(0)
-                        val date = e.optInt(1)
-                        val ga = e.optJSONArray(2)
-                        entries[id] = Entry(date / 10000, (0 until (ga?.length() ?: 0)).map { ga!!.optInt(it) }, date)
-                        val ta = e.optJSONArray(3) ?: continue
-                        for (j in 0 until ta.length()) titles.getOrPut(ta.optString(j)) { ArrayList(1) }.add(id)
-                    }
-                    catalogs["$type:$group"] = Catalog(entries, titles)
+            val entries = HashMap<String, Entry>(4096)
+            val titles = HashMap<String, MutableList<String>>(8192)
+            java.util.zip.GZIPInputStream(f.inputStream()).bufferedReader().useLines { lines ->
+                for (line in lines) {
+                    val p = line.split('\t')
+                    if (p.size < 4) continue
+                    val id = p[0]
+                    val date = p[1].toIntOrNull() ?: 0
+                    val genres = if (p[2].isEmpty()) emptyList() else p[2].split(',').mapNotNull { it.toIntOrNull() }
+                    entries[id] = Entry(date / 10000, genres, date)
+                    if (p[3].isNotEmpty()) for (t in p[3].split('|')) titles.getOrPut(t) { ArrayList(1) }.add(id)
                 }
             }
-        }.isSuccess
+            Catalog(entries, titles)
+        }.getOrNull()
     }
     private val marks = Regex("\\p{Mn}+")
     fun titleKey(s: String): String =
@@ -280,8 +275,13 @@ object Tmdb {
         val type = if (kind == Kind.SERIES) "tv" else "movie"
         val id = "$type:$group"
         catalogs[id]?.let { return@coroutineScope it }
-        // Lo más rápido: el catálogo ya preparado (un archivo para todas las plataformas)
-        if (loadBundle(type)) catalogs[id]?.let { return@coroutineScope it }
+        // Lo más rápido y ligero: el archivo ya preparado de esa plataforma (de una en una)
+        loadLock.withLock {
+            catalogs[id]?.let { return@coroutineScope it }
+            loadPrepared(type, group)?.let { catalogs[id] = it; return@coroutineScope it }
+        }
+        // En la tele no se usa el método pesado (miles de consultas): mejor no mostrar la fila que cerrar la app
+        if (runCatching { Repo.prefs.isLowEnd }.getOrDefault(true)) return@coroutineScope null
         val f = catFile(kind, group)
         // Copia guardada en el móvil/tele
         runCatching {
@@ -308,7 +308,7 @@ object Tmdb {
         first.optJSONArray("results")?.let { results[1] = it }
         val done = AtomicInteger(1)
         onProgress(1, pages)
-        val sem = Semaphore(if (slow) 2 else 8)
+        val sem = Semaphore(if (slow) 2 else 4)
         (2..pages).map { pg ->
             async(Dispatchers.IO) {
                 sem.withPermit {

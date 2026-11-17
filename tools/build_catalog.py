@@ -3,8 +3,9 @@
 Genera el catálogo de plataformas en España (Netflix, Disney+, Max…) a partir de TMDB,
 para que la app lo descargue de una vez (un archivo pequeño) en lugar de hacer miles de consultas.
 
-Salida: catalog-movie.json.gz y catalog-tv.json.gz
-Formato: {"v":1,"t":<epoch>,"g":{"Netflix":[[id, yyyymmdd, [géneros], ["titulo normalizado", ...]], ...], ...}}
+Salida: un archivo pequeño por plataforma y tipo: cat-movie-netflix.tsv.gz, cat-tv-disney.tsv.gz…
+Formato (una línea por título, separado por tabuladores, ligero de leer en la tele):
+    id <TAB> aaaammdd <TAB> géneros separados por comas <TAB> títulos normalizados separados por |
 """
 import gzip, json, os, re, sys, time, unicodedata, urllib.parse, urllib.request
 from concurrent.futures import ThreadPoolExecutor
@@ -87,10 +88,18 @@ def build(kind):
         print(f"{typ} {g}: {pages} páginas, {len(seen)} títulos", flush=True)
     return out
 
+SLUG = {"Netflix": "netflix", "Disney+": "disney", "Max": "max", "Prime Video": "prime", "Apple TV+": "apple",
+        "Movistar Plus+": "movistar", "SkyShowtime": "skyshowtime", "Filmin": "filmin"}
+
 if __name__ == "__main__":
     for kind in ("movie", "tv"):
-        data = {"v": 1, "t": int(time.time()), "g": build(kind)}
-        raw = json.dumps(data, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
-        with gzip.open(f"catalog-{kind}.json.gz", "wb", compresslevel=9) as f:
-            f.write(raw)
-        print(f"catalog-{kind}.json.gz: {len(raw)//1024} KB sin comprimir", flush=True)
+        for g, rows in build(kind).items():
+            name = f"cat-{kind}-{SLUG[g]}.tsv.gz"
+            lines = []
+            for tid, date, genres, titles in rows:
+                titles = [t.replace("|", " ").replace("\t", " ") for t in titles]
+                lines.append(f"{tid}\t{date}\t{','.join(str(x) for x in genres)}\t{'|'.join(titles)}")
+            raw = ("\n".join(lines) + "\n").encode("utf-8")
+            with gzip.open(name, "wb", compresslevel=9) as f:
+                f.write(raw)
+            print(f"{name}: {len(rows)} títulos, {len(raw)//1024} KB sin comprimir", flush=True)
