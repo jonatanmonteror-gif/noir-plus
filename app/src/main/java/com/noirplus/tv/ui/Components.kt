@@ -119,7 +119,6 @@ object Col {
 }
 
 private val focusSpring = spring<Float>(dampingRatio = 0.82f, stiffness = 420f)
-private val elevationSpring = spring<androidx.compose.ui.unit.Dp>(dampingRatio = 1f, stiffness = 420f)
 
 /** Recuerda qué tarjeta tenía el foco para devolverlo al volver atrás. */
 class FocusMemory {
@@ -158,8 +157,8 @@ fun Focusable(
         pressed && !tv -> 0.96f
         else -> 1f
     }
-    val scale by animateFloatAsState(target, focusSpring, label = "scale")
-    val elevation by animateDpAsState(if (focused && tv && focusScale > 1f) 22.dp else 0.dp, elevationSpring, label = "elev")
+    // Foco ágil: crecimiento corto y sin resplandor/sombra (la sombra animada se cortaba y frenaba la tele)
+    val scale by animateFloatAsState(target, if (tv) tween(120, easing = FastOutSlowInEasing) else focusSpring, label = "scale")
     val mem = LocalFocusMemory.current
     val ownRequester = remember { FocusRequester() }
     val fr = focusRequester ?: ownRequester
@@ -213,7 +212,7 @@ fun Focusable(
                     else -> false
                 }
             }
-            .shadow(elevation, shape, clip = false, ambientColor = Color.White.copy(alpha = 0.25f), spotColor = Color.White.copy(alpha = 0.35f))
+
             .then(if (focused && border) Modifier.border(2.dp, Color.White, shape) else Modifier)
             .clip(shape)
             .then(clickMod),
