@@ -459,6 +459,7 @@ fun BrowseContent(kind: Kind) {
 }
 
 /** Fila "Continuar viendo" (Inicio, Películas y Series). */
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun ContinueRow(history: List<com.noirplus.tv.data.Progress>, memPrefix: String, onHero: (Item) -> Unit) {
     val d = LocalDims.current

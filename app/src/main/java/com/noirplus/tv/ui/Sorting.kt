@@ -188,3 +188,11 @@ fun GenreButton(selected: Int?, genres: Map<Int, String>, onChange: (Int?) -> Un
         }
     }
 }
+
+/** Icono "tráiler" (pantalla con play). */
+val TrailerIcon: ImageVector = materialIcon(name = "Filled.Trailer") {
+    materialPath {
+        moveTo(2f, 5f); horizontalLineTo(22f); verticalLineTo(19f); horizontalLineTo(2f); close()
+        moveTo(10f, 8.5f); verticalLineTo(15.5f); lineTo(16f, 12f); close()
+    }
+}

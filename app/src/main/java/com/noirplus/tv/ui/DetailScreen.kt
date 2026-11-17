@@ -562,15 +562,6 @@ private fun SeriesDetail(item: Item) {
 }
 
 
-/** Icono "tráiler" (pantalla con play). */
-private val TrailerIcon: androidx.compose.ui.graphics.vector.ImageVector =
-    androidx.compose.material.icons.materialIcon(name = "Filled.Trailer") {
-        androidx.compose.material.icons.materialPath {
-            moveTo(2f, 5f); horizontalLineTo(22f); verticalLineTo(19f); horizontalLineTo(2f); close()
-            moveTo(10f, 8.5f); verticalLineTo(15.5f); lineTo(16f, 12f); close()
-        }
-    }
-
 /**
  * Abre el tráiler en español en YouTube. Si TMDB no tiene uno en español, busca en YouTube
  * "<título> tráiler español".
