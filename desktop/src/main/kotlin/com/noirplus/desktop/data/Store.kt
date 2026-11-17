@@ -88,7 +88,7 @@ object Store {
     /** Tamaño de los subtítulos en el reproductor (escala de VLC). */
     var subScale: Int
         get() = o.optInt("subScale", 100)
-        set(v) { o.put("subScale", v.coerceIn(50, 200)); save() }
+        set(v) { o.put("subScale", v.coerceIn(30, 200)); save() }
 
     /** ¿Esta opción del reproductor va como botón en pantalla? (si no, va dentro de la ruedita). Por defecto, todo en la ruedita. */
     fun quick(k: String): Boolean = o.optJSONObject("quick")?.optBoolean(k, false) ?: false
@@ -104,7 +104,7 @@ object Store {
 
     // ---------- Subtítulos (los dibuja VLC con estas opciones) ----------
     var subFont: String
-        get() = s("subFont").ifBlank { "Segoe UI" }
+        get() = s("subFont").takeIf { it in listOf("Segoe UI", "Arial", "Georgia") } ?: "Segoe UI"
         set(v) { o.put("subFont", v); save() }
     /** Color del texto en RGB. */
     var subColor: Int

@@ -65,8 +65,9 @@ import uk.co.caprica.vlcj.player.embedded.videosurface.callback.format.RV32Buffe
 /** Opciones de VLC, incluido el estilo de los subtítulos elegido en Ajustes. */
 fun vlcArgs(): List<String> {
     val a = mutableListOf("--no-video-title-show", "--quiet", "--avcodec-hw=any",
-        "--sub-text-scale=${Store.subScale}", "--freetype-font=${Store.subFont}", "--freetype-color=${Store.subColor}",
-        "--freetype-outline-thickness=${listOf(0, 2, 4, 6)[Store.subOutline]}", "--sub-margin=${subMarginFor(Vlc.lastHeight)}")
+        // Letra blanca con contorno normal, siempre
+        "--sub-text-scale=${Store.subScale}", "--freetype-font=${Store.subFont}", "--freetype-color=16777215",
+        "--freetype-outline-thickness=4", "--sub-margin=${subMarginFor(Vlc.lastHeight)}")
     when (Store.subBg) {
         2 -> a += listOf("--freetype-background-opacity=160", "--freetype-background-color=0", "--freetype-shadow-opacity=0")
         1 -> a += listOf("--freetype-background-opacity=0", "--freetype-shadow-opacity=200")
@@ -84,6 +85,9 @@ fun subMarginFor(h: Int): Int = when (Store.subPos) {
     2 -> if (h > 0) (h * 0.86f).toInt() + Store.subMargin - 40 else Store.subMargin
     else -> Store.subMargin
 }.coerceAtLeast(0)
+
+/** Las 3 letras disponibles para los subtítulos. */
+val SubFonts = listOf("Segoe UI", "Arial", "Georgia")
 
 /** ¿Hay VLC instalado? Se comprueba una sola vez. */
 object Vlc {
@@ -595,11 +599,11 @@ fun SubPreview(ch: Int) {
         runCatching { androidx.compose.ui.text.font.FontFamily(androidx.compose.ui.text.platform.SystemFont(Store.subFont)) }
             .getOrDefault(androidx.compose.ui.text.font.FontFamily.SansSerif)
     }
-    val color = Color(0xFF000000 or Store.subColor.toLong())
+    val color = Color.White
     val size = (18f * Store.subScale / 100f).sp
     val shadow = when {
-        Store.subBg == 1 || Store.subOutline > 0 -> androidx.compose.ui.graphics.Shadow(Color.Black, blurRadius = (2 + Store.subOutline * 2).toFloat())
-        else -> null
+        Store.subBg == 2 -> null
+        else -> androidx.compose.ui.graphics.Shadow(Color.Black, blurRadius = 6f)
     }
     Box(
         Modifier.fillMaxWidth().height(86.dp).clip(RoundedCornerShape(10.dp))
@@ -633,7 +637,7 @@ fun SubStyleControls(ch: Int, compact: Boolean, onChange: () -> Unit) {
     // key(ch): se vuelve a dibujar todo al cambiar algo, para que se vea marcado al momento
     key(ch) {
     line("Tamaño") {
-        listOf(50 to "XS", 70 to "S", 100 to "M", 130 to "L", 160 to "XL").forEach { (v, l) ->
+        listOf(35 to "XXS", 50 to "XS", 70 to "S", 100 to "M", 130 to "L", 160 to "XL").forEach { (v, l) ->
             Chip(l, Store.subScale == v) { Store.subScale = v; onChange() }
         }
     }
@@ -646,14 +650,9 @@ fun SubStyleControls(ch: Int, compact: Boolean, onChange: () -> Unit) {
     line("Fondo") {
         listOf("Nada", "Sombra", "Caja").forEachIndexed { i, l -> Chip(l, Store.subBg == i) { Store.subBg = i; onChange() } }
     }
-    line("Color") {
-        listOf(0xFFFFFF to "Blanco", 0xFFE14D to "Amarillo").forEach { (c, l) -> Chip(l, Store.subColor == c) { Store.subColor = c; onChange() } }
-    }
-    line("Contorno") {
-        listOf("No", "Fino", "Normal", "Grueso").forEachIndexed { i, l -> Chip(l, Store.subOutline == i) { Store.subOutline = i; onChange() } }
-    }
-    line("Letra") {
-        listOf("Segoe UI", "Arial", "Verdana", "Tahoma", "Georgia").forEach { f -> Chip(f, Store.subFont == f) { Store.subFont = f; onChange() } }
+    // La letra solo se elige en Ajustes (no en el reproductor)
+    if (!compact) line("Letra") {
+        SubFonts.forEach { f -> Chip(f, Store.subFont == f) { Store.subFont = f; onChange() } }
     }}
 }
 

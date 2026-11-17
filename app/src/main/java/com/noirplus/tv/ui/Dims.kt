@@ -25,7 +25,7 @@ data class Dims(
     val bottomPad: Dp,
 )
 
-val TvDims = Dims(tv = true, compact = false, edge = 48.dp, poster = 112.dp, wide = 210.dp, heroH = 196.dp, gap = 14.dp, bottomPad = 48.dp)
+val TvDims = Dims(tv = true, compact = false, edge = 48.dp, poster = 132.dp, wide = 240.dp, heroH = 196.dp, gap = 14.dp, bottomPad = 48.dp)
 val PhoneDims = Dims(tv = false, compact = true, edge = 16.dp, poster = 104.dp, wide = 190.dp, heroH = 300.dp, gap = 10.dp, bottomPad = 112.dp)
 val TabletDims = Dims(tv = false, compact = false, edge = 28.dp, poster = 118.dp, wide = 220.dp, heroH = 230.dp, gap = 12.dp, bottomPad = 48.dp)
 
