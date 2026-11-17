@@ -471,12 +471,10 @@ fun PlayerScreen(start: PlayRequest, mini: Boolean = false) {
                             }
                             Spacer(Modifier.width(8.dp))
                         }
+                        // Sin botón de pantalla completa: sigue disponible con la tecla F
                         if (quick.size < QuickOptions.size) {
                             RoundIcon(Icons.Filled.Settings, "Opciones (O)") { menu = if (menu == "all") null else "all" }
-                            Spacer(Modifier.width(8.dp))
                         }
-                        RoundIcon(if (window.placement == WindowPlacement.Fullscreen) Icons.Filled.FullscreenExit else Icons.Filled.Fullscreen,
-                            "Pantalla completa (F)") { toggleFull() }
                     }
                 }
                 menu?.let { m ->
