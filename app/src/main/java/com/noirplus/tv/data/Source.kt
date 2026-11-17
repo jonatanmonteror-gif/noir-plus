@@ -21,6 +21,9 @@ interface Source {
     suspend fun accountInfo(): String?
     fun streamUrl(item: Item): String
     fun episodeUrl(ep: Episode): String
+
+    /** Olvida lo descargado (de un tipo o de todo) para volver a pedirlo al servidor. */
+    fun clear(kind: Kind?)
 }
 
 fun normalizeServer(s: String): String {
@@ -271,6 +274,18 @@ class XtreamSource(
     }
 
     override fun episodeUrl(ep: Episode): String = ep.url ?: "$base/series/$user/$pass/${ep.id}.${ep.ext}"
+
+    override fun clear(kind: Kind?) {
+        if (kind == null) {
+            cats.clear(); itemsCache.clear(); allCache.clear(); movies.clear(); series.clear()
+            return
+        }
+        cats.remove(kind)
+        allCache.remove(kind)
+        itemsCache.keys.filter { it.startsWith("${kind.name}:") }.forEach { itemsCache.remove(it) }
+        if (kind == Kind.MOVIE) movies.clear()
+        if (kind == Kind.SERIES) series.clear()
+    }
 }
 
 class M3uSource(private val url: String) : Source {
@@ -334,4 +349,9 @@ class M3uSource(private val url: String) : Source {
     override suspend fun accountInfo(): String? = "Lista M3U"
     override fun streamUrl(item: Item): String = item.url ?: ""
     override fun episodeUrl(ep: Episode): String = ep.url ?: ""
+
+    // La lista M3U es un único archivo: actualizar cualquier parte la vuelve a descargar entera.
+    override fun clear(kind: Kind?) {
+        data = null
+    }
 }

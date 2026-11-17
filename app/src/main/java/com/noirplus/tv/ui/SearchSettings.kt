@@ -57,12 +57,12 @@ fun SearchContent() {
     val focusManager = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
     var query by rememberSaveable { mutableStateOf("") }
-    var index by remember { mutableStateOf<List<Pair<String, Item>>?>(null) }
+    var index by remember(Repo.dataVersion.intValue) { mutableStateOf<List<Pair<String, Item>>?>(null) }
     var loading by remember { mutableStateOf(false) }
     val wantsSearch = query.trim().length >= 2
 
     // El catálogo completo solo se descarga la primera vez que se busca algo.
-    LaunchedEffect(wantsSearch) {
+    LaunchedEffect(wantsSearch, index == null) {
         if (wantsSearch && index == null && !loading) {
             loading = true
             index = withContext(Dispatchers.Default) {

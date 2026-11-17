@@ -75,6 +75,11 @@ class Prefs(ctx: Context) {
 
     fun hasAccount() = type.isNotEmpty()
 
+    /** Última vez que se entró a la app (ms), para contar novedades. */
+    var lastVisit: Long
+        get() = sp.getLong("lastVisit", 0L)
+        set(v) { sp.edit().putLong("lastVisit", v).apply() }
+
     // ---------- Perfil ----------
     var name: String
         get() = s("name")

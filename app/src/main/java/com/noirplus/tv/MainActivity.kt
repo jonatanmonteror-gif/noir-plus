@@ -18,6 +18,21 @@ class MainActivity : ComponentActivity() {
         setContent { App() }
     }
 
+    private var stoppedAt = 0L
+
+    override fun onStop() {
+        super.onStop()
+        stoppedAt = System.currentTimeMillis()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        // Si la app vuelve tras más de 4 horas en segundo plano, saludo de nuevo y listas frescas.
+        if (stoppedAt > 0 && System.currentTimeMillis() - stoppedAt > 4 * 3600_000L) {
+            Repo.welcomeRequest.intValue = Repo.welcomeRequest.intValue + 1
+        }
+    }
+
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus) hideSystemBars()

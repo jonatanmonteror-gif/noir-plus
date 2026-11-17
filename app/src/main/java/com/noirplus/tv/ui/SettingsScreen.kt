@@ -38,6 +38,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.noirplus.tv.BuildConfig
+import com.noirplus.tv.data.Kind
 import com.noirplus.tv.data.Repo
 import com.noirplus.tv.data.Updater
 import kotlinx.coroutines.launch
@@ -87,6 +88,39 @@ fun SettingsContent() {
     var updStatus by remember { mutableStateOf<String?>(null) }
     var updRelease by remember { mutableStateOf<Updater.Release?>(null) }
     var updProgress by remember { mutableStateOf<Float?>(null) }
+
+    var refreshStatus by remember { mutableStateOf<String?>(null) }
+    var refreshing by remember { mutableStateOf(false) }
+    val lastUpd = remember(Repo.dataVersion.intValue) {
+        val mins = (System.currentTimeMillis() - Repo.loadedAt) / 60_000
+        when {
+            mins < 1 -> "Ahora mismo"
+            mins < 60 -> "Hace $mins min"
+            mins < 60 * 24 -> "Hace ${mins / 60} h"
+            else -> "Hace ${mins / 1440} días"
+        }
+    }
+
+    fun refresh(kinds: List<Kind>?) {
+        if (refreshing) return
+        refreshing = true
+        scope.launch {
+            val nf = java.text.NumberFormat.getIntegerInstance(java.util.Locale("es", "ES"))
+            val done = mutableListOf<String>()
+            Repo.refresh(kinds) { st ->
+                refreshStatus = when {
+                    st.error != null -> "Error en ${kindPlural(st.kind)}: ${st.error}"
+                    st.count == null -> (done + "actualizando ${kindPlural(st.kind)}…").joinToString("  ·  ")
+                    else -> {
+                        done += "${nf.format(st.count)} ${kindPlural(st.kind)}"
+                        done.joinToString("  ·  ")
+                    }
+                }
+            }
+            refreshStatus = "Listo: " + done.joinToString("  ·  ")
+            refreshing = false
+        }
+    }
 
     fun checkUpdates() {
         updStatus = "Buscando…"
@@ -151,13 +185,23 @@ fun SettingsContent() {
                     Note(info ?: "Comprobando cuenta…")
                 }
                 Column {
-                    LinkRow("Recargar contenido", key = "set-reload") { Repo.rebuild() }
                     LinkRow("Cambiar de lista", key = "set-logout", danger = true) {
                         prefs.clearAccount()
                         Repo.rebuild()
                         nav.reset(Screen.Setup)
                     }
                 }
+            }
+
+            Section("Actualizar listas") {
+                Note("Tu proveedor añade contenido a diario. Actualiza para traer lo último sin cerrar la app.")
+                Column {
+                    LinkRow("Actualizar todo", lastUpd, key = "upd-all") { refresh(null) }
+                    LinkRow("Solo películas", key = "upd-mov") { refresh(listOf(Kind.MOVIE)) }
+                    LinkRow("Solo series", key = "upd-ser") { refresh(listOf(Kind.SERIES)) }
+                    LinkRow("Solo canales en directo", key = "upd-live") { refresh(listOf(Kind.LIVE)) }
+                }
+                refreshStatus?.let { Note(it) }
             }
 
             Section("Aspecto") {

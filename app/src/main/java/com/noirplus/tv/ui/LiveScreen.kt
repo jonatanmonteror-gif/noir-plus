@@ -62,7 +62,7 @@ fun LiveContent() {
     val nav = LocalNav.current
     val changes = prefs.changes.intValue
     var error by remember { mutableStateOf<String?>(null) }
-    val cats by produceState<List<Category>?>(null) {
+    val cats by produceState<List<Category>?>(null, Repo.dataVersion.intValue) {
         value = try {
             src.categories(Kind.LIVE).filter { prefs.visible(Kind.LIVE, it.id) }
         } catch (t: Throwable) {
@@ -83,7 +83,7 @@ fun LiveContent() {
         if (allCats.isNotEmpty() && allCats.none { it.id == selected }) selected = allCats.first().id
     }
 
-    val channels by produceState<List<Item>?>(null, selected, favs) {
+    val channels by produceState<List<Item>?>(null, selected, favs, Repo.dataVersion.intValue) {
         val id = selected ?: return@produceState
         if (id == FAV.id) {
             value = favs

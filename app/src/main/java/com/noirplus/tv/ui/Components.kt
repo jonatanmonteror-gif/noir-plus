@@ -530,7 +530,7 @@ fun CategoryRow(
     val src = Repo.source ?: return
     val nav = LocalNav.current
     val d = LocalDims.current
-    val items by produceState<List<Item>?>(null, kind, cat.id) {
+    val items by produceState<List<Item>?>(null, kind, cat.id, Repo.dataVersion.intValue) {
         value = runCatching { src.items(kind, cat.id) }.getOrDefault(emptyList())
     }
     val list = items

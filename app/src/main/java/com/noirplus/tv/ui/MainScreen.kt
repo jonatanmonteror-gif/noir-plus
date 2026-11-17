@@ -322,13 +322,13 @@ fun HomeContent() {
     val history = remember(changes) { prefs.history() }
     val favs = remember(changes) { prefs.favorites().filter { it.kind != Kind.LIVE } }
     var hero by remember { mutableStateOf<Item?>(null) }
-    val movieCats by produceState(emptyList<Category>(), changes) {
+    val movieCats by produceState(emptyList<Category>(), changes, Repo.dataVersion.intValue) {
         value = runCatching { src.categories(Kind.MOVIE).filter { prefs.visible(Kind.MOVIE, it.id) }.take(4) }.getOrDefault(emptyList())
     }
-    val seriesCats by produceState(emptyList<Category>(), changes) {
+    val seriesCats by produceState(emptyList<Category>(), changes, Repo.dataVersion.intValue) {
         value = runCatching { src.categories(Kind.SERIES).filter { prefs.visible(Kind.SERIES, it.id) }.take(4) }.getOrDefault(emptyList())
     }
-    val featured by produceState(emptyList<Item>(), changes) {
+    val featured by produceState(emptyList<Item>(), changes, Repo.dataVersion.intValue) {
         val m = recentOf(Kind.MOVIE, 6)
         val sr = recentOf(Kind.SERIES, 4)
         value = (m.zip(sr).flatMap { listOf(it.first, it.second) } + m.drop(sr.size) + sr.drop(m.size)).take(10)
@@ -386,7 +386,7 @@ fun HomeContent() {
 }
 
 /** Lo último añadido de un tipo (para "Recién llegados"). */
-private suspend fun recentOf(kind: Kind, n: Int): List<Item> {
+suspend fun recentOf(kind: Kind, n: Int): List<Item> {
     val src = Repo.source ?: return emptyList()
     val prefs = Repo.prefs
     return runCatching {
@@ -421,7 +421,7 @@ fun BrowseContent(kind: Kind) {
     val changes = prefs.changes.intValue
     var hero by remember(kind) { mutableStateOf<Item?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
-    val cats by produceState<List<Category>?>(null, kind, changes) {
+    val cats by produceState<List<Category>?>(null, kind, changes, Repo.dataVersion.intValue) {
         value = try {
             src.categories(kind).filter { prefs.visible(kind, it.id) }
         } catch (t: Throwable) {
@@ -429,7 +429,7 @@ fun BrowseContent(kind: Kind) {
             emptyList()
         }
     }
-    val featured by produceState(emptyList<Item>(), kind, changes) { value = recentOf(kind, 10) }
+    val featured by produceState(emptyList<Item>(), kind, changes, Repo.dataVersion.intValue) { value = recentOf(kind, 10) }
     val title = if (kind == Kind.MOVIE) "Películas" else "Series"
 
     val c = cats

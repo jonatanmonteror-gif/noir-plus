@@ -50,6 +50,7 @@ import kotlinx.coroutines.delay
 sealed interface Screen {
     data object Setup : Screen
     data object Main : Screen
+    data object Welcome : Screen
     data object Folders : Screen
     data class Detail(val item: Item) : Screen
     data class Player(val req: PlayRequest) : Screen
@@ -81,6 +82,7 @@ val LocalNav = staticCompositionLocalOf<Nav> { error("Nav no disponible") }
 private fun keyOf(s: Screen): String = when (s) {
     Screen.Setup -> "setup"
     Screen.Main -> "main"
+    Screen.Welcome -> "welcome"
     Screen.Folders -> "folders"
     is Screen.Detail -> "detail:" + s.item.key
     is Screen.Player -> "player:" + s.req.key
@@ -89,7 +91,7 @@ private fun keyOf(s: Screen): String = when (s) {
 
 @Composable
 fun App() {
-    val nav = remember { Nav(if (Repo.prefs.hasAccount()) Screen.Main else Screen.Setup) }
+    val nav = remember { Nav(if (Repo.prefs.hasAccount()) Screen.Welcome else Screen.Setup) }
     val mem = remember { FocusMemory() }
     val holder = rememberSaveableStateHolder()
     val ctx = LocalContext.current
@@ -137,6 +139,7 @@ fun App() {
                         when (screen) {
                             Screen.Setup -> SetupScreen()
                             Screen.Main -> MainScreen()
+                            Screen.Welcome -> WelcomeScreen()
                             Screen.Folders -> FoldersScreen()
                             is Screen.Detail -> DetailScreen(screen.item)
                             is Screen.Player -> PlayerScreen(screen.req)
@@ -151,6 +154,11 @@ fun App() {
                 mem.restore = false
             }
             if (top == Screen.Main) UpdateNotice()
+            // Vuelta a la app tras varias horas: saludo de nuevo (salvo si se está viendo algo)
+            val wr = Repo.welcomeRequest.intValue
+            LaunchedEffect(wr) {
+                if (wr > 0 && Repo.prefs.hasAccount() && nav.top !is Screen.Player) nav.reset(Screen.Welcome)
+            }
         }
     }
 }

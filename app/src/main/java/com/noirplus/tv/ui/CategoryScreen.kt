@@ -67,7 +67,7 @@ fun CategoryScreen(kind: Kind, cat: Category, startSearch: Boolean = false) {
     val keyboard = LocalSoftwareKeyboardController.current
     val isAll = cat.id == ALL_ID
     val prefs = Repo.prefs
-    val items by produceState<List<Item>?>(null, kind, cat.id) {
+    val items by produceState<List<Item>?>(null, kind, cat.id, Repo.dataVersion.intValue) {
         value = runCatching {
             if (isAll) src.all(kind).filter { prefs.visible(kind, it.categoryId) } else src.items(kind, cat.id)
         }.getOrDefault(emptyList())

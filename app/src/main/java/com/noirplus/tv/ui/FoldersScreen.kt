@@ -43,7 +43,7 @@ fun FoldersScreen() {
     var tab by rememberSaveable { mutableStateOf(0) }
     var askPin by remember { mutableStateOf(false) }
     val kind = listOf(Kind.MOVIE, Kind.SERIES, Kind.LIVE)[tab]
-    val cats by produceState<List<Category>?>(null, kind) {
+    val cats by produceState<List<Category>?>(null, kind, Repo.dataVersion.intValue) {
         value = runCatching { src.categories(kind) }.getOrDefault(emptyList())
     }
     val hidden = remember(changes) { prefs.hidden }
