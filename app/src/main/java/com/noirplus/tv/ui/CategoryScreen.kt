@@ -128,7 +128,8 @@ fun CategoryScreen(kind: Kind, cat: Category, startSearch: Boolean = false) {
             var l = if (q.isEmpty()) all else all.filter { normText(it.name).contains(q) }
             if (platform != null) l = catalog?.let { c -> l.filter { c.has(it) } } ?: emptyList()
             genre?.let { g -> l = genreCats?.let { cs -> l.filter { Tmdb.genresOf(it, cs)?.contains(g) == true } } ?: emptyList() }
-            l.sortedFor(sort)
+            // «Recién subido» conserva el orden de subida (lo último añadido primero)
+            if (cat.id.startsWith(com.noirplus.tv.data.Library.NEW)) l else l.sortedFor(sort)
         }
     }
 

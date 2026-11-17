@@ -262,6 +262,18 @@ fun SettingsContent() {
                 }
             }
 
+            Section("Recién subido") {
+                Note("Lo último que ha añadido tu proveedor en los últimos 3 meses, de lo más nuevo a lo más antiguo (aunque sean títulos antiguos).")
+                Column {
+                    LinkRow("Películas recién subidas", key = "new-mov") {
+                        nav.push(Screen.Category(Kind.MOVIE, com.noirplus.tv.data.Category(com.noirplus.tv.data.Library.NEW + "0-90", "Películas recién subidas")))
+                    }
+                    LinkRow("Series recién subidas", key = "new-ser") {
+                        nav.push(Screen.Category(Kind.SERIES, com.noirplus.tv.data.Category(com.noirplus.tv.data.Library.NEW + "0-90", "Series recién subidas")))
+                    }
+                }
+            }
+
             Section("Actualizar listas") {
                 Note("Tu proveedor añade contenido a diario. Actualiza para traer lo último sin cerrar la app.")
                 Column {

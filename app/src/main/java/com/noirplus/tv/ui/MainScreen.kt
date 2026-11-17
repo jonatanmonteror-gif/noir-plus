@@ -416,7 +416,8 @@ fun BrowseContent(kind: Kind) {
         mutableStateOf(when {
             !Tmdb.configured() -> "folders"
             d.compact -> prefs.browseMode(kind).takeIf { it != "folders" } ?: "plat"
-            else -> prefs.browseMode(kind)
+            // Tele: solo Plataformas o Géneros (Recién subido está en Ajustes; Carpetas, oculto)
+            else -> prefs.browseMode(kind).takeIf { it == "plat" || it == "genre" } ?: "plat"
         })
     }
     val history = remember(changes, kind) {
@@ -432,8 +433,8 @@ fun BrowseContent(kind: Kind) {
             if (d.compact) FeaturedPager(featured)
             else HeroArea(hero ?: cycling(featured), title, "Explora las categorías de tu lista")
         }) {
-            item(key = "modes") { BrowseModes(mode) { mode = it; prefs.setBrowseMode(kind, it) } }
-            item(key = "all") { AllEntryRow(kind) }
+            item(key = "modes") { BrowseModes(kind, mode) { mode = it; prefs.setBrowseMode(kind, it) } }
+            if (d.compact) item(key = "all") { AllEntryRow(kind) }
             if (history.isNotEmpty()) item(key = "history") { ContinueRow(history, "${kind.name}-h") { hero = it } }
             when (mode) {
                 "plat" -> {
@@ -510,13 +511,15 @@ fun ContinueRow(history: List<com.noirplus.tv.data.Progress>, memPrefix: String,
 
 /** Selector de vista de Películas/Series: por plataforma, por género o por carpetas del proveedor. */
 @Composable
-private fun BrowseModes(mode: String, onChange: (String) -> Unit) {
+private fun BrowseModes(kind: Kind, mode: String, onChange: (String) -> Unit) {
     val d = LocalDims.current
-    val opts = listOf("plat" to "Plataformas", "genre" to "Géneros", "new" to "Recién subido") +
-        if (d.compact) emptyList() else listOf("folders" to "Carpetas")
+    val nav = LocalNav.current
+    val opts = if (d.compact) listOf("plat" to "Plataformas", "genre" to "Géneros", "new" to "Recién subido")
+    else listOf("plat" to "Plataformas", "genre" to "Géneros")
     Row(
         Modifier.fillMaxWidth().padding(start = d.edge, end = d.edge, top = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         opts.forEach { (k, label) ->
             val sel = k == mode
@@ -530,6 +533,21 @@ private fun BrowseModes(mode: String, onChange: (String) -> Unit) {
                 ) {
                     Text(label, color = if (sel || focused) Color.Black else Col.Text, fontSize = 13.sp,
                         fontWeight = if (sel) FontWeight.SemiBold else FontWeight.Medium)
+                }
+            }
+        }
+        if (!d.compact) {
+            // A la derecha y discreto: ver la lista completa (con buscador y orden)
+            Spacer(Modifier.weight(1f))
+            val label = if (kind == Kind.MOVIE) "Todas las películas" else "Todas las series"
+            Focusable(Modifier.height(34.dp), key = "all-${kind.name}", shape = RoundedCornerShape(50), focusScale = 1.06f,
+                onClick = { nav.push(Screen.Category(kind, Category(ALL_ID, label), search = false)) }) { focused ->
+                Box(
+                    Modifier.fillMaxHeight().background(if (focused) Color.White else Color.Transparent).padding(horizontal = 14.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text("Ver " + label.replaceFirstChar { it.lowercase() } + "  ›", color = if (focused) Color.Black else Col.Sub,
+                        fontSize = 13.sp, fontWeight = FontWeight.Medium)
                 }
             }
         }
