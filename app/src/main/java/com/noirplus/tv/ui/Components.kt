@@ -280,7 +280,8 @@ fun ActionButton(
 fun SectionTitle(text: String, onSeeAll: (() -> Unit)? = null, year: String? = null, tag: String? = null) {
     val compact = LocalDims.current.compact
     val size = if (compact) 15 else 17
-    Row(Modifier.fillMaxWidth().padding(start = edge, top = 10.dp, end = edge), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().padding(start = edge, top = 10.dp, end = edge - 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
         Text(
             buildAnnotatedString {
                 append(text)
@@ -304,7 +305,7 @@ fun SectionTitle(text: String, onSeeAll: (() -> Unit)? = null, year: String? = n
                 color = Col.Sub, fontSize = 9.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.6.sp,
             )
         }
-        Spacer(Modifier.weight(1f))
+        }
         if (onSeeAll != null) {
             Text(
                 "Ver todo",
@@ -733,15 +734,24 @@ fun FeaturedPager(items: List<Item>, label: String = "Recién llegados") {
     }
     val pager = rememberPagerState(pageCount = { items.size })
     val dragged by pager.interactionSource.collectIsDraggedAsState()
-    LaunchedEffect(pager.currentPage, dragged) {
-        if (dragged) return@LaunchedEffect
+    LaunchedEffect(pager.settledPage, dragged, items.size) {
+        if (dragged || items.size < 2) return@LaunchedEffect
         delay(6000)
-        val next = (pager.currentPage + 1) % items.size
-        pager.animateScrollToPage(next, animationSpec = tween(700, easing = FastOutSlowInEasing))
+        val next = (pager.settledPage + 1) % items.size
+        pager.animateScrollToPage(next, animationSpec = tween(1200, easing = FastOutSlowInEasing))
     }
     Box(Modifier.fillMaxWidth()) {
-        HorizontalPager(state = pager, modifier = Modifier.fillMaxWidth()) { page ->
-            FeaturedPage(items[page], label) { nav.push(Screen.Detail(items[page])) }
+        HorizontalPager(state = pager, modifier = Modifier.fillMaxWidth(), beyondViewportPageCount = 1) { page ->
+            Box(
+                Modifier.graphicsLayer {
+                    val off = (pager.currentPage - page) + pager.currentPageOffsetFraction
+                    // Se mueven solo un 25 % y se funden: las dos portadas se solapan durante el cambio
+                    translationX = off * size.width * 0.75f
+                    alpha = (1f - kotlin.math.abs(off)).coerceIn(0f, 1f)
+                }
+            ) {
+                FeaturedPage(items[page], label) { nav.push(Screen.Detail(items[page])) }
+            }
         }
         Row(
             Modifier.align(Alignment.BottomCenter).padding(bottom = 10.dp),
