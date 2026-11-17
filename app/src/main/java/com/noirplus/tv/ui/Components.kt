@@ -534,8 +534,9 @@ fun CategoryRow(
     val src = Repo.source ?: return
     val nav = LocalNav.current
     val d = LocalDims.current
-    val items by produceState<List<Item>?>(null, kind, cat.id, Repo.dataVersion.intValue) {
-        value = runCatching { src.items(kind, cat.id) }.getOrDefault(emptyList())
+    val genreV = if (cat.id.startsWith(com.noirplus.tv.data.Library.GENRE)) com.noirplus.tv.data.Tmdb.genreVersion.intValue else 0
+    val items by produceState<List<Item>?>(null, kind, cat.id, Repo.dataVersion.intValue, genreV) {
+        value = runCatching { com.noirplus.tv.data.Library.items(kind, cat.id) }.getOrDefault(emptyList())
     }
     val list = items
     LaunchedEffect(list) {
@@ -543,7 +544,9 @@ fun CategoryRow(
         if (first != null) onLoaded?.invoke(first)
     }
     if (list != null && list.isEmpty()) return
-    val pretty = remember(cat.name, kind) { prettyCategory(cat.name, kind) }
+    val pretty = remember(cat.name, kind) {
+        if (com.noirplus.tv.data.Library.isVirtual(cat.id)) PrettyName(cat.name, null) else prettyCategory(cat.name, kind)
+    }
     Column {
         SectionTitle(
             pretty.main,

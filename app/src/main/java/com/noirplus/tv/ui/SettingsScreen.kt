@@ -227,8 +227,8 @@ fun SettingsContent() {
                     note = "Cómo se ordena al abrir «Ver todo» o «Todas». Siempre puedes cambiarlo dentro con el botón de ordenar.") {
                     prefs.defaultSort = sortOpts[it]
                 }
-                ChoiceRow("Columnas en las carpetas", listOf("2", "3"), if (prefs.gridCols == 2) 0 else 1, "gc",
-                    note = "En el móvil, al abrir «Ver todo» o «Todas».") { prefs.gridCols = if (it == 0) 2 else 3 }
+                ChoiceRow("Columnas en las carpetas", listOf("2", "3", "4"), prefs.gridCols - 2, "gc",
+                    note = "En el móvil, al abrir «Ver todo» o «Todas». También se cambia dentro de la propia lista.") { prefs.gridCols = it + 2 }
             }
 
             Section("Subtítulos") {

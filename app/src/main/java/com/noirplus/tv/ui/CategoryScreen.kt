@@ -69,18 +69,20 @@ fun CategoryScreen(kind: Kind, cat: Category, startSearch: Boolean = false) {
     val keyboard = LocalSoftwareKeyboardController.current
     val isAll = cat.id == ALL_ID
     val prefs = Repo.prefs
-    val items by produceState<List<Item>?>(null, kind, cat.id, Repo.dataVersion.intValue) {
-        value = runCatching {
-            if (isAll) src.all(kind).filter { prefs.visible(kind, it.categoryId) } else src.items(kind, cat.id)
-        }.getOrDefault(emptyList())
+    val virtual = com.noirplus.tv.data.Library.isVirtual(cat.id)
+    var cols by remember { androidx.compose.runtime.mutableIntStateOf(prefs.gridCols) }
+    val genreV = if (cat.id.startsWith(com.noirplus.tv.data.Library.GENRE)) Tmdb.genreVersion.intValue else 0
+    val items by produceState<List<Item>?>(null, kind, cat.id, Repo.dataVersion.intValue, genreV) {
+        value = runCatching { com.noirplus.tv.data.Library.items(kind, cat.id) }.getOrDefault(emptyList())
     }
-    val pretty = remember(cat.name) { if (isAll) PrettyName(cat.name, null) else prettyCategory(cat.name, kind) }
+    val pretty = remember(cat.name) { if (virtual) PrettyName(cat.name, null) else prettyCategory(cat.name, kind) }
     var searching by rememberSaveable { mutableStateOf(startSearch) }
     var query by rememberSaveable { mutableStateOf("") }
     var sort by rememberSaveable { mutableStateOf(prefs.defaultSort) }
     // Filtro por plataforma (TMDB): se descarga el catálogo de la plataforma una vez y se cruza con la lista.
     // No aparece dentro de carpetas que ya son de una plataforma ("Series Netflix", "HBO"…).
-    val canFilter = kind != Kind.LIVE && Tmdb.configured() && (isAll || Platforms.fromFolder(cat.name) == null)
+    val canFilter = kind != Kind.LIVE && Tmdb.configured() &&
+        !com.noirplus.tv.data.Library.isPlatformList(cat.id) && (virtual || Platforms.fromFolder(cat.name) == null)
     var platform by rememberSaveable { mutableStateOf<String?>(null) }
     var catalog by remember { mutableStateOf<Tmdb.Catalog?>(null) }
     var progress by remember { mutableStateOf<String?>(null) }
@@ -170,6 +172,10 @@ fun CategoryScreen(kind: Kind, cat: Category, startSearch: Boolean = false) {
             }
             Spacer(Modifier.width(8.dp))
             SortButton(sort, prefs.defaultSort) { sort = it }
+            if (d.compact) {
+                Spacer(Modifier.width(8.dp))
+                ColumnsButton(cols) { cols = it; prefs.gridCols = it }
+            }
         }
         if (sort != prefs.defaultSort || query.isNotBlank() || platform != null) {
             Text(
@@ -193,7 +199,7 @@ fun CategoryScreen(kind: Kind, cat: Category, startSearch: Boolean = false) {
                 else -> "No hay contenido en esta categoría"
             })
             else -> LazyVerticalGrid(
-                columns = if (LocalDims.current.compact) GridCells.Fixed(Repo.prefs.gridCols) else GridCells.Adaptive(LocalDims.current.poster),
+                columns = if (LocalDims.current.compact) GridCells.Fixed(cols) else GridCells.Adaptive(LocalDims.current.poster),
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(start = d.edge, end = d.edge, top = 4.dp, bottom = 32.dp),
                 horizontalArrangement = Arrangement.spacedBy(d.gap),

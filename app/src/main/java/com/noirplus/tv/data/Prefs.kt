@@ -145,8 +145,12 @@ class Prefs(ctx: Context) {
         set(v) { sp.edit().putString("defaultSort", v.name).apply(); bump() }
 
     var gridCols: Int
-        get() = sp.getInt("gridCols", 3)
-        set(v) { sp.edit().putInt("gridCols", v.coerceIn(2, 3)).apply(); bump() }
+        get() = sp.getInt("gridCols", 3).coerceIn(2, 4)
+        set(v) { sp.edit().putInt("gridCols", v.coerceIn(2, 4)).apply(); bump() }
+
+    /** Cómo se ve Películas/Series: "plat" (por plataforma), "genre" (por género) o "folders" (carpetas del proveedor). */
+    fun browseMode(kind: Kind): String = sp.getString("browse_${kind.name}", "plat") ?: "plat"
+    fun setBrowseMode(kind: Kind, v: String) { sp.edit().putString("browse_${kind.name}", v).apply(); bump() }
 
     // ---------- Valoraciones propias ----------
     fun ratings(): List<Rating> {

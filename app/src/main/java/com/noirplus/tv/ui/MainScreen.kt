@@ -61,6 +61,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.noirplus.tv.data.Category
+import com.noirplus.tv.data.Library
+import com.noirplus.tv.data.Platforms
+import com.noirplus.tv.data.Tmdb
 import com.noirplus.tv.data.Item
 import com.noirplus.tv.data.Kind
 import com.noirplus.tv.data.PlayRequest
@@ -435,6 +438,8 @@ fun BrowseContent(kind: Kind) {
     }
     val featured by produceState(emptyList<Item>(), kind, changes, Repo.dataVersion.intValue) { value = recentOf(kind, 10) }
     val title = if (kind == Kind.MOVIE) "Películas" else "Series"
+    var mode by remember(kind) { mutableStateOf(if (Tmdb.configured()) prefs.browseMode(kind) else "folders") }
+    LaunchedEffect(mode, kind) { if (mode == "genre") Tmdb.indexGenres(kind) }
 
     val c = cats
     when {
@@ -444,9 +449,60 @@ fun BrowseContent(kind: Kind) {
             if (d.compact) FeaturedPager(featured)
             else HeroArea(hero ?: cycling(featured), title, "Explora las categorías de tu lista")
         }) {
+            item(key = "modes") { BrowseModes(mode) { mode = it; prefs.setBrowseMode(kind, it) } }
             item(key = "all") { AllEntryRow(kind) }
-            itemsIndexed(c, key = { i, cat -> "$i:${cat.id}" }) { _, cat ->
-                CategoryRow(kind, cat) { hero = it }
+            when (mode) {
+                "plat" -> {
+                    itemsIndexed(Platforms.main, key = { _, g -> "p:$g" }) { _, g ->
+                        CategoryRow(kind, Category(Library.PLAT + g, g)) { hero = it }
+                    }
+                    item(key = "noplat") {
+                        CategoryRow(kind, Category(Library.NO_PLAT, if (kind == Kind.MOVIE) "Cine y otras" else "Otras series")) { hero = it }
+                    }
+                }
+                "genre" -> {
+                    item(key = "gprog") {
+                        val p = Tmdb.genreProgress.value
+                        if (p != null) Text(
+                            "Clasificando por géneros… ${p.first}/${p.second}. Las filas se completan solas.",
+                            color = Col.Sub, fontSize = 12.sp, modifier = Modifier.padding(horizontal = d.edge, vertical = 4.dp),
+                        )
+                    }
+                    val genres = Tmdb.genreNames(kind).entries.toList()
+                    itemsIndexed(genres, key = { _, g -> "g:${g.key}" }) { _, g ->
+                        CategoryRow(kind, Category(Library.GENRE + g.key, g.value)) { hero = it }
+                    }
+                }
+                else -> itemsIndexed(c, key = { i, cat -> "$i:${cat.id}" }) { _, cat ->
+                    CategoryRow(kind, cat) { hero = it }
+                }
+            }
+        }
+    }
+}
+
+/** Selector de vista de Películas/Series: por plataforma, por género o por carpetas del proveedor. */
+@Composable
+private fun BrowseModes(mode: String, onChange: (String) -> Unit) {
+    val d = LocalDims.current
+    val opts = listOf("plat" to "Plataformas", "genre" to "Géneros", "folders" to "Carpetas")
+    Row(
+        Modifier.fillMaxWidth().padding(start = d.edge, end = d.edge, top = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        opts.forEach { (k, label) ->
+            val sel = k == mode
+            Focusable(Modifier.height(34.dp), key = "mode-$k", shape = RoundedCornerShape(50), focusScale = 1.06f,
+                onClick = { onChange(k) }) { focused ->
+                Box(
+                    Modifier.fillMaxHeight()
+                        .background(if (sel || focused) Color.White else Color.White.copy(alpha = 0.10f))
+                        .padding(horizontal = 16.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(label, color = if (sel || focused) Color.Black else Col.Text, fontSize = 13.sp,
+                        fontWeight = if (sel) FontWeight.SemiBold else FontWeight.Medium)
+                }
             }
         }
     }

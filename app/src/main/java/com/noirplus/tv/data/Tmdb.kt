@@ -40,6 +40,8 @@ object Tmdb {
 
     fun init(ctx: android.content.Context) {
         file = File(ctx.filesDir, "tmdb_platforms.json")
+        genreFile = File(ctx.filesDir, "tmdb_genres.json")
+        loadGenres()
         runCatching {
             val o = JSONObject(file!!.readText())
             val now = System.currentTimeMillis()
@@ -76,15 +78,21 @@ object Tmdb {
     // En vez de preguntar título a título, se descarga una vez la lista de lo que hay en
     // la plataforma (unas decenas de páginas en paralelo) y se cruza con tu lista al instante.
 
-    /** Lo que hay en una plataforma: ids de TMDB y títulos normalizados con sus años. */
-    class Catalog(val ids: Set<String>, val titles: Map<String, List<Int>>) {
-        fun has(item: Item): Boolean {
-            item.tmdb?.let { if (it in ids) return true }
+    /** Una película o serie del catálogo de TMDB: año y géneros. */
+    class Entry(val year: Int, val genres: List<Int>)
+
+    /** Lo que hay en una plataforma: fichas por id de TMDB y, por cada título normalizado, sus ids. */
+    class Catalog(val entries: Map<String, Entry>, val titles: Map<String, List<String>>) {
+        /** Id de TMDB de un título de tu lista dentro de este catálogo, o null si no está. */
+        fun match(item: Item): String? {
+            item.tmdb?.let { if (entries.containsKey(it)) return it }
             val (q, y) = clean(item.name)
-            val years = titles[titleKey(q)] ?: return false
-            val year = (item.year ?: y)?.take(4)?.toIntOrNull() ?: return true
-            return years.isEmpty() || years.any { it == 0 || kotlin.math.abs(it - year) <= 1 }
+            val ids = titles[titleKey(q)] ?: return null
+            val year = (item.year ?: y)?.take(4)?.toIntOrNull() ?: return ids.firstOrNull()
+            return ids.firstOrNull { val e = entries[it]; e == null || e.year == 0 || kotlin.math.abs(e.year - year) <= 1 }
         }
+        fun has(item: Item): Boolean = match(item) != null
+        fun genresOf(item: Item): List<Int>? = match(item)?.let { entries[it]?.genres }
     }
 
     private val catalogs = ConcurrentHashMap<String, Catalog>()
@@ -106,7 +114,7 @@ object Tmdb {
     /** Catálogo de una plataforma (se guarda una semana). onProgress(hechas, total) en páginas. */
     private fun catFile(kind: Kind, group: String): File? {
         val type = if (kind == Kind.SERIES) "tv" else "movie"
-        return file?.parentFile?.let { File(it, "tmdb_cat_" + titleKey("$type:$group").replace(' ', '_') + ".json") }
+        return file?.parentFile?.let { File(it, "tmdb_cat2_" + titleKey("$type:$group").replace(' ', '_') + ".json") }
     }
 
     private fun isFresh(kind: Kind, group: String): Boolean =
@@ -126,9 +134,10 @@ object Tmdb {
                 val type = if (kind == Kind.SERIES) "tv" else "movie"
                 if (isFresh(kind, group) || catalogs.containsKey("$type:$group")) continue
                 runCatching { catalog(kind, group, slow = true) }
-                catalogs.remove("$type:$group") // no se queda en memoria: se lee del disco cuando haga falta
                 kotlinx.coroutines.delay(2_000)
             }
+            // Después, los géneros de lo que no está en ninguna plataforma
+            if (Repo.source != null) { indexGenres(Kind.MOVIE); genreJobs[Kind.MOVIE]?.join(); indexGenres(Kind.SERIES) }
         }
     }
     @Volatile private var preloadStarted = false
@@ -143,12 +152,17 @@ object Tmdb {
         runCatching {
             if (f != null && f.exists() && System.currentTimeMillis() - f.lastModified() < WEEK) {
                 val o = JSONObject(f.readText())
-                val idsA = o.getJSONArray("ids")
+                val eO = o.getJSONObject("e")
                 val tO = o.getJSONObject("t")
-                val titles = HashMap<String, List<Int>>()
-                for (k in tO.keys()) { val a = tO.getJSONArray(k); titles[k] = (0 until a.length()).map { a.optInt(it) } }
-                return@coroutineScope Catalog((0 until idsA.length()).map { idsA.optString(it) }.toSet(), titles)
-                    .also { catalogs[id] = it }
+                val entries = HashMap<String, Entry>()
+                for (k in eO.keys()) {
+                    val a = eO.getJSONArray(k)
+                    val g = a.optJSONArray(1)
+                    entries[k] = Entry(a.optInt(0), (0 until (g?.length() ?: 0)).map { g!!.optInt(it) })
+                }
+                val titles = HashMap<String, List<String>>()
+                for (k in tO.keys()) { val a = tO.getJSONArray(k); titles[k] = (0 until a.length()).map { a.optString(it) } }
+                return@coroutineScope Catalog(entries, titles).also { catalogs[id] = it }
             }
         }
         val prov = providerIds(type, group) ?: return@coroutineScope null
@@ -159,7 +173,7 @@ object Tmdb {
         first.optJSONArray("results")?.let { results[1] = it }
         val done = AtomicInteger(1)
         onProgress(1, pages)
-        val sem = Semaphore(if (slow) 2 else 16)
+        val sem = Semaphore(if (slow) 2 else 8)
         (2..pages).map { pg ->
             async(Dispatchers.IO) {
                 sem.withPermit {
@@ -171,27 +185,134 @@ object Tmdb {
                 onProgress(done.incrementAndGet(), pages)
             }
         }.awaitAll()
-        val ids = HashSet<String>()
-        val titles = HashMap<String, MutableList<Int>>()
+        val entries = HashMap<String, Entry>()
+        val titles = HashMap<String, MutableList<String>>()
         for (arr in results.values) for (i in 0 until arr.length()) {
             val o = arr.optJSONObject(i) ?: continue
-            ids.add(o.optString("id"))
+            val tid = o.optString("id").takeIf { it.isNotBlank() } ?: continue
             val year = (o.optString(if (type == "tv") "first_air_date" else "release_date")).take(4).toIntOrNull() ?: 0
+            val g = o.optJSONArray("genre_ids")
+            entries[tid] = Entry(year, (0 until (g?.length() ?: 0)).map { g!!.optInt(it) })
             for (k in listOf("title", "original_title", "name", "original_name")) {
                 val t = o.optString(k).takeIf { it.isNotBlank() } ?: continue
                 val key = titleKey(t)
-                if (key.isNotEmpty()) titles.getOrPut(key) { ArrayList() }.let { if (year !in it) it.add(year) }
+                if (key.isNotEmpty()) titles.getOrPut(key) { ArrayList() }.let { if (tid !in it) it.add(tid) }
             }
         }
-        val cat = Catalog(ids, titles)
+        val cat = Catalog(entries, titles)
         catalogs[id] = cat
         // Solo se guarda si llegaron casi todas las páginas
         if (f != null && results.size >= pages * 9 / 10) runCatching {
+            val eO = JSONObject()
+            for ((k, v) in entries) eO.put(k, org.json.JSONArray().put(v.year).put(org.json.JSONArray(v.genres)))
             val tO = JSONObject()
             for ((k, v) in titles) tO.put(k, org.json.JSONArray(v))
-            f.writeText(JSONObject().put("ids", org.json.JSONArray(ids.toList())).put("t", tO).toString())
+            f.writeText(JSONObject().put("e", eO).put("t", tO).toString())
         }
         cat
+    }
+
+    /** Catálogos de todas las plataformas de un tipo (de disco si están, si no se descargan). */
+    suspend fun allCatalogs(kind: Kind): Map<String, Catalog> = coroutineScope {
+        Platforms.main.map { g -> async { g to runCatching { catalog(kind, g) }.getOrNull() } }.awaitAll()
+            .mapNotNull { (g, c) -> c?.let { g to it } }.toMap()
+    }
+
+    // --- Géneros de cada título de tu lista ---
+    // Primero se miran los catálogos de plataformas (ya traen los géneros). Lo que no esté en ninguna
+    // plataforma (estrenos de cine, etc.) se busca en TMDB poco a poco en segundo plano y se guarda.
+
+    val movieGenres = linkedMapOf(
+        28 to "Acción", 12 to "Aventura", 16 to "Animación", 35 to "Comedia", 80 to "Crimen", 99 to "Documental",
+        18 to "Drama", 10751 to "Familia", 14 to "Fantasía", 36 to "Historia", 27 to "Terror", 10402 to "Música",
+        9648 to "Misterio", 10749 to "Romance", 878 to "Ciencia ficción", 53 to "Suspense", 10752 to "Bélica", 37 to "Western",
+    )
+    val tvGenres = linkedMapOf(
+        10759 to "Acción y aventura", 16 to "Animación", 35 to "Comedia", 80 to "Crimen", 99 to "Documental",
+        18 to "Drama", 10751 to "Familia", 10762 to "Infantil", 9648 to "Misterio", 10764 to "Reality",
+        10765 to "Ciencia ficción y fantasía", 10768 to "Bélica y política", 37 to "Western", 10766 to "Telenovela",
+    )
+    fun genreNames(kind: Kind) = if (kind == Kind.SERIES) tvGenres else movieGenres
+
+    private val genreMeta = ConcurrentHashMap<String, List<Int>>() // item.key → géneros (vacío = no encontrado)
+    private var genreFile: File? = null
+    @Volatile private var genreDirty = false
+    /** Sube cada vez que se clasifican más títulos, para refrescar las filas de géneros. */
+    val genreVersion = androidx.compose.runtime.mutableIntStateOf(0)
+    /** Progreso de la clasificación en segundo plano: (hechos, total) o null si no hay ninguna en marcha. */
+    val genreProgress = androidx.compose.runtime.mutableStateOf<Pair<Int, Int>?>(null)
+
+    private fun loadGenres() {
+        val f = genreFile ?: return
+        runCatching {
+            val o = JSONObject(f.readText())
+            for (k in o.keys()) { val a = o.getJSONArray(k); genreMeta[k] = (0 until a.length()).map { a.optInt(it) } }
+        }
+    }
+
+    private fun saveGenres() {
+        val f = genreFile ?: return
+        if (!genreDirty) return
+        genreDirty = false
+        runCatching {
+            val o = JSONObject()
+            for ((k, v) in genreMeta) o.put(k, org.json.JSONArray(v))
+            f.writeText(o.toString())
+        }
+    }
+
+    /** Géneros de un título: de los catálogos (si se pasan) o de lo ya clasificado. null = aún sin clasificar. */
+    fun genresOf(item: Item, cats: Collection<Catalog>): List<Int>? {
+        for (c in cats) c.genresOf(item)?.let { return it }
+        return genreMeta[item.key]
+    }
+
+    private val genreJobs = ConcurrentHashMap<Kind, kotlinx.coroutines.Job>()
+
+    /** Clasifica por géneros, poco a poco, lo que no esté en ningún catálogo de plataforma. */
+    fun indexGenres(kind: Kind) {
+        if (!configured() || kind == Kind.LIVE) return
+        if (genreJobs[kind]?.isActive == true) return
+        genreJobs[kind] = bg.launch {
+            val src = Repo.source ?: return@launch
+            val items = runCatching { src.all(kind) }.getOrNull() ?: return@launch
+            val cats = allCatalogs(kind).values
+            val pending = items.filter { genresOf(it, cats) == null }
+            if (pending.isEmpty()) return@launch
+            val type = if (kind == Kind.SERIES) "tv" else "movie"
+            val sem = Semaphore(2)
+            val done = AtomicInteger(0)
+            genreProgress.value = 0 to pending.size
+            try {
+                pending.map { item ->
+                    async {
+                        sem.withPermit {
+                            kotlinx.coroutines.delay(400)
+                            val (q, year) = clean(item.name)
+                            if (q.isNotBlank()) {
+                                val yp = year?.let { if (type == "tv") "&first_air_date_year=$it" else "&year=$it" } ?: ""
+                                val r = get("/search/$type", "query=${enc(q)}&include_adult=false$yp")
+                                if (r != null) {
+                                    val g = r.optJSONArray("results")?.optJSONObject(0)?.optJSONArray("genre_ids")
+                                    genreMeta[item.key] = (0 until (g?.length() ?: 0)).map { g!!.optInt(it) }
+                                    genreDirty = true
+                                }
+                            }
+                        }
+                        val n = done.incrementAndGet()
+                        if (n % 25 == 0 || n == pending.size) {
+                            saveGenres()
+                            genreProgress.value = n to pending.size
+                            genreVersion.intValue++
+                        }
+                    }
+                }.awaitAll()
+            } finally {
+                saveGenres()
+                genreProgress.value = null
+                genreVersion.intValue++
+            }
+        }
     }
 
     private suspend fun get(path: String, params: String = "", key: String = this.key): JSONObject? = withContext(Dispatchers.IO) {

@@ -122,3 +122,37 @@ fun PlatformButton(selected: String?, options: List<String>, onChange: (String?)
         }
     }
 }
+
+/** Icono "columnas" (cuadrícula 2×2). */
+val GridIcon: ImageVector = materialIcon(name = "Filled.GridSmall") {
+    materialPath {
+        moveTo(4f, 4f); horizontalLineTo(11f); verticalLineTo(11f); horizontalLineTo(4f); close()
+        moveTo(13f, 4f); horizontalLineTo(20f); verticalLineTo(11f); horizontalLineTo(13f); close()
+        moveTo(4f, 13f); horizontalLineTo(11f); verticalLineTo(20f); horizontalLineTo(4f); close()
+        moveTo(13f, 13f); horizontalLineTo(20f); verticalLineTo(20f); horizontalLineTo(13f); close()
+    }
+}
+
+/** Botón para elegir 2, 3 o 4 columnas desde la propia lista (móvil). */
+@Composable
+fun ColumnsButton(cols: Int, onChange: (Int) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        RoundIconButton(GridIcon, "Columnas") { open = true }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }, modifier = Modifier.background(Col.Surface2)) {
+            (2..4).forEach { n ->
+                val sel = n == cols
+                DropdownMenuItem(
+                    text = {
+                        Text("$n columnas", color = if (sel) Color.White else Col.Sub, fontSize = 14.sp,
+                            fontWeight = if (sel) FontWeight.SemiBold else FontWeight.Normal)
+                    },
+                    onClick = {
+                        onChange(n)
+                        open = false
+                    },
+                )
+            }
+        }
+    }
+}
