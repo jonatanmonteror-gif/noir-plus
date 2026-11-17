@@ -35,6 +35,7 @@ data class Item(
         .put("plot", plot ?: "")
         .put("year", year ?: "")
         .put("tmdb", tmdb ?: "")
+        .put("added", added)
 
     companion object {
         fun fromJson(o: JSONObject): Item = Item(
@@ -49,6 +50,7 @@ data class Item(
             plot = o.str("plot"),
             year = o.str("year"),
             tmdb = o.str("tmdb"),
+            added = o.optLong("added"),
         )
     }
 }

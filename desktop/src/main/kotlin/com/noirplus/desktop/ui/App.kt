@@ -128,6 +128,14 @@ private fun Sidebar(nav: Nav) {
         NavItem(Icons.Outlined.Search, Icons.Filled.Search, "Buscar", root == Screen.Search) { nav.tab(Screen.Search) }
         Spacer(Modifier.weight(1f))
         NavItem(Icons.Outlined.Settings, Icons.Filled.Settings, "Ajustes", root == Screen.Settings) { nav.tab(Screen.Settings) }
+        // Sin barra de título: botones para minimizar y salir
+        if (com.noirplus.desktop.LocalWindowMode.current != "window") {
+            val ws = com.noirplus.desktop.LocalWindowState.current
+            Row(Modifier.padding(start = 4.dp, top = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                NavMini(Icons.Filled.Minimize, "Minimizar") { ws.isMinimized = true }
+                NavMini(Icons.Filled.Close, "Salir") { kotlin.system.exitProcess(0) }
+            }
+        }
         Text("v${BuildInfo.VERSION}", color = Col.Sub.copy(alpha = 0.5f), fontSize = 11.sp, modifier = Modifier.padding(start = 12.dp, top = 10.dp))
     }
 }
@@ -184,3 +192,15 @@ fun kotlinx.coroutines.CoroutineScope.launchCatching(onError: (String) -> Unit, 
 
 /** Para que la lista se recargue cuando se pide desde Ajustes. */
 fun reloadLists() = Repo.refresh()
+
+
+@Composable
+private fun NavMini(icon: ImageVector, desc: String, onClick: () -> Unit) {
+    val src = remember { MutableInteractionSource() }
+    val hovered by src.collectIsHoveredAsState()
+    Box(
+        Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(Color.White.copy(alpha = if (hovered) 0.14f else 0.06f))
+            .hoverable(src).clickable(interactionSource = src, indication = null) { onClick() }.pointerHoverIcon(PointerIcon.Hand),
+        contentAlignment = Alignment.Center,
+    ) { Icon(icon, desc, tint = Col.Text, modifier = Modifier.size(18.dp)) }
+}

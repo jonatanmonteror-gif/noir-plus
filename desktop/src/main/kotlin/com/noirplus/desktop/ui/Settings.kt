@@ -48,22 +48,36 @@ fun SettingsScreen() {
                 NButton("Cambiar de cuenta") { Store.logout(); Repo.rebuild() }
             }
         }
+        Card("Pantalla") {
+            Text("Cómo se abre Noir+", color = Col.Text, fontSize = 14.sp)
+            Seg(listOf("Pantalla completa" to "full", "Inmersiva" to "immersive", "Ventana" to "window"), { Store.windowMode }) { Store.windowMode = it }
+            Text("Pantalla completa: sin barra de título. Inmersiva: oculta también la barra de Windows. Ventana: normal, con su barra.",
+                color = Col.Sub, fontSize = 12.sp, lineHeight = 17.sp)
+        }
+        Card("Subtítulos") {
+            Text("Así se verán en todo lo que reproduzcas. También se pueden cambiar desde el reproductor.", color = Col.Sub, fontSize = 12.sp)
+            SubStyleControls(changes, compact = false) {}
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Retardo por defecto", color = Col.Text, fontSize = 13.sp, modifier = Modifier.width(160.dp))
+                Stepper(String.format("%+.1f s", Store.subDelayMs / 1000f), { Store.subDelayMs -= 100 }, { Store.subDelayMs += 100 })
+            }
+        }
+        Card("Plataformas") {
+            Text("Las plataformas (Netflix, Disney+…), los géneros y las fechas de estreno vienen de TMDB. " +
+                "Este producto usa la API de TMDB pero no está respaldado ni certificado por TMDB.", color = Col.Sub, fontSize = 12.sp, lineHeight = 17.sp)
+        }
         Card("Reproducción") {
             Text("Formato de los canales en directo", color = Col.Text, fontSize = 14.sp)
-            Seg(listOf("TS" to "ts", "HLS (m3u8)" to "m3u8"), Store.liveFormat) { Store.liveFormat = it; Repo.rebuild() }
+            Seg(listOf("TS" to "ts", "HLS (m3u8)" to "m3u8"), { Store.liveFormat }) { Store.liveFormat = it; Repo.rebuild() }
             Text("Si un canal no carga, prueba el otro formato.", color = Col.Sub, fontSize = 12.sp)
-            Spacer(Modifier.height(6.dp))
-            Text("Tamaño de los subtítulos", color = Col.Text, fontSize = 14.sp)
-            Seg(listOf("Pequeño" to "70", "Normal" to "100", "Grande" to "130", "Muy grande" to "160"), Store.subScale.toString()) {
-                Store.subScale = it.toInt()
-            }
+
             Spacer(Modifier.height(6.dp))
             Text("Botones del reproductor", color = Col.Text, fontSize = 14.sp)
             Text("Cada opción va en un sitio: como botón en pantalla o dentro de la ruedita, nunca en los dos.", color = Col.Sub, fontSize = 12.sp)
             QuickOptions.forEach { (k, label) ->
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text(label, color = Col.Text, fontSize = 14.sp, modifier = Modifier.weight(1f))
-                    Seg(listOf("Botón" to "1", "En la ruedita" to "0"), if (Store.quick(k)) "1" else "0") { Store.setQuick(k, it == "1") }
+                    Seg(listOf("Botón" to "1", "En la ruedita" to "0"), { if (Store.quick(k)) "1" else "0" }) { Store.setQuick(k, it == "1") }
                 }
             }
             Spacer(Modifier.height(6.dp))
@@ -99,6 +113,7 @@ fun SettingsScreen() {
             Text("Cada versión se comprueba con su huella SHA-256 antes de instalarse.", color = Col.Sub, fontSize = 12.sp)
         }
         Card("Acerca de") {
+            Text(Startup.summary(), color = Col.Sub, fontSize = 12.sp, lineHeight = 17.sp)
             Text("Noir+ para Windows. El vídeo se reproduce con VLC (debe estar instalado, versión de 64 bits).",
                 color = Col.Sub, fontSize = 13.sp, lineHeight = 18.sp)
         }
@@ -123,7 +138,10 @@ private fun Row2(label: String, value: String) {
 }
 
 @Composable
-fun Seg(options: List<Pair<String, String>>, selected: String, onSelect: (String) -> Unit) {
+fun Seg(options: List<Pair<String, String>>, selectedOf: () -> String, onSelect: (String) -> Unit) {
+    // Se lee aquí dentro para que la opción elegida se marque al momento
+    Store.changes.intValue
+    val selected = selectedOf()
     Row(Modifier.clip(RoundedCornerShape(50)).background(Col.Surface2).padding(3.dp)) {
         options.forEach { (label, v) ->
             val s = v == selected

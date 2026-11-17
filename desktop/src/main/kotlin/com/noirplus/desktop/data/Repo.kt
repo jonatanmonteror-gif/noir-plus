@@ -14,8 +14,9 @@ object Repo {
 
     fun rebuild() {
         source = when (Store.type) {
-            "xtream" -> XtreamSource(Store.server, Store.user, Store.pass) { Store.liveFormat }
-            "m3u" -> M3uSource(Store.m3u)
+            "xtream" -> CachedSource(XtreamSource(Store.server, Store.user, Store.pass) { Store.liveFormat },
+                "x|${Store.server}|${Store.user}|${Store.liveFormat}")
+            "m3u" -> CachedSource(M3uSource(Store.m3u), "m|${Store.m3u}")
             else -> null
         }
         dataVersion.intValue++

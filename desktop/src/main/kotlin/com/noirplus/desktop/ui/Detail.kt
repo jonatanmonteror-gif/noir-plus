@@ -50,6 +50,15 @@ private fun Header(item: Item, d: Details?, extra: String?) {
         Text(it, color = Col.Text.copy(alpha = 0.88f), fontSize = 16.sp, lineHeight = 23.sp, maxLines = 6, overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(top = 16.dp).widthIn(max = 720.dp))
     }
+    // En qué plataformas está (según TMDB)
+    val plats by produceState(emptyList<String>(), item.key) {
+        if (item.kind != Kind.LIVE) { runCatching { Tmdb.allCatalogs(item.kind) }; value = Tmdb.platformsOf(item) }
+    }
+    if (plats.isNotEmpty()) {
+        Text("Disponible en " + plats.joinToString(" · "), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(top = 12.dp).clip(RoundedCornerShape(50)).background(Color.White.copy(alpha = 0.12f))
+                .padding(horizontal = 12.dp, vertical = 6.dp))
+    }
     d?.cast?.takeIf { it.isNotBlank() }?.let {
         Text("Reparto: $it", color = Col.Sub, fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(top = 10.dp).widthIn(max = 720.dp))

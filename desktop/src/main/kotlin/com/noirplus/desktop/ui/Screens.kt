@@ -127,7 +127,10 @@ fun HomeScreen() {
     val changes = Store.changes.intValue
     val dv = Repo.dataVersion.intValue
     val history = remember(changes) { Store.history() }
-    val movies by produceState(emptyList<Item>(), dv) { value = Repo.recent(Kind.MOVIE, 20) }
+    val movies by produceState(emptyList<Item>(), dv) {
+        value = Repo.recent(Kind.MOVIE, 20)
+        if (Startup.listsAt == 0L) Startup.listsAt = System.currentTimeMillis()
+    }
     val series by produceState(emptyList<Item>(), dv) { value = Repo.recent(Kind.SERIES, 20) }
     var heroIndex by remember { mutableIntStateOf(0) }
     val featured = remember(movies, series) { (movies.take(5).zip(series.take(5)).flatMap { listOf(it.first, it.second) }).ifEmpty { movies + series } }
@@ -198,6 +201,7 @@ fun BrowseScreen(kind: Kind) {
         value = try { src.categories(kind).newestFirst() } catch (t: Throwable) { error = friendlyError(t); emptyList() }
     }
     val nav = LocalNav.current
+    var mode by remember(kind) { mutableStateOf(Store.browseMode(kind)) }
     val c = cats
     when {
         c == null -> Loading()
@@ -212,7 +216,23 @@ fun BrowseScreen(kind: Kind) {
                     }
                 }
             }
-            items(c, key = { it.id }) { cat -> CategoryRow(kind, cat) }
+            item(key = "modes") {
+                Row(Modifier.padding(start = 40.dp, top = 4.dp, bottom = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("plat" to "Plataformas", "genre" to "Géneros", "folders" to "Carpetas").forEach { (k, l) ->
+                        Chip(l, mode == k) { mode = k; Store.setBrowseMode(kind, k) }
+                    }
+                }
+            }
+            when (mode) {
+                "plat" -> {
+                    items(Tmdb.platforms, key = { "p:$it" }) { g -> CategoryRow(kind, Category(Library.PLAT + g, g)) }
+                    item(key = "noplat") { CategoryRow(kind, Category(Library.NO_PLAT, if (kind == Kind.MOVIE) "Cine y otras" else "Otras series")) }
+                }
+                "genre" -> items(Tmdb.genreNames(kind).entries.toList(), key = { "g:${it.key}" }) { g ->
+                    CategoryRow(kind, Category(Library.GENRE + g.key, g.value))
+                }
+                else -> items(c, key = { it.id }) { cat -> CategoryRow(kind, cat) }
+            }
         }
     }
 }
@@ -224,10 +244,10 @@ fun CategoryRow(kind: Kind, cat: Category) {
     val src = Repo.source ?: return
     val nav = LocalNav.current
     val dv = Repo.dataVersion.intValue
-    val items by produceState<List<Item>?>(null, cat.id, dv) { value = runCatching { src.items(kind, cat.id) }.getOrDefault(emptyList()) }
+    val items by produceState<List<Item>?>(null, cat.id, dv) { value = runCatching { Library.items(kind, cat.id) }.getOrDefault(emptyList()) }
     val l = items
     if (l != null && l.isEmpty()) return
-    val pretty = remember(cat.name) { prettyCategory(cat.name, kind) }
+    val pretty = remember(cat.name) { if (Library.isVirtual(cat.id)) PrettyName(cat.name, null) else prettyCategory(cat.name, kind) }
     Column {
         SectionTitle(pretty.main + (pretty.year?.let { " ($it)" } ?: "")) { nav.push(Screen.Category(kind, cat)) }
         if (l == null) Box(Modifier.fillMaxWidth().height(290.dp))
@@ -241,7 +261,7 @@ fun CategoryScreen(kind: Kind, cat: Category) {
     val nav = LocalNav.current
     val dv = Repo.dataVersion.intValue
     val items by produceState<List<Item>?>(null, cat.id, dv) {
-        value = runCatching { if (cat.id == ALL_ID) src.all(kind) else src.items(kind, cat.id) }.getOrDefault(emptyList())
+        value = runCatching { Library.items(kind, if (cat.id == ALL_ID) Library.ALL else cat.id) }.getOrDefault(emptyList())
     }
     var query by remember { mutableStateOf("") }
     var sort by remember { mutableStateOf(0) } // 0 recientes, 1 A-Z, 2 valoración, 3 original
@@ -249,14 +269,14 @@ fun CategoryScreen(kind: Kind, cat: Category) {
         val q = normText(query.trim())
         items?.filter { q.isEmpty() || normText(it.name).contains(q) }?.let { l ->
             when (sort) {
-                0 -> l.sortedWith(compareByDescending<Item> { it.added }.thenByDescending { it.year?.toIntOrNull() ?: 0 })
+                0 -> if (kind == Kind.LIVE) l else Tmdb.byRelease(l)
                 1 -> l.sortedBy { normText(it.name) }
                 2 -> l.sortedByDescending { it.rating?.toFloatOrNull() ?: 0f }
                 else -> l
             }
         }
     }
-    val title = remember(cat.name) { if (cat.id == ALL_ID) cat.name else prettyCategory(cat.name, kind).let { it.main + (it.year?.let { y -> " ($y)" } ?: "") } }
+    val title = remember(cat.name) { if (cat.id == ALL_ID || Library.isVirtual(cat.id)) cat.name else prettyCategory(cat.name, kind).let { it.main + (it.year?.let { y -> " ($y)" } ?: "") } }
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(start = 40.dp, end = 40.dp, top = 24.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("‹", color = Col.Text, fontSize = 30.sp, modifier = Modifier.clickable { nav.pop() }.pointerHoverIcon(PointerIcon.Hand).padding(end = 14.dp))

@@ -97,6 +97,42 @@ object Store {
         q.put(k, v); save()
     }
 
+    /** Ventana: "full" (pantalla completa sin barra de título, por defecto), "immersive" (oculta también la barra de Windows) o "window". */
+    var windowMode: String
+        get() = s("windowMode").ifBlank { "full" }
+        set(v) { o.put("windowMode", v); save() }
+
+    // ---------- Subtítulos (los dibuja VLC con estas opciones) ----------
+    var subFont: String
+        get() = s("subFont").ifBlank { "Segoe UI" }
+        set(v) { o.put("subFont", v); save() }
+    /** Color del texto en RGB. */
+    var subColor: Int
+        get() = o.optInt("subColor", 0xFFFFFF)
+        set(v) { o.put("subColor", v); save() }
+    /** Fondo: 0 sin fondo, 1 sombra, 2 caja semitransparente. */
+    var subBg: Int
+        get() = o.optInt("subBg", 1)
+        set(v) { o.put("subBg", v.coerceIn(0, 2)); save() }
+    /** Distancia desde abajo, en píxeles del vídeo. */
+    var subMargin: Int
+        get() = o.optInt("subMargin", 40)
+        set(v) { o.put("subMargin", v.coerceIn(0, 600)); save() }
+    /** Contorno: 0 ninguno, 1 fino, 2 normal, 3 grueso. */
+    var subOutline: Int
+        get() = o.optInt("subOutline", 2)
+        set(v) { o.put("subOutline", v.coerceIn(0, 3)); save() }
+    /** Retardo por defecto en milisegundos. */
+    var subDelayMs: Int
+        get() = o.optInt("subDelayMs", 0)
+        set(v) { o.put("subDelayMs", v.coerceIn(-5000, 5000)); save() }
+    /** Versión del estilo: sube con cada cambio para volver a preparar el reproductor. */
+    val subStyleKey: String get() = "$subScale|$subFont|$subColor|$subBg|$subMargin|$subOutline"
+
+    /** Vista de Películas/Series: "plat" (plataformas, por defecto), "genre" o "folders". */
+    fun browseMode(kind: Kind): String = s("browse_${kind.name}").ifBlank { "plat" }
+    fun setBrowseMode(kind: Kind, v: String) { o.put("browse_${kind.name}", v); save() }
+
     var volume: Int
         get() = o.optInt("volume", 100)
         set(v) { o.put("volume", v.coerceIn(0, 150)); o.toString().let { runCatching { file.writeText(it) } } }

@@ -59,6 +59,19 @@ import uk.co.caprica.vlcj.player.embedded.videosurface.callback.BufferFormatCall
 import uk.co.caprica.vlcj.player.embedded.videosurface.callback.RenderCallback
 import uk.co.caprica.vlcj.player.embedded.videosurface.callback.format.RV32BufferFormat
 
+/** Opciones de VLC, incluido el estilo de los subtítulos elegido en Ajustes. */
+fun vlcArgs(): List<String> {
+    val a = mutableListOf("--no-video-title-show", "--quiet", "--avcodec-hw=any",
+        "--sub-text-scale=${Store.subScale}", "--freetype-font=${Store.subFont}", "--freetype-color=${Store.subColor}",
+        "--freetype-outline-thickness=${listOf(0, 2, 4, 6)[Store.subOutline]}", "--sub-margin=${Store.subMargin}")
+    when (Store.subBg) {
+        2 -> a += listOf("--freetype-background-opacity=160", "--freetype-background-color=0", "--freetype-shadow-opacity=0")
+        1 -> a += listOf("--freetype-background-opacity=0", "--freetype-shadow-opacity=200")
+        else -> a += listOf("--freetype-background-opacity=0", "--freetype-shadow-opacity=0")
+    }
+    return a
+}
+
 /** ¿Hay VLC instalado? Se comprueba una sola vez. */
 object Vlc {
     val available: Boolean by lazy { runCatching { NativeDiscovery().discover() }.getOrDefault(false) }
@@ -68,10 +81,8 @@ object Vlc {
  * Motor de vídeo: VLC dibuja cada fotograma en memoria y Compose lo pinta.
  * Así los controles pueden ir encima del vídeo sin parpadeos.
  */
-class VlcVideo(subScale: Int) {
-    val factory = MediaPlayerFactory(
-        "--no-video-title-show", "--quiet", "--sub-text-scale=$subScale", "--avcodec-hw=any",
-    )
+class VlcVideo {
+    val factory = MediaPlayerFactory(*vlcArgs().toTypedArray())
     val mp: EmbeddedMediaPlayer = factory.mediaPlayers().newEmbeddedMediaPlayer()
     val frame = mutableStateOf<ImageBitmap?>(null)
 
@@ -110,10 +121,15 @@ class VlcVideo(subScale: Int) {
 fun PlayerScreen(start: PlayRequest) {
     val nav = LocalNav.current
     val window = LocalWindowState.current
+    val base = if (com.noirplus.desktop.LocalWindowMode.current == "immersive") WindowPlacement.Fullscreen else WindowPlacement.Maximized
     if (!Vlc.available) return NoVlc { nav.pop() }
 
     var req by remember { mutableStateOf(start) }
-    val video = remember { VlcVideo(Store.subScale) }
+    // Si cambias el estilo de los subtítulos, se prepara el reproductor de nuevo y sigue donde estaba
+    var styleKey by remember { mutableStateOf(Store.subStyleKey) }
+    var resumeAt by remember { mutableLongStateOf(start.startMs) }
+    var pendingSubTrack by remember { mutableStateOf<Int?>(null) }
+    val video = remember(styleKey) { VlcVideo() }
     val scope = rememberCoroutineScope()
 
     var playing by remember { mutableStateOf(true) }
@@ -169,13 +185,27 @@ fun PlayerScreen(start: PlayRequest) {
 
     fun exit() {
         saveProgress(notify = true)
-        if (window.placement == WindowPlacement.Fullscreen) window.placement = WindowPlacement.Maximized
+        window.placement = base
         nav.pop()
     }
 
-    DisposableEffect(Unit) {
+    DisposableEffect(video) {
+        var firstPlay = true
         video.mp.events().addMediaPlayerEventListener(object : MediaPlayerEventAdapter() {
-            override fun playing(mediaPlayer: MediaPlayer) { buffering = false; playing = true }
+            override fun playing(mediaPlayer: MediaPlayer) {
+                buffering = false; playing = true
+                if (firstPlay) {
+                    firstPlay = false
+                    val track = pendingSubTrack
+                    pendingSubTrack = null
+                    Thread {
+                        runCatching {
+                            if (track != null) mediaPlayer.subpictures().setTrack(track)
+                            if (Store.subDelayMs != 0) mediaPlayer.subpictures().setDelay(Store.subDelayMs * 1000L)
+                        }
+                    }.start()
+                }
+            }
             override fun paused(mediaPlayer: MediaPlayer) { playing = false }
             override fun buffering(mediaPlayer: MediaPlayer, newCache: Float) { buffering = newCache < 100f }
             override fun finished(mediaPlayer: MediaPlayer) { ended = true }
@@ -185,7 +215,7 @@ fun PlayerScreen(start: PlayRequest) {
             }
         })
         video.mp.audio().setVolume(volume)
-        load(req)
+        load(req.copy(startMs = resumeAt))
         onDispose {
             Thread { video.release() }.start()
         }
@@ -221,7 +251,7 @@ fun PlayerScreen(start: PlayRequest) {
     fun seekBy(ms: Long) { if (!req.isLive) scope.launch(Dispatchers.IO) { video.mp.controls().skipTime(ms) }; toast = if (ms > 0) "+${ms / 1000} s" else "${ms / 1000} s" }
     fun setVol(v: Int) { volume = v.coerceIn(0, 150); video.mp.audio().setVolume(volume); Store.volume = volume; toast = "Volumen $volume%" }
     fun toggleFull() {
-        window.placement = if (window.placement == WindowPlacement.Fullscreen) WindowPlacement.Maximized else WindowPlacement.Fullscreen
+        window.placement = if (window.placement == WindowPlacement.Fullscreen) base else WindowPlacement.Fullscreen
     }
 
     KeyHandler { e ->
@@ -244,7 +274,7 @@ fun PlayerScreen(start: PlayRequest) {
             Key.Escape, Key.Backspace -> {
                 when {
                     menu != null -> menu = null
-                    window.placement == WindowPlacement.Fullscreen -> window.placement = WindowPlacement.Maximized
+                    window.placement == WindowPlacement.Fullscreen && base != WindowPlacement.Fullscreen -> window.placement = base
                     else -> exit()
                 }
                 true
@@ -358,6 +388,12 @@ fun PlayerScreen(start: PlayRequest) {
                 }
                 menu?.let { m ->
                     OptionsPanel(m, video, speed, { speed = it; video.mp.controls().setRate(it) }, format, { format = it },
+                        onStyle = {
+                            // Reaplicar el estilo: mismo punto, misma pista de subtítulos
+                            resumeAt = if (req.isLive) 0 else time
+                            pendingSubTrack = runCatching { video.mp.subpictures().track() }.getOrNull()
+                            styleKey = Store.subStyleKey
+                        },
                         Modifier.align(Alignment.BottomEnd).padding(end = 28.dp, bottom = 110.dp))
                 }
             }
@@ -420,7 +456,8 @@ val FormatNames = listOf("Ajustar", "Rellenar", "Estirar")
  */
 @Composable
 private fun OptionsPanel(
-    sec: String, video: VlcVideo, speed: Float, onSpeed: (Float) -> Unit, format: Int, onFormat: (Int) -> Unit, modifier: Modifier,
+    sec: String, video: VlcVideo, speed: Float, onSpeed: (Float) -> Unit, format: Int, onFormat: (Int) -> Unit,
+    onStyle: () -> Unit, modifier: Modifier,
 ) {
     val all = sec == "all"
     val changes = Store.changes.intValue
@@ -442,7 +479,7 @@ private fun OptionsPanel(
                 when (k) {
                     "audio" -> Tracks(video, audio = true)
                     "cc" -> Tracks(video, audio = false)
-                    "subopts" -> SubOptions(video)
+                    "subopts" -> SubOptions(video, onStyle)
                     "speed" -> Stepper(String.format(java.util.Locale("es", "ES"), "%.1f×", speed),
                         { onSpeed(((speed * 10).roundToInt() - 1).coerceAtLeast(5) / 10f) },
                         { onSpeed(((speed * 10).roundToInt() + 1).coerceAtMost(20) / 10f) })
@@ -490,19 +527,62 @@ private fun Tracks(video: VlcVideo, audio: Boolean) {
 }
 
 @Composable
-private fun SubOptions(video: VlcVideo) {
+private fun SubOptions(video: VlcVideo, onStyle: () -> Unit) {
+    val ch = Store.changes.intValue
     var delayMs by remember { mutableLongStateOf(runCatching { video.mp.subpictures().delay() / 1000 }.getOrDefault(0L)) }
-    Row(Modifier.fillMaxWidth().padding(start = 4.dp, top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text("Retardo", color = Col.Text, fontSize = 14.sp, modifier = Modifier.weight(1f))
-        Stepper(String.format("%+.1f s", delayMs / 1000f),
-            { delayMs = (delayMs - 100).coerceIn(-5000, 5000); video.mp.subpictures().setDelay(delayMs * 1000) },
-            { delayMs = (delayMs + 100).coerceIn(-5000, 5000); video.mp.subpictures().setDelay(delayMs * 1000) })
+    Column(Modifier.padding(start = 4.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Retardo", color = Col.Text, fontSize = 13.sp, modifier = Modifier.width(90.dp))
+            Stepper(String.format("%+.1f s", delayMs / 1000f),
+                { delayMs = (delayMs - 100).coerceIn(-5000, 5000); video.mp.subpictures().setDelay(delayMs * 1000) },
+                { delayMs = (delayMs + 100).coerceIn(-5000, 5000); video.mp.subpictures().setDelay(delayMs * 1000) })
+        }
+        SubStyleControls(ch, compact = true, onStyle)
     }
-    Text("El tamaño de los subtítulos se cambia en Ajustes.", color = Col.Sub, fontSize = 12.sp, modifier = Modifier.padding(start = 4.dp, top = 6.dp))
+}
+
+/** Controles del estilo de subtítulos (en Ajustes y en el reproductor). */
+@Composable
+fun SubStyleControls(ch: Int, compact: Boolean, onChange: () -> Unit) {
+    @Composable
+    fun line(label: String, content: @Composable RowScope.() -> Unit) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(label, color = Col.Text, fontSize = 13.sp, modifier = Modifier.width(if (compact) 90.dp else 160.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), content = content)
+        }
+    }
+    // key(ch): se vuelve a dibujar todo al cambiar algo, para que se vea marcado al momento
+    key(ch) {
+    line("Tamaño") {
+        listOf(70 to "S", 100 to "M", 130 to "L", 160 to "XL").forEach { (v, l) ->
+            Chip(l, Store.subScale == v) { Store.subScale = v; onChange() }
+        }
+    }
+    line("Altura") {
+        Stepper("${Store.subMargin}", { Store.subMargin -= 20; onChange() }, { Store.subMargin += 20; onChange() })
+    }
+    line("Fondo") {
+        listOf("Nada", "Sombra", "Caja").forEachIndexed { i, l -> Chip(l, Store.subBg == i) { Store.subBg = i; onChange() } }
+    }
+    line("Color") {
+        listOf(0xFFFFFF to "Blanco", 0xFFE14D to "Amarillo").forEach { (c, l) -> Chip(l, Store.subColor == c) { Store.subColor = c; onChange() } }
+    }
+    line("Contorno") {
+        listOf("No", "Fino", "Normal", "Grueso").forEachIndexed { i, l -> Chip(l, Store.subOutline == i) { Store.subOutline = i; onChange() } }
+    }
+    line("Letra") {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            listOf("Segoe UI", "Arial", "Verdana", "Tahoma", "Georgia").chunked(3).forEach { rowFonts ->
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    rowFonts.forEach { f -> Chip(f, Store.subFont == f) { Store.subFont = f; onChange() } }
+                }
+            }
+        }
+    }}
 }
 
 @Composable
-private fun Stepper(value: String, onMinus: () -> Unit, onPlus: () -> Unit) {
+fun Stepper(value: String, onMinus: () -> Unit, onPlus: () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(4.dp)) {
         Chip("−", false, onMinus)
         Text(value, color = Col.Text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 12.dp))
@@ -511,7 +591,7 @@ private fun Stepper(value: String, onMinus: () -> Unit, onPlus: () -> Unit) {
 }
 
 @Composable
-private fun Chip(text: String, selected: Boolean, onClick: () -> Unit) {
+fun Chip(text: String, selected: Boolean, onClick: () -> Unit) {
     Text(text, color = if (selected) Color.Black else Col.Text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
         modifier = Modifier.clip(RoundedCornerShape(50)).background(if (selected) Color.White else Color.White.copy(alpha = 0.12f))
             .clickable { onClick() }.pointerHoverIcon(PointerIcon.Hand).padding(horizontal = 12.dp, vertical = 6.dp))
