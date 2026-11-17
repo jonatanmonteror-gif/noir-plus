@@ -145,7 +145,10 @@ val TrailerIcon: ImageVector = materialIcon(name = "Filled.Trailer") {
  * en la tele, el menú desplegable de siempre.
  */
 @Composable
-fun <T> OptionPicker(open: Boolean, title: String, options: List<Pair<T, String>>, selected: T, onPick: (T) -> Unit, onDismiss: () -> Unit) {
+fun <T> OptionPicker(
+    open: Boolean, title: String, options: List<Pair<T, String>>, selected: T, onPick: (T) -> Unit,
+    isSel: ((T) -> Boolean)? = null, closeOnPick: Boolean = true, onDismiss: () -> Unit,
+) {
     if (LocalDims.current.compact) {
         // Móvil: tarjeta flotante compacta bajo el botón (no ocupa la pantalla), con desplazamiento si hay muchas opciones
         if (!open) return
@@ -177,9 +180,9 @@ fun <T> OptionPicker(open: Boolean, title: String, options: List<Pair<T, String>
                     androidx.compose.foundation.lazy.LazyColumn(Modifier.heightIn(max = 340.dp)) {
                         items(options.size) { i ->
                             val (v, label) = options[i]
-                            val sel = v == selected
+                            val sel = isSel?.invoke(v) ?: (v == selected)
                             androidx.compose.foundation.layout.Row(
-                                Modifier.fillMaxWidth().clickable { onPick(v); onDismiss() }.padding(horizontal = 16.dp, vertical = 9.dp),
+                                Modifier.fillMaxWidth().clickable { onPick(v); if (closeOnPick) onDismiss() }.padding(horizontal = 16.dp, vertical = 9.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Text(label, color = if (sel) Color.White else Col.Text.copy(alpha = 0.8f), fontSize = 14.sp,
@@ -194,13 +197,14 @@ fun <T> OptionPicker(open: Boolean, title: String, options: List<Pair<T, String>
     } else {
         DropdownMenu(expanded = open, onDismissRequest = onDismiss, modifier = Modifier.background(Col.Surface2)) {
             options.forEach { (v, label) ->
-                val sel = v == selected
+                val sel = isSel?.invoke(v) ?: (v == selected)
                 DropdownMenuItem(
                     text = {
                         Text(label, color = if (sel) Color.White else Col.Sub, fontSize = 14.sp,
                             fontWeight = if (sel) FontWeight.SemiBold else FontWeight.Normal)
                     },
-                    onClick = { onPick(v); onDismiss() },
+                    trailingIcon = { if (sel && !closeOnPick) Text("✓", color = Color.White, fontSize = 13.sp) },
+                    onClick = { onPick(v); if (closeOnPick) onDismiss() },
                 )
             }
         }
@@ -209,12 +213,14 @@ fun <T> OptionPicker(open: Boolean, title: String, options: List<Pair<T, String>
 
 /** Botón de filtrar por plataforma (datos de TMDB). null = todas. */
 @Composable
-fun PlatformButton(selected: String?, options: List<String>, onChange: (String?) -> Unit) {
+fun PlatformButton(selected: Set<String>, options: List<String>, onChange: (Set<String>) -> Unit) {
     var open by remember { mutableStateOf(false) }
     Box {
-        RoundIconButton(PlatformIcon, "Plataforma", active = selected != null) { open = true }
-        OptionPicker(open, "Plataforma", listOf<Pair<String?, String>>(null to "Todas las plataformas") + options.map { it to it },
-            selected, onChange) { open = false }
+        RoundIconButton(PlatformIcon, "Plataformas", active = selected.isNotEmpty()) { open = true }
+        // Se pueden marcar varias (p. ej. Netflix y Max); «Todas» las desmarca
+        OptionPicker(open, "Plataformas (varias)", listOf<Pair<String?, String>>(null to "Todas las plataformas") + options.map { it to it },
+            null, onPick = { v -> onChange(if (v == null) emptySet() else if (v in selected) selected - v else selected + v) },
+            isSel = { v -> if (v == null) selected.isEmpty() else v in selected }, closeOnPick = false) { open = false }
     }
 }
 
@@ -230,11 +236,12 @@ fun ColumnsButton(cols: Int, onChange: (Int) -> Unit) {
 
 /** Botón de filtrar por género. null = todos. */
 @Composable
-fun GenreButton(selected: Int?, genres: Map<Int, String>, onChange: (Int?) -> Unit) {
+fun GenreButton(selected: Set<Int>, genres: Map<Int, String>, onChange: (Set<Int>) -> Unit) {
     var open by remember { mutableStateOf(false) }
     Box {
-        RoundIconButton(GenreIcon, "Género", active = selected != null) { open = true }
-        OptionPicker(open, "Género", listOf<Pair<Int?, String>>(null to "Todos los géneros") + genres.map { it.key to it.value },
-            selected, onChange) { open = false }
+        RoundIconButton(GenreIcon, "Géneros", active = selected.isNotEmpty()) { open = true }
+        OptionPicker(open, "Géneros (varios)", listOf<Pair<Int?, String>>(null to "Todos los géneros") + genres.map { it.key to it.value },
+            null, onPick = { v -> onChange(if (v == null) emptySet() else if (v in selected) selected - v else selected + v) },
+            isSel = { v -> if (v == null) selected.isEmpty() else v in selected }, closeOnPick = false) { open = false }
     }
 }

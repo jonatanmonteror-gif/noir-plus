@@ -83,32 +83,40 @@ fun CategoryScreen(kind: Kind, cat: Category, startSearch: Boolean = false) {
     // No aparece dentro de carpetas que ya son de una plataforma ("Series Netflix", "HBO"…).
     val canFilter = kind != Kind.LIVE && Tmdb.configured() &&
         !com.noirplus.tv.data.Library.isPlatformList(cat.id) && (virtual || Platforms.fromFolder(cat.name) == null)
-    var platform by rememberSaveable { mutableStateOf<String?>(null) }
-    var catalog by remember { mutableStateOf<Tmdb.Catalog?>(null) }
+    // Varias plataformas a la vez (p. ej. Netflix + Max): se guardan como "Netflix|Max"
+    var platformsRaw by rememberSaveable { mutableStateOf("") }
+    val platforms = remember(platformsRaw) { platformsRaw.split('|').filter { it.isNotEmpty() }.toSet() }
+    var catalogs by remember { mutableStateOf<List<Tmdb.Catalog>?>(null) }
     var progress by remember { mutableStateOf<String?>(null) }
-    var failed by remember { mutableStateOf(false) }
-    LaunchedEffect(platform) {
-        catalog = null
-        failed = false
-        val p = platform ?: return@LaunchedEffect
-        progress = "Cargando catálogo de $p…"
+    var failed by remember { mutableStateOf<List<String>>(emptyList()) }
+    LaunchedEffect(platformsRaw) {
+        catalogs = null
+        failed = emptyList()
+        if (platforms.isEmpty()) return@LaunchedEffect
+        val got = mutableListOf<Tmdb.Catalog>()
+        val bad = mutableListOf<String>()
         try {
-            val c = Tmdb.catalog(kind, p) { done, total ->
-                if (total > 1 && (done % 5 == 0 || done == total)) progress = "Cargando catálogo de $p… ${done * 100 / total}%"
+            for (p in Platforms.main.filter { it in platforms }) {
+                progress = "Cargando catálogo de $p…"
+                val c = Tmdb.catalog(kind, p) { done, total ->
+                    if (total > 1 && (done % 5 == 0 || done == total)) progress = "Cargando catálogo de $p… ${done * 100 / total}%"
+                }
+                if (c != null) got += c else bad += p
             }
-            catalog = c
-            failed = c == null
+            catalogs = got
+            failed = bad
         } finally {
             progress = null
         }
     }
-    // Filtro por género (TMDB). No sale dentro de una lista que ya es de un género.
+    // Filtro por género (TMDB), también varios a la vez. No sale dentro de una lista que ya es de un género.
     val canGenre = kind != Kind.LIVE && Tmdb.configured() && !cat.id.startsWith(com.noirplus.tv.data.Library.GENRE)
-    var genre by rememberSaveable { mutableStateOf<Int?>(null) }
+    var genresRaw by rememberSaveable { mutableStateOf("") }
+    val genres = remember(genresRaw) { genresRaw.split(',').mapNotNull { it.toIntOrNull() }.toSet() }
     var genreCats by remember { mutableStateOf<Collection<Tmdb.Catalog>?>(null) }
-    val genreV2 = if (genre != null) Tmdb.genreVersion.intValue else 0
-    LaunchedEffect(genre) {
-        if (genre == null) return@LaunchedEffect
+    val genreV2 = if (genres.isNotEmpty()) Tmdb.genreVersion.intValue else 0
+    LaunchedEffect(genres.isNotEmpty()) {
+        if (genres.isEmpty()) return@LaunchedEffect
         Tmdb.indexGenres(kind)
         genreCats = Tmdb.allCatalogs(kind).values
     }
@@ -122,12 +130,12 @@ fun CategoryScreen(kind: Kind, cat: Category, startSearch: Boolean = false) {
     // Cargar los catálogos para ordenar por fecha de estreno de TMDB (y reordenar cuando lleguen)
     val catV = Tmdb.catalogsVersion.intValue
     LaunchedEffect(kind) { if (kind != Kind.LIVE && Tmdb.configured()) runCatching { Tmdb.allCatalogs(kind) } }
-    val shown = remember(items, query, sort, platform, catalog, genre, genreCats, genreV2, catV) {
+    val shown = remember(items, query, sort, platformsRaw, catalogs, genresRaw, genreCats, genreV2, catV) {
         val q = normText(query.trim())
         items?.let { all ->
             var l = if (q.isEmpty()) all else all.filter { normText(it.name).contains(q) }
-            if (platform != null) l = catalog?.let { c -> l.filter { c.has(it) } } ?: emptyList()
-            genre?.let { g -> l = genreCats?.let { cs -> l.filter { Tmdb.genresOf(it, cs)?.contains(g) == true } } ?: emptyList() }
+            if (platforms.isNotEmpty()) l = catalogs?.let { cs -> l.filter { i -> cs.any { it.has(i) } } } ?: emptyList()
+            if (genres.isNotEmpty()) l = genreCats?.let { cs -> l.filter { i -> Tmdb.genresOf(i, cs)?.any { it in genres } == true } } ?: emptyList()
             // «Recién subido» conserva el orden de subida (lo último añadido primero)
             if (cat.id.startsWith(com.noirplus.tv.data.Library.NEW)) l else l.sortedFor(sort)
         }
@@ -183,25 +191,25 @@ fun CategoryScreen(kind: Kind, cat: Category, startSearch: Boolean = false) {
             }
             if (canGenre) {
                 Spacer(Modifier.width(8.dp))
-                GenreButton(genre, Tmdb.genreNames(kind)) { genre = it }
+                GenreButton(genres, Tmdb.genreNames(kind)) { g -> genresRaw = g.joinToString(",") }
             }
             if (canFilter) {
                 Spacer(Modifier.width(8.dp))
-                PlatformButton(platform, Platforms.main) { platform = it }
+                PlatformButton(platforms, Platforms.main) { p -> platformsRaw = Platforms.main.filter { it in p }.joinToString("|") }
             }
             if (d.compact) {
                 Spacer(Modifier.width(8.dp))
                 ColumnsButton(cols) { cols = it; prefs.gridCols = it }
             }
         }
-        if (query.isNotBlank() || platform != null || genre != null) {
+        if (query.isNotBlank() || platforms.isNotEmpty() || genres.isNotEmpty()) {
             Text(
                 listOfNotNull(
                     shown?.let { "${it.size} resultados" },
-                    platform,
-                    genre?.let { Tmdb.genreNames(kind)[it] },
+                    platforms.takeIf { it.isNotEmpty() }?.let { ps -> Platforms.main.filter { it in ps }.joinToString(" + ") },
+                    genres.takeIf { it.isNotEmpty() }?.let { gs -> gs.mapNotNull { Tmdb.genreNames(kind)[it] }.joinToString(" + ") },
                     progress,
-                    if (genre != null) Tmdb.genreProgress.value?.let { "clasificando ${it.first}/${it.second}" } else null,
+                    if (genres.isNotEmpty()) Tmdb.genreProgress.value?.let { "clasificando ${it.first}/${it.second}" } else null,
                 ).joinToString("  ·  "),
                 color = Col.Sub, fontSize = 12.sp, modifier = Modifier.padding(start = d.edge, bottom = 6.dp),
             )
@@ -212,8 +220,8 @@ fun CategoryScreen(kind: Kind, cat: Category, startSearch: Boolean = false) {
             list.isEmpty() && progress != null -> Loading()
             list.isEmpty() -> Message(when {
                 query.isNotBlank() -> "Sin resultados para «${query.trim()}»"
-                platform != null && failed -> "No se pudo cargar el catálogo de $platform. Revisa la conexión."
-                platform != null -> "Nada de $platform en esta carpeta"
+                platforms.isNotEmpty() && failed.isNotEmpty() -> "No se pudo cargar el catálogo de ${failed.joinToString(", ")}. Revisa la conexión."
+                platforms.isNotEmpty() -> "Nada de " + Platforms.main.filter { it in platforms }.joinToString(" ni ") + " aquí"
                 else -> "No hay contenido en esta categoría"
             })
             else -> LazyVerticalGrid(

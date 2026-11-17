@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
@@ -270,9 +271,22 @@ fun CategoryScreen(kind: Kind, cat: Category) {
     }
     var query by remember { mutableStateOf("") }
     var sort by remember { mutableStateOf(0) } // 0 recientes, 1 A-Z, 2 valoración, 3 original
-    val shown = remember(items, query, sort) {
+    // Filtros: varias plataformas y varios géneros a la vez (p. ej. Netflix + Max)
+    val canPlat = kind != Kind.LIVE && !Library.isPlatform(cat.id)
+    val canGenre = kind != Kind.LIVE && !cat.id.startsWith(Library.GENRE)
+    var plats by remember { mutableStateOf(setOf<String>()) }
+    var genres by remember { mutableStateOf(setOf<Int>()) }
+    val catV = Tmdb.version.intValue
+    LaunchedEffect(plats, genres) {
+        if (genres.isNotEmpty()) runCatching { Tmdb.allCatalogs(kind) }
+        else for (p in plats) runCatching { Tmdb.catalog(kind, p) }
+    }
+    val shown = remember(items, query, sort, plats, genres, catV) {
         val q = normText(query.trim())
-        items?.filter { q.isEmpty() || normText(it.name).contains(q) }?.let { l ->
+        items?.filter { q.isEmpty() || normText(it.name).contains(q) }
+            ?.filter { plats.isEmpty() || Tmdb.platformsOf(it).any { p -> p in plats } }
+            ?.filter { genres.isEmpty() || Tmdb.genresOf(it)?.any { g -> g in genres } == true }
+            ?.let { l ->
             when (sort) {
                 0 -> if (kind == Kind.LIVE) l else Tmdb.byRelease(l)
                 1 -> l.sortedBy { normText(it.name) }
@@ -295,10 +309,31 @@ fun CategoryScreen(kind: Kind, cat: Category) {
                         .clickable { sort = i }.pointerHoverIcon(PointerIcon.Hand).padding(horizontal = 12.dp, vertical = 7.dp))
             }
         }
+        if (canPlat || canGenre) {
+            LazyRow(contentPadding = PaddingValues(horizontal = 40.dp), horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.padding(bottom = 6.dp)) {
+                if (canPlat) items(Tmdb.platforms, key = { "fp:$it" }) { p ->
+                    PickChip(p, p in plats) { plats = if (p in plats) plats - p else plats + p }
+                }
+            }
+            if (canGenre) LazyRow(contentPadding = PaddingValues(horizontal = 40.dp), horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.padding(bottom = 10.dp)) {
+                items(Tmdb.genreNames(kind).entries.toList(), key = { "fg:${it.key}" }) { g ->
+                    PickChip(g.value, g.key in genres) { genres = if (g.key in genres) genres - g.key else genres + g.key }
+                }
+            }
+            if (plats.isNotEmpty() || genres.isNotEmpty()) Text(
+                listOfNotNull(shown?.let { "${it.size} resultados" },
+                    Tmdb.platforms.filter { it in plats }.takeIf { it.isNotEmpty() }?.joinToString(" + "),
+                    genres.mapNotNull { Tmdb.genreNames(kind)[it] }.takeIf { it.isNotEmpty() }?.joinToString(" + "),
+                    "Quitar filtros").joinToString("   ·   "),
+                color = Col.Sub, fontSize = 12.sp,
+                modifier = Modifier.padding(start = 40.dp, bottom = 8.dp).clickable { plats = emptySet(); genres = emptySet() }.pointerHoverIcon(PointerIcon.Hand))
+        }
         val l = shown
         when {
             l == null -> Loading()
-            l.isEmpty() -> Message(if (query.isBlank()) "No hay contenido" else "Sin resultados para «${query.trim()}»")
+            l.isEmpty() -> Message(if (query.isBlank() && plats.isEmpty() && genres.isEmpty()) "No hay contenido" else "Sin resultados con estos filtros")
             else -> LazyVerticalGrid(
                 columns = GridCells.Adaptive(170.dp),
                 contentPadding = PaddingValues(start = 40.dp, end = 40.dp, top = 8.dp, bottom = 40.dp),
@@ -394,4 +429,13 @@ fun SearchScreen() {
             }
         }
     }
+}
+
+
+/** Pastilla de filtro que se marca y desmarca (se pueden elegir varias). */
+@Composable
+private fun PickChip(label: String, on: Boolean, onClick: () -> Unit) {
+    Text((if (on) "✓  " else "") + label, color = if (on) Color.Black else Col.Text, fontSize = 13.sp, fontWeight = FontWeight.Medium,
+        modifier = Modifier.clip(RoundedCornerShape(50)).background(if (on) Color.White else Color.White.copy(alpha = 0.08f))
+            .clickable(onClick = onClick).pointerHoverIcon(PointerIcon.Hand).padding(horizontal = 14.dp, vertical = 7.dp))
 }
