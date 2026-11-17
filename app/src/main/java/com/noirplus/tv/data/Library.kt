@@ -46,7 +46,12 @@ object Library {
                 visibleAll(kind).filter { Tmdb.genresOf(it, cats)?.contains(g) == true }
                     .distinctBy { Tmdb.prep(it).key }.newest()
             }
-            else -> src.items(kind, catId)
+            else -> {
+                // Carpetas del proveedor: también por fecha de estreno de TMDB
+                if (kind != Kind.LIVE && Tmdb.configured()) runCatching { Tmdb.allCatalogs(kind) }
+                val l = src.items(kind, catId)
+                if (kind == Kind.LIVE) l else Tmdb.byRelease(l)
+            }
         }
     }
 }

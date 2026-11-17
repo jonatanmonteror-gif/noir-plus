@@ -119,7 +119,10 @@ fun CategoryScreen(kind: Kind, cat: Category, startSearch: Boolean = false) {
             runCatching { fieldFr.requestFocus() }
         }
     }
-    val shown = remember(items, query, sort, platform, catalog, genre, genreCats, genreV2) {
+    // Cargar los catálogos para ordenar por fecha de estreno de TMDB (y reordenar cuando lleguen)
+    val catV = Tmdb.catalogsVersion.intValue
+    LaunchedEffect(kind) { if (kind != Kind.LIVE && Tmdb.configured()) runCatching { Tmdb.allCatalogs(kind) } }
+    val shown = remember(items, query, sort, platform, catalog, genre, genreCats, genreV2, catV) {
         val q = normText(query.trim())
         items?.let { all ->
             var l = if (q.isEmpty()) all else all.filter { normText(it.name).contains(q) }

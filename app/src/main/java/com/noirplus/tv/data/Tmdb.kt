@@ -110,6 +110,35 @@ object Tmdb {
     }
 
     private val catalogs = ConcurrentHashMap<String, Catalog>()
+    /** Sube cada vez que se carga un catálogo (para reordenar listas). */
+    val catalogsVersion = androidx.compose.runtime.mutableIntStateOf(0)
+
+    /**
+     * Fecha de estreno según TMDB (aaaammdd) de un título de tu lista, buscándolo en los catálogos ya cargados.
+     * Si no aparece en ninguno, se usa el año que da el proveedor (o 0).
+     */
+    fun releaseDate(item: Item): Int {
+        val p = prep(item)
+        val type = if (item.kind == Kind.SERIES) "tv:" else "movie:"
+        var best = 0
+        for ((k, c) in catalogs) {
+            if (!k.startsWith(type)) continue
+            val d = c.match(p)?.let { c.entries[it]?.date } ?: continue
+            if (d > best) best = d
+        }
+        if (best > 0) return best
+        dates[item.key]?.let { return it }
+        return (p.year ?: 0) * 10000
+    }
+
+    /** Ordena por fecha de estreno (la más reciente primero); a igualdad, lo último añadido. */
+    fun byRelease(list: List<Item>): List<Item> =
+        list.map { it to releaseDate(it) }
+            .sortedWith(compareByDescending<Pair<Item, Int>> { it.second }.thenByDescending { it.first.added })
+            .map { it.first }
+
+    /** Fechas de estreno encontradas al clasificar por géneros (títulos que no están en plataformas). */
+    private val dates = ConcurrentHashMap<String, Int>()
 
     // --- Catálogo preparado cada día en GitHub: un archivo pequeño por plataforma ---
     private const val CAT_URL = "https://github.com/jonatanmonteror-gif/noir-plus/releases/download/catalog/"
@@ -278,7 +307,7 @@ object Tmdb {
         // Lo más rápido y ligero: el archivo ya preparado de esa plataforma (de una en una)
         loadLock.withLock {
             catalogs[id]?.let { return@coroutineScope it }
-            loadPrepared(type, group)?.let { catalogs[id] = it; return@coroutineScope it }
+            loadPrepared(type, group)?.let { catalogs[id] = it; catalogsVersion.intValue++; return@coroutineScope it }
         }
         // En la tele no se usa el método pesado (miles de consultas): mejor no mostrar la fila que cerrar la app
         if (runCatching { Repo.prefs.isLowEnd }.getOrDefault(true)) return@coroutineScope null
@@ -297,7 +326,7 @@ object Tmdb {
                 }
                 val titles = HashMap<String, List<String>>()
                 for (k in tO.keys()) { val a = tO.getJSONArray(k); titles[k] = (0 until a.length()).map { a.optString(it) } }
-                return@coroutineScope Catalog(entries, titles).also { catalogs[id] = it }
+                return@coroutineScope Catalog(entries, titles).also { catalogs[id] = it; catalogsVersion.intValue++ }
             }
         }
         val prov = providerIds(type, group) ?: return@coroutineScope null
@@ -338,6 +367,7 @@ object Tmdb {
         }
         val cat = Catalog(entries, titles)
         catalogs[id] = cat
+        catalogsVersion.intValue++
         // Solo se guarda si llegaron casi todas las páginas
         if (f != null && results.size >= pages * 9 / 10) runCatching {
             val eO = JSONObject()
@@ -431,7 +461,10 @@ object Tmdb {
                                 val yp = year?.let { if (type == "tv") "&first_air_date_year=$it" else "&year=$it" } ?: ""
                                 val r = get("/search/$type", "query=${enc(q)}&include_adult=false$yp")
                                 if (r != null) {
-                                    val g = r.optJSONArray("results")?.optJSONObject(0)?.optJSONArray("genre_ids")
+                                    val first = r.optJSONArray("results")?.optJSONObject(0)
+                                    (first?.optString(if (type == "tv") "first_air_date" else "release_date") ?: "")
+                                        .replace("-", "").take(8).toIntOrNull()?.let { dates[item.key] = it }
+                                    val g = first?.optJSONArray("genre_ids")
                                     genreMeta[item.key] = (0 until (g?.length() ?: 0)).map { g!!.optInt(it) }
                                     genreDirty = true
                                 }

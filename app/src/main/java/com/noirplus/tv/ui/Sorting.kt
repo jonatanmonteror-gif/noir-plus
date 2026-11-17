@@ -38,7 +38,8 @@ fun normText(s: String): String = marks.replace(Normalizer.normalize(s, Normaliz
 
 fun List<Item>.sortedFor(mode: SortMode): List<Item> = when (mode) {
     SortMode.DEFAULT -> this
-    SortMode.RECENT -> sortedWith(compareByDescending<Item> { it.added }.thenByDescending { it.year?.toIntOrNull() ?: 0 })
+    // Por fecha de estreno de TMDB (si no se conoce, el año del proveedor); a igualdad, lo último añadido
+    SortMode.RECENT -> com.noirplus.tv.data.Tmdb.byRelease(this)
     SortMode.RATING -> sortedByDescending { parseRating(it.rating) ?: 0f }
     SortMode.AZ -> sortedBy { normText(it.name) }
     SortMode.ZA -> sortedByDescending { normText(it.name) }
