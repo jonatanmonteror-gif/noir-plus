@@ -213,8 +213,11 @@ fun PlayerScreen(start: PlayRequest) {
                     firstPlay = false
                     val track = pendingSubTrack
                     pendingSubTrack = null
+                    val seekTo = resumeAt
                     Thread {
                         runCatching {
+                            // Volver al punto exacto (algunos servidores ignoran el inicio pedido al abrir)
+                            if (seekTo > 5_000 && mediaPlayer.status().time() < seekTo - 3_000) mediaPlayer.controls().setTime(seekTo)
                             if (track != null) mediaPlayer.subpictures().setTrack(track)
                             if (Store.subDelayMs != 0) mediaPlayer.subpictures().setDelay(Store.subDelayMs * 1000L)
                         }
@@ -581,7 +584,7 @@ fun SubStyleControls(ch: Int, compact: Boolean, onChange: () -> Unit) {
     // key(ch): se vuelve a dibujar todo al cambiar algo, para que se vea marcado al momento
     key(ch) {
     line("Tamaño") {
-        listOf(70 to "S", 100 to "M", 130 to "L", 160 to "XL").forEach { (v, l) ->
+        listOf(50 to "XS", 70 to "S", 100 to "M", 130 to "L", 160 to "XL").forEach { (v, l) ->
             Chip(l, Store.subScale == v) { Store.subScale = v; onChange() }
         }
     }
