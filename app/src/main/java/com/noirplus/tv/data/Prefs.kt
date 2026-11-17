@@ -85,8 +85,8 @@ class Prefs(ctx: Context) {
 
     /** Valoraciones visibles. Por defecto: sí en el móvil, no en la tele. */
     var ratingsEnabled: Boolean
-        get() = if (sp.contains("ratings")) sp.getBoolean("ratings", true) else !isTv
-        set(v) { sp.edit().putBoolean("ratings", v).apply(); bump() }
+        get() = if (sp.contains("ratingsVisible")) sp.getBoolean("ratingsVisible", true) else !isTv
+        set(v) { sp.edit().putBoolean("ratingsVisible", v).apply(); bump() }
 
     val type: String get() = s("type")
     val server: String get() = s("server")
