@@ -80,13 +80,15 @@ object Sync {
             "progress" -> prefs.history().associate { it.key to (it.toJson() to it.time) }
             "favs" -> prefs.favorites().associate { it.key to (it.toJson() to null) }
             "ratings" -> prefs.ratings().associate { it.key to (it.toJson() to it.time) }
-            "settings" -> buildMap {
-                fun put(k: String, v: Any) = put(k, JSONObject().put("v", v) to null)
-                if (prefs.has("defaultSort")) put("sort", prefs.str("defaultSort"))
-                if (prefs.has("autoNext")) put("autoNext", prefs.autoNext)
-                if (prefs.has("hiddenCats")) put("hidden", JSONArray(prefs.hidden.sorted()))
-                if (prefs.has("lockedCats")) put("locked", JSONArray(prefs.locked.sorted()))
-                if (prefs.has("pin")) put("pin", prefs.pin)
+            "settings" -> {
+                val m = mutableMapOf<String, Pair<JSONObject, Long?>>()
+                fun add(k: String, v: Any) { m[k] = Pair(JSONObject().put("v", v), null) }
+                if (prefs.has("defaultSort")) add("sort", prefs.str("defaultSort"))
+                if (prefs.has("autoNext")) add("autoNext", prefs.autoNext)
+                if (prefs.has("hiddenCats")) add("hidden", JSONArray(prefs.hidden.sorted()))
+                if (prefs.has("lockedCats")) add("locked", JSONArray(prefs.locked.sorted()))
+                if (prefs.has("pin")) add("pin", prefs.pin)
+                m
             }
             else -> emptyMap()
         }
