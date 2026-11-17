@@ -8,6 +8,7 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -767,20 +768,13 @@ class PeekSpec(private val leadPx: Float) : BringIntoViewSpec {
  * dejando ver un trozo de la siguiente. Así no da saltos.
  */
 @OptIn(ExperimentalFoundationApi::class)
-class EdgeSpec(private val marginPx: Float) : BringIntoViewSpec {
+class EdgeSpec(private val keylinePx: Float) : BringIntoViewSpec {
+    // La carátula elegida se queda siempre en el mismo sitio (a la izquierda) y la fila se desliza
+    // una carátula por pulsación, con un movimiento corto y uniforme: sin saltos ni frenazos.
     @Suppress("OVERRIDE_DEPRECATION", "DEPRECATION")
-    override val scrollAnimationSpec: AnimationSpec<Float> = spring(dampingRatio = 1f, stiffness = 300f)
+    override val scrollAnimationSpec: AnimationSpec<Float> = tween(200, easing = LinearOutSlowInEasing)
 
-    override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float {
-        val start = marginPx
-        val end = containerSize - marginPx
-        return when {
-            size >= end - start -> offset - start
-            offset < start -> offset - start
-            offset + size > end -> offset + size - end
-            else -> 0f
-        }
-    }
+    override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float = offset - keylinePx
 }
 
 /** Envuelve una fila horizontal de la tele con el desplazamiento suave por bordes. */
@@ -792,7 +786,7 @@ fun TvHorizontalScroll(content: @Composable () -> Unit) {
         content()
         return
     }
-    val px = with(LocalDensity.current) { (d.poster * 0.9f).toPx() }
+    val px = with(LocalDensity.current) { d.edge.toPx() }
     val spec = remember(px) { EdgeSpec(px) }
     CompositionLocalProvider(LocalBringIntoViewSpec provides spec) { content() }
 }

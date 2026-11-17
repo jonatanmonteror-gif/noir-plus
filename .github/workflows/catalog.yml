@@ -40,4 +40,4 @@ jobs:
           gh release view catalog --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
             gh release create catalog --repo "$GITHUB_REPOSITORY" --title "Catálogo de plataformas" \
               --notes "Se actualiza solo cada día. Lo usa la app para las plataformas y géneros." --prerelease --latest=false
-          gh release upload catalog cat-*.tsv.gz --repo "$GITHUB_REPOSITORY" --clobber
+          gh release upload catalog cat-*.tsv.gz logos.json --repo "$GITHUB_REPOSITORY" --clobber

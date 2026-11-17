@@ -84,8 +84,9 @@ fun Modifier.hoverLift(hovered: Boolean, scale: Float = 1.05f): Modifier {
 }
 
 @Composable
-fun SectionTitle(text: String, onSeeAll: (() -> Unit)? = null) {
+fun SectionTitle(text: String, logo: String? = null, onSeeAll: (() -> Unit)? = null) {
     Row(Modifier.fillMaxWidth().padding(start = 40.dp, end = 32.dp, top = 18.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+        if (logo != null) AsyncImage(logo, null, modifier = Modifier.padding(end = 10.dp).size(26.dp).clip(RoundedCornerShape(6.dp)))
         Text(text, color = Col.Text, fontSize = 19.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f),
             maxLines = 1, overflow = TextOverflow.Ellipsis)
         if (onSeeAll != null) {

@@ -46,14 +46,19 @@ def get(path, params):
             time.sleep(1.5 * (attempt + 1))
     return None
 
+LOGOS = {}
+
 def build(kind):
     typ = "tv" if kind == "tv" else "movie"
     provs = get(f"/watch/providers/{typ}", {"watch_region": "ES"}) or {}
     ids = {}
-    for p in provs.get("results", []):
+    ordered = sorted(provs.get("results", []), key=lambda p: (p.get("display_priorities") or {}).get("ES", p.get("display_priority", 999)))
+    for p in ordered:
         g = group(p.get("provider_name", ""))
         if g in MAIN:
             ids.setdefault(g, []).append(str(p["provider_id"]))
+            if g not in LOGOS and p.get("logo_path"):
+                LOGOS[g] = "https://image.tmdb.org/t/p/w92" + p["logo_path"]
     out = {}
     for g in MAIN:
         if g not in ids:
@@ -103,3 +108,6 @@ if __name__ == "__main__":
             with gzip.open(name, "wb", compresslevel=9) as f:
                 f.write(raw)
             print(f"{name}: {len(rows)} títulos, {len(raw)//1024} KB sin comprimir", flush=True)
+    with open("logos.json", "w", encoding="utf-8") as f:
+        json.dump(LOGOS, f, ensure_ascii=False)
+    print("logos.json:", len(LOGOS), "logos", flush=True)

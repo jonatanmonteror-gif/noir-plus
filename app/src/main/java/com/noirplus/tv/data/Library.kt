@@ -9,6 +9,8 @@ object Library {
     const val PLAT = "__plat:"
     const val GENRE = "__genre:"
     const val NO_PLAT = "__noplat"
+    /** Lo último subido al servidor en los últimos N días (aunque sean títulos antiguos). */
+    const val NEW = "__new:"
 
     fun isVirtual(catId: String) = catId.startsWith("__")
     fun isPlatformList(catId: String) = catId.startsWith(PLAT) || catId == NO_PLAT
@@ -35,6 +37,12 @@ object Library {
                     .distinctBy { it.first.key }
                     .sortedByDescending { it.second }
                     .map { it.first.item }.toList()
+            }
+            catId.startsWith(NEW) -> {
+                // "__new:desde-hasta" en días (p. ej. 1-7 = de ayer a hace una semana)
+                val (a, b) = catId.removePrefix(NEW).split('-').map { it.toLongOrNull() ?: 0 }.let { it.getOrElse(0) { 0 } to it.getOrElse(1) { 7 } }
+                val now = System.currentTimeMillis() / 1000
+                visibleAll(kind).filter { it.added in (now - b * 86_400)..(now - a * 86_400) }.sortedByDescending { it.added }
             }
             catId == NO_PLAT -> {
                 val cats = Tmdb.allCatalogs(kind).values

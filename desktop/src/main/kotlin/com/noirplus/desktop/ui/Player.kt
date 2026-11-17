@@ -63,7 +63,7 @@ import uk.co.caprica.vlcj.player.embedded.videosurface.callback.format.RV32Buffe
 fun vlcArgs(): List<String> {
     val a = mutableListOf("--no-video-title-show", "--quiet", "--avcodec-hw=any",
         "--sub-text-scale=${Store.subScale}", "--freetype-font=${Store.subFont}", "--freetype-color=${Store.subColor}",
-        "--freetype-outline-thickness=${listOf(0, 2, 4, 6)[Store.subOutline]}", "--sub-margin=${Store.subMargin}")
+        "--freetype-outline-thickness=${listOf(0, 2, 4, 6)[Store.subOutline]}", "--sub-margin=${subMarginFor(Vlc.lastHeight)}")
     when (Store.subBg) {
         2 -> a += listOf("--freetype-background-opacity=160", "--freetype-background-color=0", "--freetype-shadow-opacity=0")
         1 -> a += listOf("--freetype-background-opacity=0", "--freetype-shadow-opacity=200")
@@ -72,8 +72,20 @@ fun vlcArgs(): List<String> {
     return a
 }
 
+/**
+ * Distancia de los subtítulos desde abajo. Para centrarlos o subirlos arriba hace falta la altura del vídeo
+ * (se conoce al empezar a reproducir; el reproductor se reprepara solo una vez con ella).
+ */
+fun subMarginFor(h: Int): Int = when (Store.subPos) {
+    1 -> if (h > 0) (h * 0.46f).toInt() + Store.subMargin - 40 else Store.subMargin
+    2 -> if (h > 0) (h * 0.86f).toInt() + Store.subMargin - 40 else Store.subMargin
+    else -> Store.subMargin
+}.coerceAtLeast(0)
+
 /** ¿Hay VLC instalado? Se comprueba una sola vez. */
 object Vlc {
+    /** Altura del último vídeo reproducido (para colocar los subtítulos en el centro o arriba). */
+    @Volatile var lastHeight = 0
     val available: Boolean by lazy { runCatching { NativeDiscovery().discover() }.getOrDefault(false) }
 }
 
@@ -85,6 +97,8 @@ class VlcVideo {
     val factory = MediaPlayerFactory(*vlcArgs().toTypedArray())
     val mp: EmbeddedMediaPlayer = factory.mediaPlayers().newEmbeddedMediaPlayer()
     val frame = mutableStateOf<ImageBitmap?>(null)
+    /** Altura del vídeo que se está reproduciendo. */
+    val height = mutableStateOf(0)
 
     @Volatile private var bitmap: Bitmap? = null
     @Volatile private var bytes: ByteArray? = null
@@ -92,6 +106,7 @@ class VlcVideo {
     init {
         val format = object : BufferFormatCallbackAdapter() {
             override fun getBufferFormat(sourceWidth: Int, sourceHeight: Int): BufferFormat {
+                height.value = sourceHeight
                 bytes = ByteArray(sourceWidth * sourceHeight * 4)
                 bitmap = Bitmap().apply { allocPixels(ImageInfo(sourceWidth, sourceHeight, ColorType.BGRA_8888, ColorAlphaType.OPAQUE)) }
                 return RV32BufferFormat(sourceWidth, sourceHeight)
@@ -219,6 +234,18 @@ fun PlayerScreen(start: PlayRequest) {
         onDispose {
             Thread { video.release() }.start()
         }
+    }
+
+    // Subtítulos en el centro o arriba: al conocer la altura del vídeo, se colocan bien (una sola vez)
+    val vh = video.height.value
+    LaunchedEffect(vh) {
+        if (vh > 0 && Store.subPos != 0 && Vlc.lastHeight != vh) {
+            Vlc.lastHeight = vh
+            delay(300)
+            resumeAt = if (req.isLive) 0 else time
+            pendingSubTrack = runCatching { video.mp.subpictures().track() }.getOrNull()
+            styleKey = Store.subStyleKey + "|h$vh"
+        } else if (vh > 0) Vlc.lastHeight = vh
     }
 
     // Reloj del reproductor
@@ -558,7 +585,10 @@ fun SubStyleControls(ch: Int, compact: Boolean, onChange: () -> Unit) {
             Chip(l, Store.subScale == v) { Store.subScale = v; onChange() }
         }
     }
-    line("Altura") {
+    line("Posición") {
+        listOf("Abajo", "Centro", "Arriba").forEachIndexed { i, l -> Chip(l, Store.subPos == i) { Store.subPos = i; onChange() } }
+    }
+    line("Ajuste fino") {
         Stepper("${Store.subMargin}", { Store.subMargin -= 20; onChange() }, { Store.subMargin += 20; onChange() })
     }
     line("Fondo") {

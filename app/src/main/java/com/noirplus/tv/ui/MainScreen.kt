@@ -444,6 +444,13 @@ fun BrowseContent(kind: Kind) {
                         CategoryRow(kind, Category(Library.NO_PLAT, if (kind == Kind.MOVIE) "Cine y otras" else "Otras series")) { hero = it }
                     }
                 }
+                "new" -> {
+                    // Lo último que ha subido tu proveedor, por fecha de subida (aunque sean títulos antiguos)
+                    item(key = "n1") { CategoryRow(kind, Category(Library.NEW + "0-1", "Últimas 24 horas")) { hero = it } }
+                    item(key = "n7") { CategoryRow(kind, Category(Library.NEW + "1-7", "Esta semana")) { hero = it } }
+                    item(key = "n30") { CategoryRow(kind, Category(Library.NEW + "7-30", "Este mes")) { hero = it } }
+                    item(key = "n90") { CategoryRow(kind, Category(Library.NEW + "30-90", "Últimos 3 meses")) { hero = it } }
+                }
                 "genre" -> {
                     item(key = "gprog") {
                         val p = Tmdb.genreProgress.value
@@ -505,7 +512,8 @@ fun ContinueRow(history: List<com.noirplus.tv.data.Progress>, memPrefix: String,
 @Composable
 private fun BrowseModes(mode: String, onChange: (String) -> Unit) {
     val d = LocalDims.current
-    val opts = listOf("plat" to "Plataformas", "genre" to "Géneros") + if (d.compact) emptyList() else listOf("folders" to "Carpetas")
+    val opts = listOf("plat" to "Plataformas", "genre" to "Géneros", "new" to "Recién subido") +
+        if (d.compact) emptyList() else listOf("folders" to "Carpetas")
     Row(
         Modifier.fillMaxWidth().padding(start = d.edge, end = d.edge, top = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),

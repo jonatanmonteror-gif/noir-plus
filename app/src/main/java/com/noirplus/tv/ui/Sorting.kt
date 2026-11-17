@@ -1,6 +1,14 @@
 package com.noirplus.tv.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -100,29 +108,6 @@ val PlatformIcon: ImageVector = materialIcon(name = "Filled.Platforms") {
     }
 }
 
-/** Botón de filtrar por plataforma (datos de TMDB) con su menú. null = todas. */
-@Composable
-fun PlatformButton(selected: String?, options: List<String>, onChange: (String?) -> Unit) {
-    var open by remember { mutableStateOf(false) }
-    Box {
-        RoundIconButton(PlatformIcon, "Plataforma", active = selected != null) { open = true }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }, modifier = Modifier.background(Col.Surface2)) {
-            (listOf<String?>(null) + options).forEach { p ->
-                val sel = p == selected
-                DropdownMenuItem(
-                    text = {
-                        Text(p ?: "Todas las plataformas", color = if (sel) Color.White else Col.Sub, fontSize = 14.sp,
-                            fontWeight = if (sel) FontWeight.SemiBold else FontWeight.Normal)
-                    },
-                    onClick = {
-                        onChange(p)
-                        open = false
-                    },
-                )
-            }
-        }
-    }
-}
 
 /** Icono "columnas" (cuadrícula 2×2). */
 val GridIcon: ImageVector = materialIcon(name = "Filled.GridSmall") {
@@ -134,29 +119,6 @@ val GridIcon: ImageVector = materialIcon(name = "Filled.GridSmall") {
     }
 }
 
-/** Botón para elegir 2, 3 o 4 columnas desde la propia lista (móvil). */
-@Composable
-fun ColumnsButton(cols: Int, onChange: (Int) -> Unit) {
-    var open by remember { mutableStateOf(false) }
-    Box {
-        RoundIconButton(GridIcon, "Columnas") { open = true }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }, modifier = Modifier.background(Col.Surface2)) {
-            (2..4).forEach { n ->
-                val sel = n == cols
-                DropdownMenuItem(
-                    text = {
-                        Text("$n columnas", color = if (sel) Color.White else Col.Sub, fontSize = 14.sp,
-                            fontWeight = if (sel) FontWeight.SemiBold else FontWeight.Normal)
-                    },
-                    onClick = {
-                        onChange(n)
-                        open = false
-                    },
-                )
-            }
-        }
-    }
-}
 
 /** Icono "géneros" (etiqueta). */
 val GenreIcon: ImageVector = materialIcon(name = "Filled.GenreTag") {
@@ -166,34 +128,109 @@ val GenreIcon: ImageVector = materialIcon(name = "Filled.GenreTag") {
     }
 }
 
-/** Botón de filtrar por género con su menú. null = todos. */
-@Composable
-fun GenreButton(selected: Int?, genres: Map<Int, String>, onChange: (Int?) -> Unit) {
-    var open by remember { mutableStateOf(false) }
-    Box {
-        RoundIconButton(GenreIcon, "Género", active = selected != null) { open = true }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }, modifier = Modifier.background(Col.Surface2)) {
-            (listOf<Pair<Int?, String>>(null to "Todos los géneros") + genres.map { it.key to it.value }).forEach { (id, name) ->
-                val sel = id == selected
-                DropdownMenuItem(
-                    text = {
-                        Text(name, color = if (sel) Color.White else Col.Sub, fontSize = 14.sp,
-                            fontWeight = if (sel) FontWeight.SemiBold else FontWeight.Normal)
-                    },
-                    onClick = {
-                        onChange(id)
-                        open = false
-                    },
-                )
-            }
-        }
-    }
-}
 
 /** Icono "tráiler" (pantalla con play). */
 val TrailerIcon: ImageVector = materialIcon(name = "Filled.Trailer") {
     materialPath {
         moveTo(2f, 5f); horizontalLineTo(22f); verticalLineTo(19f); horizontalLineTo(2f); close()
         moveTo(10f, 8.5f); verticalLineTo(15.5f); lineTo(16f, 12f); close()
+    }
+}
+
+/**
+ * Selector de opciones: en el móvil, panel lateral a la derecha (cómodo de recorrer, no se sale de la pantalla);
+ * en la tele, el menú desplegable de siempre.
+ */
+@Composable
+fun <T> OptionPicker(open: Boolean, title: String, options: List<Pair<T, String>>, selected: T, onPick: (T) -> Unit, onDismiss: () -> Unit) {
+    if (LocalDims.current.compact) {
+        if (!open) return
+        androidx.compose.ui.window.Dialog(
+            onDismissRequest = onDismiss,
+            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+        ) {
+            var shown by remember { mutableStateOf(false) }
+            LaunchedEffect(Unit) { shown = true }
+            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.45f))
+                .clickable(interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null) { onDismiss() }) {
+                androidx.compose.animation.AnimatedVisibility(
+                    shown,
+                    enter = androidx.compose.animation.slideInHorizontally { it },
+                    modifier = Modifier.align(Alignment.CenterEnd),
+                ) {
+                    androidx.compose.foundation.layout.Column(
+                        Modifier.fillMaxHeight().width(290.dp)
+                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(topStart = 20.dp, bottomStart = 20.dp))
+                            .background(Col.Surface)
+                            .clickable(interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null) { }
+                            .padding(top = 40.dp, bottom = 24.dp),
+                    ) {
+                        Text(title, color = Col.Text, fontSize = 18.sp, fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(start = 22.dp, bottom = 12.dp))
+                        androidx.compose.foundation.lazy.LazyColumn(Modifier.fillMaxSize()) {
+                            items(options.size) { i ->
+                                val (v, label) = options[i]
+                                val sel = v == selected
+                                androidx.compose.foundation.layout.Row(
+                                    Modifier.fillMaxWidth().clickable { onPick(v); onDismiss() }
+                                        .background(if (sel) Color.White.copy(alpha = 0.08f) else Color.Transparent)
+                                        .padding(horizontal = 22.dp, vertical = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(label, color = if (sel) Color.White else Col.Sub, fontSize = 15.sp,
+                                        fontWeight = if (sel) FontWeight.SemiBold else FontWeight.Normal, modifier = Modifier.weight(1f))
+                                    if (sel) Text("✓", color = Color.White, fontSize = 15.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    } else {
+        DropdownMenu(expanded = open, onDismissRequest = onDismiss, modifier = Modifier.background(Col.Surface2)) {
+            options.forEach { (v, label) ->
+                val sel = v == selected
+                DropdownMenuItem(
+                    text = {
+                        Text(label, color = if (sel) Color.White else Col.Sub, fontSize = 14.sp,
+                            fontWeight = if (sel) FontWeight.SemiBold else FontWeight.Normal)
+                    },
+                    onClick = { onPick(v); onDismiss() },
+                )
+            }
+        }
+    }
+}
+
+/** Botón de filtrar por plataforma (datos de TMDB). null = todas. */
+@Composable
+fun PlatformButton(selected: String?, options: List<String>, onChange: (String?) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        RoundIconButton(PlatformIcon, "Plataforma", active = selected != null) { open = true }
+        OptionPicker(open, "Plataforma", listOf<Pair<String?, String>>(null to "Todas las plataformas") + options.map { it to it },
+            selected, onChange) { open = false }
+    }
+}
+
+/** Botón para elegir 2, 3 o 4 columnas desde la propia lista (móvil). */
+@Composable
+fun ColumnsButton(cols: Int, onChange: (Int) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        RoundIconButton(GridIcon, "Columnas") { open = true }
+        OptionPicker(open, "Columnas", (2..4).map { it to "$it columnas" }, cols, onChange) { open = false }
+    }
+}
+
+/** Botón de filtrar por género. null = todos. */
+@Composable
+fun GenreButton(selected: Int?, genres: Map<Int, String>, onChange: (Int?) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        RoundIconButton(GenreIcon, "Género", active = selected != null) { open = true }
+        OptionPicker(open, "Género", listOf<Pair<Int?, String>>(null to "Todos los géneros") + genres.map { it.key to it.value },
+            selected, onChange) { open = false }
     }
 }

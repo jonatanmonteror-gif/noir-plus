@@ -124,6 +124,27 @@ object Tmdb {
         }.getOrNull()
     }
 
+    // --- Logos de las plataformas (los prepara GitHub junto al catálogo) ---
+    private var logos: Map<String, String>? = null
+    private val logoLock = Mutex()
+    suspend fun logo(group: String): String? {
+        logos?.let { return it[group] }
+        return logoLock.withLock {
+            logos?.let { return@withLock it[group] }
+            val f = File(dir, "logos.json")
+            val m = withContext(Dispatchers.IO) {
+                if (!(f.exists() && System.currentTimeMillis() - f.lastModified() < 7L * 24 * 3600 * 1000)) runCatching {
+                    val req = Request.Builder().url(URL + "logos.json").header("User-Agent", "NoirPlus-Desktop").build()
+                    Http.client.newCall(req).execute().use { r -> if (r.isSuccessful) r.body?.string()?.let { f.writeText(it) } }
+                }
+                runCatching { org.json.JSONObject(f.readText()).let { o -> o.keys().asSequence().associateWith { o.getString(it) } } }
+                    .getOrDefault(emptyMap())
+            }
+            if (m.isNotEmpty()) logos = m
+            m[group]
+        }
+    }
+
     suspend fun allCatalogs(kind: Kind): Map<String, Catalog> = coroutineScope {
         platforms.map { g -> async { g to catalog(kind, g) } }.awaitAll().mapNotNull { (g, c) -> c?.let { g to it } }.toMap()
     }
@@ -170,6 +191,8 @@ object Library {
     const val GENRE = "__genre:"
     const val NO_PLAT = "__noplat"
     const val ALL = "__all"
+    /** Lo último subido al servidor: "__new:desde-hasta" en días. */
+    const val NEW = "__new:"
 
     fun isVirtual(id: String) = id.startsWith("__")
     fun isPlatform(id: String) = id.startsWith(PLAT) || id == NO_PLAT
@@ -183,6 +206,12 @@ object Library {
                 src.all(kind).asSequence().map { Tmdb.prep(it) }
                     .mapNotNull { p -> c.match(p)?.let { id -> p to (c.entries[id]?.date ?: 0) } }
                     .distinctBy { it.first.key }.sortedByDescending { it.second }.map { it.first.item }.toList()
+            }
+            catId.startsWith(NEW) -> {
+                val r = catId.removePrefix(NEW).split('-').map { it.toLongOrNull() ?: 0 }
+                val now = System.currentTimeMillis() / 1000
+                src.all(kind).filter { it.added in (now - r.getOrElse(1) { 7 } * 86_400)..(now - r.getOrElse(0) { 0 } * 86_400) }
+                    .sortedByDescending { it.added }
             }
             catId == NO_PLAT -> {
                 val cats = Tmdb.allCatalogs(kind).values

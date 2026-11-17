@@ -218,7 +218,7 @@ fun BrowseScreen(kind: Kind) {
             }
             item(key = "modes") {
                 Row(Modifier.padding(start = 40.dp, top = 4.dp, bottom = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("plat" to "Plataformas", "genre" to "Géneros", "folders" to "Carpetas").forEach { (k, l) ->
+                    listOf("plat" to "Plataformas", "genre" to "Géneros", "new" to "Recién subido").forEach { (k, l) ->
                         Chip(l, mode == k) { mode = k; Store.setBrowseMode(kind, k) }
                     }
                 }
@@ -231,6 +231,8 @@ fun BrowseScreen(kind: Kind) {
                 "genre" -> items(Tmdb.genreNames(kind).entries.toList(), key = { "g:${it.key}" }) { g ->
                     CategoryRow(kind, Category(Library.GENRE + g.key, g.value))
                 }
+                "new" -> items(listOf("0-1" to "Últimas 24 horas", "1-7" to "Esta semana", "7-30" to "Este mes", "30-90" to "Últimos 3 meses"),
+                    key = { "n:${it.first}" }) { (r, l) -> CategoryRow(kind, Category(Library.NEW + r, l)) }
                 else -> items(c, key = { it.id }) { cat -> CategoryRow(kind, cat) }
             }
         }
@@ -249,7 +251,10 @@ fun CategoryRow(kind: Kind, cat: Category) {
     if (l != null && l.isEmpty()) return
     val pretty = remember(cat.name) { if (Library.isVirtual(cat.id)) PrettyName(cat.name, null) else prettyCategory(cat.name, kind) }
     Column {
-        SectionTitle(pretty.main + (pretty.year?.let { " ($it)" } ?: "")) { nav.push(Screen.Category(kind, cat)) }
+        val logo by produceState<String?>(null, cat.id) {
+            if (cat.id.startsWith(Library.PLAT)) value = Tmdb.logo(cat.id.removePrefix(Library.PLAT))
+        }
+        SectionTitle(pretty.main + (pretty.year?.let { " ($it)" } ?: ""), logo = logo) { nav.push(Screen.Category(kind, cat)) }
         if (l == null) Box(Modifier.fillMaxWidth().height(290.dp))
         else ScrollRow(l.take(20), { it.key }) { PosterCard(it) { nav.push(Screen.Detail(it)) } }
     }
