@@ -20,6 +20,7 @@ object Repo {
             else -> null
         }
         dataVersion.intValue++
+        Sync.request(2000)
     }
 
     fun refresh() {

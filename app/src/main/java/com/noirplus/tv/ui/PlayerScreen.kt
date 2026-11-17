@@ -156,6 +156,7 @@ fun PlayerScreen(req: PlayRequest) {
                 w.attributes = lp
             }
             SubtitleClock.delayUs = 0L
+            com.noirplus.tv.data.Sync.request(800)
         }
     }
 
@@ -274,6 +275,27 @@ fun PlayerScreen(req: PlayRequest) {
                 return true
             }
             return false
+        }
+        if (!view.isControllerFullyVisible) {
+            when (ev.keyCode) {
+                // OK del centro: pausa / reanuda sin abrir los controles
+                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER -> {
+                    if (down && ev.repeatCount == 0) {
+                        if (exo.isPlaying) exo.pause() else exo.play()
+                    }
+                    return true
+                }
+                // Flecha arriba: elegir audio
+                KeyEvent.KEYCODE_DPAD_UP -> {
+                    if (down && ev.repeatCount == 0) openPanel("audio")
+                    return true
+                }
+                // Flecha abajo: elegir subtítulos
+                KeyEvent.KEYCODE_DPAD_DOWN -> {
+                    if (down && ev.repeatCount == 0) openPanel("cc")
+                    return true
+                }
+            }
         }
         if (down && !view.isControllerFullyVisible) {
             when (ev.keyCode) {

@@ -191,12 +191,14 @@ class Prefs(ctx: Context) {
         val arr = JSONArray()
         list.take(500).forEach { arr.put(it.toJson()) }
         sp.edit().putString("ratings", arr.toString()).apply(); bump()
+        Sync.request()
     }
 
     fun removeRating(key: String) {
         val arr = JSONArray()
         ratings().filter { it.key != key }.forEach { arr.put(it.toJson()) }
         sp.edit().putString("ratings", arr.toString()).apply(); bump()
+        Sync.request()
     }
 
     // ---------- Carpetas ocultas y protegidas ----------
@@ -208,13 +210,13 @@ class Prefs(ctx: Context) {
     fun toggleHidden(key: String) {
         val cur = hidden.toMutableSet()
         if (!cur.add(key)) cur.remove(key)
-        sp.edit().putStringSet("hiddenCats", cur).apply(); bump()
+        sp.edit().putStringSet("hiddenCats", cur).apply(); bump(); Sync.request()
     }
 
     fun toggleLocked(key: String) {
         val cur = locked.toMutableSet()
         if (!cur.add(key)) cur.remove(key)
-        sp.edit().putStringSet("lockedCats", cur).apply(); bump()
+        sp.edit().putStringSet("lockedCats", cur).apply(); bump(); Sync.request()
     }
 
     var pin: String
@@ -245,7 +247,7 @@ class Prefs(ctx: Context) {
     }
 
     fun clearAccount() {
-        sp.edit().remove("type").remove("favs").remove("history").apply()
+        sp.edit().remove("type").remove("favs").remove("history").remove("syncState").apply()
         bump()
     }
 
@@ -268,6 +270,7 @@ class Prefs(ctx: Context) {
         list.forEach { arr.put(it.toJson()) }
         sp.edit().putString("favs", arr.toString()).apply()
         bump()
+        Sync.request()
         return !existed
     }
 
@@ -294,6 +297,27 @@ class Prefs(ctx: Context) {
         writeHistory(list.take(60))
     }
 
-    fun removeProgress(key: String) = writeHistory(history().filter { it.key != key })
-    fun clearHistory() = writeHistory(emptyList())
+    fun removeProgress(key: String) { writeHistory(history().filter { it.key != key }); Sync.request() }
+    fun clearHistory() { writeHistory(emptyList()); Sync.request() }
+
+    // ---------- Sincronización ----------
+    fun has(k: String) = sp.contains(k)
+    fun str(k: String, def: String = ""): String = sp.getString(k, def) ?: def
+    fun putStr(k: String, v: String) { sp.edit().putString(k, v).apply(); bump() }
+    fun bool(k: String, def: Boolean): Boolean = sp.getBoolean(k, def)
+    fun putBool(k: String, v: Boolean) { sp.edit().putBoolean(k, v).apply(); bump() }
+    fun strSet(k: String): Set<String> = set(k)
+    fun putStrSet(k: String, v: Set<String>) { sp.edit().putStringSet(k, v).apply(); bump() }
+
+    fun replaceFavorites(list: List<Item>) {
+        val arr = JSONArray(); list.forEach { arr.put(it.toJson()) }
+        sp.edit().putString("favs", arr.toString()).apply(); bump()
+    }
+
+    fun replaceRatings(list: List<Rating>) {
+        val arr = JSONArray(); list.take(500).forEach { arr.put(it.toJson()) }
+        sp.edit().putString("ratings", arr.toString()).apply(); bump()
+    }
+
+    fun replaceHistory(list: List<Progress>) = writeHistory(list.take(60))
 }

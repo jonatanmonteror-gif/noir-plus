@@ -77,6 +77,7 @@ object Repo {
             "m3u" -> M3uSource(p.m3u)
             else -> null
         }
+        Sync.request(2000)
     }
 
     /**

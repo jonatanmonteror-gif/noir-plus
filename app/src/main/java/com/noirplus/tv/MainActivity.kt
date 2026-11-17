@@ -23,11 +23,13 @@ class MainActivity : ComponentActivity() {
     override fun onStop() {
         super.onStop()
         stoppedAt = System.currentTimeMillis()
+        com.noirplus.tv.data.Sync.request(0)
     }
 
     override fun onStart() {
         super.onStart()
         Repo.resumeCount.intValue = Repo.resumeCount.intValue + 1
+        com.noirplus.tv.data.Sync.request(300)
         // Si la app vuelve tras más de 4 horas en segundo plano, saludo de nuevo y listas frescas.
         if (stoppedAt > 0 && System.currentTimeMillis() - stoppedAt > 4 * 3600_000L) {
             Repo.welcomeRequest.intValue = Repo.welcomeRequest.intValue + 1

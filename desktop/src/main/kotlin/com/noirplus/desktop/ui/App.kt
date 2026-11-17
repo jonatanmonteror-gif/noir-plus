@@ -74,6 +74,13 @@ private fun Shell() {
     val nav = remember { Nav(Screen.Home) }
     var update by remember { mutableStateOf<Updater.Release?>(null) }
     LaunchedEffect(Unit) { update = runCatching { Updater.check() }.getOrNull() }
+    // Sincronización: al abrir y cada 3 minutos mientras Noir+ está abierto
+    LaunchedEffect(Unit) {
+        while (true) {
+            com.noirplus.desktop.data.Sync.request(0)
+            kotlinx.coroutines.delay(180_000)
+        }
+    }
 
     // Esc / Retroceso = volver atrás
     KeyHandler { e ->
@@ -255,5 +262,5 @@ object PlayerHost {
     var session by mutableIntStateOf(0)
         private set
     fun open(r: com.noirplus.desktop.data.PlayRequest) { req = r; mini = false; session++ }
-    fun close() { req = null; mini = false }
+    fun close() { req = null; mini = false; com.noirplus.desktop.data.Sync.request(800) }
 }

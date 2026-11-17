@@ -46,6 +46,7 @@ import com.noirplus.tv.data.Kind
 import com.noirplus.tv.data.SUB_MAX
 import com.noirplus.tv.data.SUB_MIN
 import com.noirplus.tv.data.Repo
+import com.noirplus.tv.data.Sync
 import com.noirplus.tv.data.Updater
 import kotlinx.coroutines.launch
 
@@ -111,6 +112,8 @@ fun SettingsContent() {
     var nameEdit by remember { mutableStateOf(prefs.name) }
     var pinDialog by remember { mutableStateOf<String?>(null) } // "set", "unlock", "remove"
     var nameDialog by remember { mutableStateOf(false) }
+    var syncDialog by remember { mutableStateOf<String?>(null) } // "url", "name"
+    LaunchedEffect(Unit) { Sync.request(0) }
     var updStatus by remember { mutableStateOf<String?>(null) }
     var updRelease by remember { mutableStateOf<Updater.Release?>(null) }
     var updProgress by remember { mutableStateOf<Float?>(null) }
@@ -219,6 +222,43 @@ fun SettingsContent() {
                         Repo.rebuild()
                         nav.reset(Screen.Setup)
                     }
+                }
+            }
+
+            Section("Sincronización") {
+                val sv = Sync.version.intValue
+                Note("Recuerda lo que has visto, Mi lista, tus valoraciones y algunos ajustes entre la tele, el móvil y Windows con la misma cuenta. Se guarda en tu propio servidor.")
+                Column {
+                    LinkRow("Servidor", Sync.url.removePrefix("https://").removeSuffix("/noir-sync/sync.php").ifEmpty { "Sin configurar" }, key = "sync-url") { syncDialog = "url" }
+                    LinkRow("Nombre de este aparato", Sync.deviceName, key = "sync-name") { syncDialog = "name" }
+                }
+                ChoiceRow("Sincronizar este aparato", listOf("Sí", "No"), if (Sync.enabled) 0 else 1, "sync-on") { Sync.enabled = it == 0 }
+                if (Sync.enabled) {
+                    ChoiceRow("Continuar viendo", listOf("Sí", "No"), if (Sync.section("progress")) 0 else 1, "sync-p") { Sync.setSection("progress", it == 0) }
+                    ChoiceRow("Mi lista", listOf("Sí", "No"), if (Sync.section("favs")) 0 else 1, "sync-f") { Sync.setSection("favs", it == 0) }
+                    ChoiceRow("Valoraciones", listOf("Sí", "No"), if (Sync.section("ratings")) 0 else 1, "sync-r") { Sync.setSection("ratings", it == 0) }
+                    ChoiceRow("Ajustes (orden, carpetas ocultas, PIN)", listOf("Sí", "No"), if (Sync.section("settings")) 0 else 1, "sync-s") { Sync.setSection("settings", it == 0) }
+                    Column {
+                        LinkRow("Sincronizar ahora", Sync.status.value ?: "", key = "sync-now") { Sync.request(0) }
+                    }
+                    val devs = Sync.devices.value
+                    if (devs.isNotEmpty()) {
+                        Text("Aparatos", color = Col.Text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                        Note("Un aparato excluido no comparte ni recibe nada hasta que lo vuelvas a incluir desde otro.")
+                        Column {
+                            val me = Sync.deviceId
+                            devs.forEach { dv ->
+                                val kindTxt = when (dv.kind) { "tv" -> "Tele"; "movil" -> "Móvil"; "windows" -> "Windows"; else -> "" }
+                                val label = dv.name + if (dv.id == me) " (este)" else ""
+                                val value = listOf(kindTxt, if (dv.blocked) "Excluido" else "Incluido").filter { it.isNotEmpty() }.joinToString(" · ")
+                                if (dv.id == me) LinkRow(label, value, key = "dev-${dv.id}") { Sync.request(0) }
+                                else LinkRow(label + if (dv.blocked) " · pulsa para incluir" else " · pulsa para excluir", value, key = "dev-${dv.id}") {
+                                    Sync.setBlocked(dv.id, !dv.blocked)
+                                }
+                            }
+                        }
+                    }
+                    if (sv < 0) Spacer(Modifier)
                 }
             }
 
@@ -339,6 +379,11 @@ fun SettingsContent() {
             Text("Noir+  ·  ${BuildConfig.VERSION_NAME}", color = Col.Sub, fontSize = 12.sp, modifier = Modifier.padding(start = 4.dp))
         }
 
+        syncDialog?.let { which ->
+            if (which == "url") NameDialog(Sync.url.removePrefix("https://"), title = "Dirección del servidor (tu dominio)", maxLen = 200, url = true,
+                onCancel = { syncDialog = null }) { Sync.setUrl(it); syncDialog = null }
+            else NameDialog(Sync.deviceName, title = "Nombre de este aparato", maxLen = 40, onCancel = { syncDialog = null }) { Sync.deviceName = it; syncDialog = null }
+        }
         if (nameDialog) NameDialog(prefs.name, onCancel = { nameDialog = false }) { prefs.name = it; nameEdit = it; nameDialog = false }
         pinDialog?.let { mode ->
             PinDialog(
@@ -404,7 +449,7 @@ fun PinDialog(title: String, onCancel: () -> Unit, onDone: (String) -> String?) 
 
 /** Ventanita para escribir el nombre con el mando: el teclado se abre solo y «Hecho» guarda. */
 @Composable
-private fun NameDialog(current: String, onCancel: () -> Unit, onSave: (String) -> Unit) {
+private fun NameDialog(current: String, title: String = "Tu nombre", maxLen: Int = 30, url: Boolean = false, onCancel: () -> Unit, onSave: (String) -> Unit) {
     var name by remember { mutableStateOf(current) }
     val fr = remember { androidx.compose.ui.focus.FocusRequester() }
     val kb = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
@@ -419,10 +464,11 @@ private fun NameDialog(current: String, onCancel: () -> Unit, onSave: (String) -
             Modifier.widthIn(max = 420.dp).clip(RoundedCornerShape(16.dp)).background(Col.Surface2).padding(22.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Text("Tu nombre", color = Col.Text, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+            Text(title, color = Col.Text, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
             OutlinedTextField(
-                value = name, onValueChange = { name = it.take(30) }, singleLine = true,
-                keyboardOptions = KeyboardOptions(capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Words,
+                value = name, onValueChange = { name = it.take(maxLen) }, singleLine = true,
+                keyboardOptions = if (url) KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = androidx.compose.ui.text.input.ImeAction.Done)
+                else KeyboardOptions(capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Words,
                     imeAction = androidx.compose.ui.text.input.ImeAction.Done),
                 keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { kb?.hide(); onSave(name.trim()) }),
                 modifier = Modifier.fillMaxWidth().focusRequester(fr), colors = fieldColors(),

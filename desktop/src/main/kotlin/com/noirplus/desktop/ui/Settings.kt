@@ -48,6 +48,54 @@ fun SettingsScreen() {
                 NButton("Cambiar de cuenta") { Store.logout(); Repo.rebuild() }
             }
         }
+        Card("Sincronización") {
+            val sv = Sync.version.intValue
+            var syncUrl by remember { mutableStateOf(Sync.url.removePrefix("https://")) }
+            var devName by remember { mutableStateOf(Sync.deviceName) }
+            LaunchedEffect(Unit) { Sync.request(0) }
+            Text("Recuerda lo que has visto y Mi lista entre Windows, la tele y el móvil con la misma cuenta. Se guarda en tu propio servidor.",
+                color = Col.Sub, fontSize = 12.sp, lineHeight = 17.sp)
+            Field("Dirección del servidor (tu dominio)", syncUrl) { syncUrl = it }
+            if (syncUrl.trim() != Sync.url.removePrefix("https://")) NButton("Guardar dirección", primary = true) {
+                Sync.setUrl(syncUrl); syncUrl = Sync.url.removePrefix("https://")
+            }
+            Field("Nombre de este aparato", devName) { devName = it.take(40) }
+            if (devName.trim() != Sync.deviceName) NButton("Guardar nombre", primary = true) { Sync.deviceName = devName }
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("Sincronizar este aparato", color = Col.Text, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                Seg(listOf("Sí" to "1", "No" to "0"), { if (Sync.enabled) "1" else "0" }) { Sync.enabled = it == "1" }
+            }
+            if (Sync.enabled) {
+                listOf("progress" to "Continuar viendo", "favs" to "Mi lista").forEach { (k, label) ->
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(label, color = Col.Text, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                        Seg(listOf("Sí" to "1", "No" to "0"), { if (Sync.section(k)) "1" else "0" }) { Sync.setSection(k, it == "1") }
+                    }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    NButton("Sincronizar ahora") { Sync.request(0) }
+                    Sync.status.value?.let { Text(it, color = Col.Sub, fontSize = 13.sp) }
+                }
+                val devs = Sync.devices.value
+                if (devs.isNotEmpty()) {
+                    Spacer(Modifier.height(4.dp))
+                    Text("Aparatos", color = Col.Text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    Text("Un aparato excluido no comparte ni recibe nada hasta que lo vuelvas a incluir desde otro.", color = Col.Sub, fontSize = 12.sp)
+                    devs.forEach { dv ->
+                        val kindTxt = when (dv.kind) { "tv" -> "Tele"; "movil" -> "Móvil"; "windows" -> "Windows"; else -> "" }
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text(dv.name + if (dv.id == Sync.deviceId) " (este)" else "", color = Col.Text, fontSize = 14.sp)
+                                Text(listOf(kindTxt, if (dv.blocked) "Excluido" else "Incluido").filter { it.isNotEmpty() }.joinToString(" · "),
+                                    color = Col.Sub, fontSize = 12.sp)
+                            }
+                            if (dv.id != Sync.deviceId) NButton(if (dv.blocked) "Incluir" else "Excluir") { Sync.setBlocked(dv.id, !dv.blocked) }
+                        }
+                    }
+                }
+            }
+            if (sv < 0) Spacer(Modifier)
+        }
         Card("Pantalla") {
             Text("Cómo se abre Noir+", color = Col.Text, fontSize = 14.sp)
             Seg(listOf("Pantalla completa" to "full", "Inmersiva" to "immersive", "Ventana" to "window"), { Store.windowMode }) { Store.windowMode = it }

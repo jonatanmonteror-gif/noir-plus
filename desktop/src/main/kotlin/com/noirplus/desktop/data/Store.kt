@@ -73,7 +73,7 @@ object Store {
     }
     fun saveM3u(url: String) { o.put("type", "m3u").put("m3u", url); save() }
     fun logout() {
-        listOf("type", "server", "user", "pass", "m3u").forEach { o.remove(it) }; save()
+        listOf("type", "server", "user", "pass", "m3u", "favs", "history", "syncState").forEach { o.remove(it) }; save()
     }
 
     var name: String
@@ -158,12 +158,13 @@ object Store {
     fun saveProgress(p: Progress, notify: Boolean = false) {
         val list = history().filter { it.key != p.key && (p.parent == null || it.parent != p.parent) }.toMutableList()
         if (p.duration <= 0 || p.fraction < 0.95f) list.add(0, p)
-        o.put("history", JSONArray(list.take(40).map { it.toJson() }))
+        o.put("history", JSONArray(list.take(60).map { it.toJson() }))
         if (notify) save() else runCatching { file.writeText(o.toString()) }
     }
 
     fun removeProgress(key: String) {
         o.put("history", JSONArray(history().filter { it.key != key }.map { it.toJson() })); save()
+        Sync.request()
     }
 
     // ---------- Mi lista ----------
@@ -176,5 +177,14 @@ object Store {
         val l = favorites().toMutableList()
         if (l.removeAll { it.key == item.key }.not()) l.add(0, item)
         o.put("favs", JSONArray(l.map { it.toJson() })); save()
+        Sync.request()
     }
+
+    // ---------- Sincronización ----------
+    fun str(k: String, def: String = ""): String = o.optString(k, def)
+    fun putStr(k: String, v: String) { o.put(k, v); save() }
+    fun bool(k: String, def: Boolean): Boolean = o.optBoolean(k, def)
+    fun putBool(k: String, v: Boolean) { o.put(k, v); save() }
+    fun replaceHistory(list: List<Progress>) { o.put("history", JSONArray(list.take(60).map { it.toJson() })); save() }
+    fun replaceFavorites(list: List<Item>) { o.put("favs", JSONArray(list.map { it.toJson() })); save() }
 }

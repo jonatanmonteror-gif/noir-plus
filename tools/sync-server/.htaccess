@@ -1,0 +1,5 @@
+# Noir+ sync: solo se puede usar sync.php
+Options -Indexes
+<FilesMatch "^(?!sync\.php$).*">
+    Require all denied
+</FilesMatch>
