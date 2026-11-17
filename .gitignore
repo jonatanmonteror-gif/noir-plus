@@ -10,3 +10,5 @@ local.properties
 *.keystore
 !*.jks.enc
 !app/legacy.jks
+desktop/build/
+desktop/.gradle/

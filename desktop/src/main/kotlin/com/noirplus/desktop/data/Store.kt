@@ -1,0 +1,129 @@
+package com.noirplus.desktop.data
+
+import androidx.compose.runtime.mutableIntStateOf
+import org.json.JSONArray
+import org.json.JSONObject
+import java.io.File
+
+/** Dónde vive todo lo de Noir+ en el PC: %APPDATA%\NoirPlus */
+object AppDirs {
+    val root: File by lazy {
+        val base = System.getenv("APPDATA")?.let { File(it) } ?: File(System.getProperty("user.home"), ".noirplus")
+        File(base, "NoirPlus").apply { mkdirs() }
+    }
+}
+
+/** Lo visto a medias, para "Continuar viendo". */
+data class Progress(
+    val key: String,
+    val title: String,
+    val image: String?,
+    val url: String,
+    val position: Long,
+    val duration: Long,
+    val time: Long,
+    val parent: String? = null,
+) {
+    val fraction: Float get() = if (duration > 0) (position.toFloat() / duration).coerceIn(0f, 1f) else 0f
+
+    fun toJson(): JSONObject = JSONObject()
+        .put("key", key).put("title", title).put("image", image ?: "").put("url", url)
+        .put("pos", position).put("dur", duration).put("time", time).put("parent", parent ?: "")
+
+    companion object {
+        fun fromJson(o: JSONObject) = Progress(
+            o.optString("key"), o.optString("title"), o.str("image"), o.optString("url"),
+            o.optLong("pos"), o.optLong("dur"), o.optLong("time"), o.str("parent"),
+        )
+    }
+}
+
+/**
+ * Ajustes y datos de la app guardados en un archivo JSON del PC (no en el código).
+ * Cada cambio sube [changes] para que la interfaz se refresque.
+ */
+object Store {
+    private val file = File(AppDirs.root, "settings.json")
+    private var o: JSONObject = runCatching { JSONObject(file.readText()) }.getOrDefault(JSONObject())
+    val changes = mutableIntStateOf(0)
+
+    @Synchronized
+    private fun save() {
+        runCatching {
+            val tmp = File(file.parentFile, "settings.tmp")
+            tmp.writeText(o.toString())
+            if (file.exists()) file.delete()
+            tmp.renameTo(file)
+        }
+        changes.intValue++
+    }
+
+    private fun s(k: String) = o.optString(k, "")
+
+    // ---------- Cuenta ----------
+    val type: String get() = s("type")
+    val server: String get() = s("server")
+    val user: String get() = s("user")
+    val pass: String get() = s("pass")
+    val m3u: String get() = s("m3u")
+    val hasAccount: Boolean get() = type == "xtream" || (type == "m3u" && m3u.isNotBlank())
+
+    fun saveXtream(server: String, user: String, pass: String) {
+        o.put("type", "xtream").put("server", server).put("user", user).put("pass", pass); save()
+    }
+    fun saveM3u(url: String) { o.put("type", "m3u").put("m3u", url); save() }
+    fun logout() {
+        listOf("type", "server", "user", "pass", "m3u").forEach { o.remove(it) }; save()
+    }
+
+    var name: String
+        get() = s("name")
+        set(v) { o.put("name", v.trim()); save() }
+
+    /** Formato de los canales en directo: "ts" o "m3u8". */
+    var liveFormat: String
+        get() = s("liveFormat").ifBlank { "ts" }
+        set(v) { o.put("liveFormat", v); save() }
+
+    /** Tamaño de los subtítulos en el reproductor (escala de VLC). */
+    var subScale: Int
+        get() = o.optInt("subScale", 100)
+        set(v) { o.put("subScale", v.coerceIn(50, 200)); save() }
+
+    var volume: Int
+        get() = o.optInt("volume", 100)
+        set(v) { o.put("volume", v.coerceIn(0, 150)); o.toString().let { runCatching { file.writeText(it) } } }
+
+    // ---------- Continuar viendo ----------
+    fun history(): List<Progress> {
+        val a = o.optJSONArray("history") ?: return emptyList()
+        return (0 until a.length()).mapNotNull { a.optJSONObject(it)?.let(Progress::fromJson) }
+            .filter { it.duration <= 0 || it.fraction < 0.95f }
+            .sortedByDescending { it.time }
+    }
+
+    fun progress(key: String): Progress? = history().firstOrNull { it.key == key }
+
+    fun saveProgress(p: Progress, notify: Boolean = false) {
+        val list = history().filter { it.key != p.key && (p.parent == null || it.parent != p.parent) }.toMutableList()
+        if (p.duration <= 0 || p.fraction < 0.95f) list.add(0, p)
+        o.put("history", JSONArray(list.take(40).map { it.toJson() }))
+        if (notify) save() else runCatching { file.writeText(o.toString()) }
+    }
+
+    fun removeProgress(key: String) {
+        o.put("history", JSONArray(history().filter { it.key != key }.map { it.toJson() })); save()
+    }
+
+    // ---------- Mi lista ----------
+    fun favorites(): List<Item> {
+        val a = o.optJSONArray("favs") ?: return emptyList()
+        return (0 until a.length()).mapNotNull { a.optJSONObject(it)?.let(Item::fromJson) }
+    }
+    fun isFavorite(item: Item) = favorites().any { it.key == item.key }
+    fun toggleFavorite(item: Item) {
+        val l = favorites().toMutableList()
+        if (l.removeAll { it.key == item.key }.not()) l.add(0, item)
+        o.put("favs", JSONArray(l.map { it.toJson() })); save()
+    }
+}
