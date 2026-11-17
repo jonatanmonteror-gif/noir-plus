@@ -65,10 +65,10 @@ fun RoundIconButton(icon: ImageVector, desc: String, active: Boolean = false, on
 
 /** Botón de ordenar con su menú desplegable. */
 @Composable
-fun SortButton(mode: SortMode, onChange: (SortMode) -> Unit) {
+fun SortButton(mode: SortMode, default: SortMode = SortMode.DEFAULT, onChange: (SortMode) -> Unit) {
     var open by remember { mutableStateOf(false) }
     Box {
-        RoundIconButton(SortIcon, "Ordenar", active = mode != SortMode.DEFAULT) { open = true }
+        RoundIconButton(SortIcon, "Ordenar", active = mode != default) { open = true }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }, modifier = Modifier.background(Col.Surface2)) {
             SortMode.entries.forEach { m ->
                 DropdownMenuItem(

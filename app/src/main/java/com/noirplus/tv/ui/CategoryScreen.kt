@@ -58,7 +58,6 @@ import com.noirplus.tv.data.Kind
 import com.noirplus.tv.data.Platforms
 import com.noirplus.tv.data.Repo
 import com.noirplus.tv.data.Tmdb
-import androidx.compose.runtime.mutableIntStateOf
 import kotlinx.coroutines.delay
 
 /** Carpeta completa: cuadrícula con buscador dentro de la carpeta y orden. */
@@ -78,32 +77,28 @@ fun CategoryScreen(kind: Kind, cat: Category, startSearch: Boolean = false) {
     val pretty = remember(cat.name) { if (isAll) PrettyName(cat.name, null) else prettyCategory(cat.name, kind) }
     var searching by rememberSaveable { mutableStateOf(startSearch) }
     var query by rememberSaveable { mutableStateOf("") }
-    var sort by rememberSaveable { mutableStateOf(SortMode.DEFAULT) }
-    // Filtro por plataforma (TMDB). Las plataformas de cada título se consultan una vez y se recuerdan.
-    val canFilter = kind != Kind.LIVE && Tmdb.configured()
+    var sort by rememberSaveable { mutableStateOf(prefs.defaultSort) }
+    // Filtro por plataforma (TMDB): se descarga el catálogo de la plataforma una vez y se cruza con la lista.
+    // No aparece dentro de carpetas que ya son de una plataforma ("Series Netflix", "HBO"…).
+    val canFilter = kind != Kind.LIVE && Tmdb.configured() && (isAll || Platforms.fromFolder(cat.name) == null)
     var platform by rememberSaveable { mutableStateOf<String?>(null) }
-    var checked by remember { mutableIntStateOf(0) }
-    var checking by remember { mutableStateOf(false) }
-    LaunchedEffect(platform, items) {
-        val all = items ?: return@LaunchedEffect
-        if (platform == null) return@LaunchedEffect
-        val pending = all.filter { Tmdb.known(it) == null }
-        if (pending.isEmpty()) { checked = all.size; return@LaunchedEffect }
-        checking = true
-        val base = all.size - pending.size
-        checked = base
+    var catalog by remember { mutableStateOf<Tmdb.Catalog?>(null) }
+    var progress by remember { mutableStateOf<String?>(null) }
+    var failed by remember { mutableStateOf(false) }
+    LaunchedEffect(platform) {
+        catalog = null
+        failed = false
+        val p = platform ?: return@LaunchedEffect
+        progress = "Cargando catálogo de $p…"
         try {
-            Tmdb.resolve(pending) { n -> if (n % 10 == 0 || n == pending.size) checked = base + n }
-            checked = all.size
+            val c = Tmdb.catalog(kind, p) { done, total ->
+                if (total > 1 && (done % 5 == 0 || done == total)) progress = "Cargando catálogo de $p… ${done * 100 / total}%"
+            }
+            catalog = c
+            failed = c == null
         } finally {
-            checking = false
-            Tmdb.save()
+            progress = null
         }
-    }
-    val platformOptions = remember(items, checked) {
-        val seen = LinkedHashSet<String>()
-        items?.forEach { i -> Tmdb.known(i)?.forEach { seen.add(Platforms.group(it)) } }
-        Platforms.main + seen.filter { it !in Platforms.main }.sorted()
     }
     val fieldFr = remember { FocusRequester() }
     LaunchedEffect(searching) {
@@ -112,11 +107,11 @@ fun CategoryScreen(kind: Kind, cat: Category, startSearch: Boolean = false) {
             runCatching { fieldFr.requestFocus() }
         }
     }
-    val shown = remember(items, query, sort, platform, checked) {
+    val shown = remember(items, query, sort, platform, catalog) {
         val q = normText(query.trim())
         items?.let { all ->
             var l = if (q.isEmpty()) all else all.filter { normText(it.name).contains(q) }
-            platform?.let { p -> l = l.filter { i -> Tmdb.known(i)?.any { Platforms.group(it) == p } == true } }
+            if (platform != null) l = catalog?.let { c -> l.filter { c.has(it) } } ?: emptyList()
             l.sortedFor(sort)
         }
     }
@@ -171,18 +166,18 @@ fun CategoryScreen(kind: Kind, cat: Category, startSearch: Boolean = false) {
             }
             if (canFilter) {
                 Spacer(Modifier.width(8.dp))
-                PlatformButton(platform, platformOptions) { platform = it }
+                PlatformButton(platform, Platforms.main) { platform = it }
             }
             Spacer(Modifier.width(8.dp))
-            SortButton(sort) { sort = it }
+            SortButton(sort, prefs.defaultSort) { sort = it }
         }
-        if (sort != SortMode.DEFAULT || query.isNotBlank() || platform != null) {
+        if (sort != prefs.defaultSort || query.isNotBlank() || platform != null) {
             Text(
                 listOfNotNull(
                     shown?.let { "${it.size} resultados" },
                     platform,
-                    if (checking) "buscando plataformas ${checked}/${items?.size ?: 0}…" else null,
-                    sort.takeIf { it != SortMode.DEFAULT }?.label,
+                    progress,
+                    sort.takeIf { it != prefs.defaultSort }?.label,
                 ).joinToString("  ·  "),
                 color = Col.Sub, fontSize = 12.sp, modifier = Modifier.padding(start = d.edge, bottom = 6.dp),
             )
@@ -190,9 +185,10 @@ fun CategoryScreen(kind: Kind, cat: Category, startSearch: Boolean = false) {
         val list = shown
         when {
             list == null -> Loading()
-            list.isEmpty() && checking -> Loading()
+            list.isEmpty() && progress != null -> Loading()
             list.isEmpty() -> Message(when {
                 query.isNotBlank() -> "Sin resultados para «${query.trim()}»"
+                platform != null && failed -> "No se pudo cargar el catálogo de $platform. Revisa la conexión."
                 platform != null -> "Nada de $platform en esta carpeta"
                 else -> "No hay contenido en esta categoría"
             })

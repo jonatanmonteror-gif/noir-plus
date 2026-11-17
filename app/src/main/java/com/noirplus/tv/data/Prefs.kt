@@ -139,6 +139,11 @@ class Prefs(ctx: Context) {
         set(v) { sp.edit().putBoolean("autoNext", v).apply(); bump() }
 
     /** Columnas en las cuadrículas del móvil (2 o 3). */
+    /** Orden con el que se abren las carpetas ("Ver todo", "Todas"). Por defecto, lo más reciente primero. */
+    var defaultSort: com.noirplus.tv.ui.SortMode
+        get() = runCatching { com.noirplus.tv.ui.SortMode.valueOf(s("defaultSort")) }.getOrDefault(com.noirplus.tv.ui.SortMode.RECENT)
+        set(v) { sp.edit().putString("defaultSort", v.name).apply(); bump() }
+
     var gridCols: Int
         get() = sp.getInt("gridCols", 3)
         set(v) { sp.edit().putInt("gridCols", v.coerceIn(2, 3)).apply(); bump() }

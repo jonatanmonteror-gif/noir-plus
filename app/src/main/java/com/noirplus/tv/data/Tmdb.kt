@@ -71,22 +71,95 @@ object Tmdb {
     /** Plataformas ya conocidas de un título (null = aún no se ha consultado). */
     fun known(item: Item): List<String>? = cache[item.key]?.map { it.name } ?: names[item.key]?.second
 
-    /**
-     * Consulta las plataformas de muchos títulos a la vez (para el filtro).
-     * Sin pedir la ficha al proveedor IPTV, para no saturarlo. Lo ya consultado no se repite.
-     */
-    suspend fun resolve(items: List<Item>, onProgress: (Int) -> Unit) = coroutineScope {
-        val sem = Semaphore(8)
-        val done = AtomicInteger(0)
-        items.map { item ->
+    // --- Catálogo de cada plataforma en España (para el filtro) ---
+    // En vez de preguntar título a título, se descarga una vez la lista de lo que hay en
+    // la plataforma (unas decenas de páginas en paralelo) y se cruza con tu lista al instante.
+
+    /** Lo que hay en una plataforma: ids de TMDB y títulos normalizados con sus años. */
+    class Catalog(val ids: Set<String>, val titles: Map<String, List<Int>>) {
+        fun has(item: Item): Boolean {
+            item.tmdb?.let { if (it in ids) return true }
+            val (q, y) = clean(item.name)
+            val years = titles[titleKey(q)] ?: return false
+            val year = (item.year ?: y)?.take(4)?.toIntOrNull() ?: return true
+            return years.isEmpty() || years.any { it == 0 || kotlin.math.abs(it - year) <= 1 }
+        }
+    }
+
+    private val catalogs = ConcurrentHashMap<String, Catalog>()
+    private val marks = Regex("\\p{Mn}+")
+    fun titleKey(s: String): String =
+        marks.replace(java.text.Normalizer.normalize(s, java.text.Normalizer.Form.NFD), "").lowercase()
+            .replace(Regex("[^a-z0-9]+"), " ").trim()
+
+    /** Ids de TMDB de todas las variantes de una plataforma en España (p. ej. Netflix y Netflix con anuncios). */
+    private suspend fun providerIds(type: String, group: String): String? {
+        val arr = get("/watch/providers/$type", "watch_region=ES")?.optJSONArray("results") ?: return null
+        val ids = (0 until arr.length()).mapNotNull { i ->
+            val o = arr.optJSONObject(i) ?: return@mapNotNull null
+            o.optString("provider_id").takeIf { Platforms.group(o.optString("provider_name")) == group }
+        }
+        return ids.takeIf { it.isNotEmpty() }?.joinToString("|")
+    }
+
+    /** Catálogo de una plataforma (se guarda una semana). onProgress(hechas, total) en páginas. */
+    suspend fun catalog(kind: Kind, group: String, onProgress: (Int, Int) -> Unit = { _, _ -> }): Catalog? = coroutineScope {
+        val type = if (kind == Kind.SERIES) "tv" else "movie"
+        val id = "$type:$group"
+        catalogs[id]?.let { return@coroutineScope it }
+        val f = file?.parentFile?.let { File(it, "tmdb_cat_" + titleKey(id).replace(' ', '_') + ".json") }
+        // Copia guardada en el móvil/tele
+        runCatching {
+            if (f != null && f.exists() && System.currentTimeMillis() - f.lastModified() < WEEK) {
+                val o = JSONObject(f.readText())
+                val idsA = o.getJSONArray("ids")
+                val tO = o.getJSONObject("t")
+                val titles = HashMap<String, List<Int>>()
+                for (k in tO.keys()) { val a = tO.getJSONArray(k); titles[k] = (0 until a.length()).map { a.optInt(it) } }
+                return@coroutineScope Catalog((0 until idsA.length()).map { idsA.optString(it) }.toSet(), titles)
+                    .also { catalogs[id] = it }
+            }
+        }
+        val prov = providerIds(type, group) ?: return@coroutineScope null
+        val base = "watch_region=ES&with_watch_providers=${enc(prov)}&with_watch_monetization_types=${enc("flatrate|free|ads")}&sort_by=popularity.desc"
+        val first = get("/discover/$type", "$base&page=1") ?: return@coroutineScope null
+        val pages = first.optInt("total_pages", 1).coerceIn(1, 500)
+        val results = ConcurrentHashMap<Int, org.json.JSONArray>()
+        first.optJSONArray("results")?.let { results[1] = it }
+        val done = AtomicInteger(1)
+        onProgress(1, pages)
+        val sem = Semaphore(16)
+        (2..pages).map { pg ->
             async(Dispatchers.IO) {
-                if (known(item) == null) sem.withPermit { runCatching { providers(item, fast = true) } }
-                val n = done.incrementAndGet()
-                if (n % 25 == 0) save()
-                onProgress(n)
+                sem.withPermit {
+                    var r: JSONObject? = null
+                    for (attempt in 0 until 3) { r = get("/discover/$type", "$base&page=$pg"); if (r != null) break; kotlinx.coroutines.delay(400L * (attempt + 1)) }
+                    r?.optJSONArray("results")?.let { results[pg] = it }
+                }
+                onProgress(done.incrementAndGet(), pages)
             }
         }.awaitAll()
-        save()
+        val ids = HashSet<String>()
+        val titles = HashMap<String, MutableList<Int>>()
+        for (arr in results.values) for (i in 0 until arr.length()) {
+            val o = arr.optJSONObject(i) ?: continue
+            ids.add(o.optString("id"))
+            val year = (o.optString(if (type == "tv") "first_air_date" else "release_date")).take(4).toIntOrNull() ?: 0
+            for (k in listOf("title", "original_title", "name", "original_name")) {
+                val t = o.optString(k).takeIf { it.isNotBlank() } ?: continue
+                val key = titleKey(t)
+                if (key.isNotEmpty()) titles.getOrPut(key) { ArrayList() }.let { if (year !in it) it.add(year) }
+            }
+        }
+        val cat = Catalog(ids, titles)
+        catalogs[id] = cat
+        // Solo se guarda si llegaron casi todas las páginas
+        if (f != null && results.size >= pages * 9 / 10) runCatching {
+            val tO = JSONObject()
+            for ((k, v) in titles) tO.put(k, org.json.JSONArray(v))
+            f.writeText(JSONObject().put("ids", org.json.JSONArray(ids.toList())).put("t", tO).toString())
+        }
+        cat
     }
 
     private suspend fun get(path: String, params: String = "", key: String = this.key): JSONObject? = withContext(Dispatchers.IO) {
@@ -111,7 +184,7 @@ object Tmdb {
     private fun enc(s: String) = URLEncoder.encode(s, "UTF-8")
 
     /** Título limpio para buscar: sin año, calidad, idioma ni corchetes. */
-    private fun clean(title: String): Pair<String, String?> {
+    fun clean(title: String): Pair<String, String?> {
         val year = Regex("""\b(19|20)\d{2}\b""").find(title)?.value
         val t = title
             .replace(Regex("""^\s*[A-Za-z]{2,3}\s*[\|:\-]\s*"""), "")

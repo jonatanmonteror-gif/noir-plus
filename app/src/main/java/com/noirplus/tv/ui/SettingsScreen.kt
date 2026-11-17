@@ -221,6 +221,12 @@ fun SettingsContent() {
             }
 
             Section("Aspecto") {
+                val sortOpts = listOf(SortMode.RECENT, SortMode.RATING, SortMode.AZ, SortMode.DEFAULT)
+                ChoiceRow("Orden de las carpetas", listOf("Recientes", "Valoradas", "A–Z", "Original"),
+                    sortOpts.indexOf(prefs.defaultSort).coerceAtLeast(0), "ds",
+                    note = "Cómo se ordena al abrir «Ver todo» o «Todas». Siempre puedes cambiarlo dentro con el botón de ordenar.") {
+                    prefs.defaultSort = sortOpts[it]
+                }
                 ChoiceRow("Columnas en las carpetas", listOf("2", "3"), if (prefs.gridCols == 2) 0 else 1, "gc",
                     note = "En el móvil, al abrir «Ver todo» o «Todas».") { prefs.gridCols = if (it == 0) 2 else 3 }
             }

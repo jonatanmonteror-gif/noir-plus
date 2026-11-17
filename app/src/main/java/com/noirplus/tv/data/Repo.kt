@@ -81,8 +81,9 @@ object Repo {
     private fun setupImages(ctx: Context) {
         Coil.setImageLoader(
             ImageLoader.Builder(ctx)
-                .okHttpClient(Http.client)
-                .crossfade(220)
+                .okHttpClient(ImageTuning.client)
+                .components { add(ImageTuning.interceptor) }
+                .crossfade(150)
                 .allowRgb565(true)
                 .respectCacheHeaders(false)
                 .memoryCache { MemoryCache.Builder(ctx).maxSizePercent(0.20).build() }
