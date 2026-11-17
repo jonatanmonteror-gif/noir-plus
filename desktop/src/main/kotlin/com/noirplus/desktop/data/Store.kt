@@ -104,7 +104,7 @@ object Store {
 
     // ---------- Subtítulos (los dibuja VLC con estas opciones) ----------
     var subFont: String
-        get() = s("subFont").takeIf { it in listOf("Segoe UI", "Arial", "Georgia") } ?: "Segoe UI"
+        get() = s("subFont").takeIf { it in listOf("Segoe UI", "Inter", "Atkinson Hyperlegible", "Verdana", "Arial", "Georgia") } ?: "Segoe UI"
         set(v) { o.put("subFont", v); save() }
     /** Color del texto en RGB. */
     var subColor: Int

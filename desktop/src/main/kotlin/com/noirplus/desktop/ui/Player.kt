@@ -7,6 +7,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -87,7 +89,7 @@ fun subMarginFor(h: Int): Int = when (Store.subPos) {
 }.coerceAtLeast(0)
 
 /** Las 3 letras disponibles para los subtítulos. */
-val SubFonts = listOf("Segoe UI", "Arial", "Georgia")
+val SubFonts = listOf("Segoe UI", "Inter", "Atkinson Hyperlegible", "Verdana", "Arial", "Georgia")
 
 /** ¿Hay VLC instalado? Se comprueba una sola vez. */
 object Vlc {
@@ -140,11 +142,11 @@ class VlcVideo {
 
 @OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
-fun PlayerScreen(start: PlayRequest) {
+fun PlayerScreen(start: PlayRequest, mini: Boolean = false) {
     val nav = LocalNav.current
     val window = LocalWindowState.current
     val base = if (com.noirplus.desktop.LocalWindowMode.current == "immersive") WindowPlacement.Fullscreen else WindowPlacement.Maximized
-    if (!Vlc.available) return NoVlc { nav.pop() }
+    if (!Vlc.available) return NoVlc { PlayerHost.close() }
 
     var req by remember { mutableStateOf(start) }
     // Si cambias el estilo de los subtítulos, se prepara el reproductor de nuevo y sigue donde estaba
@@ -210,7 +212,7 @@ fun PlayerScreen(start: PlayRequest) {
     fun exit() {
         saveProgress(notify = true)
         window.placement = base
-        nav.pop()
+        PlayerHost.close()
     }
 
     DisposableEffect(video) {
@@ -319,6 +321,7 @@ fun PlayerScreen(start: PlayRequest) {
 
     KeyHandler { e ->
         if (e.type != KeyEventType.KeyDown) return@KeyHandler false
+        if (mini) return@KeyHandler false // minimizado: el teclado es para navegar por la app
         lastMove = System.currentTimeMillis()
         when (e.key) {
             Key.Spacebar, Key.K -> { togglePause(); true }
@@ -352,13 +355,17 @@ fun PlayerScreen(start: PlayRequest) {
     Box(
         Modifier.fillMaxSize().background(Color.Black)
             .onPointerEvent(PointerEventType.Move) { lastMove = System.currentTimeMillis() }
-            .pointerHoverIcon(if (showControls) PointerIcon.Default else PointerIcon(java.awt.Toolkit.getDefaultToolkit()
+            .pointerHoverIcon(if (showControls || mini) PointerIcon.Default else PointerIcon(java.awt.Toolkit.getDefaultToolkit()
                 .createCustomCursor(java.awt.image.BufferedImage(1, 1, java.awt.image.BufferedImage.TYPE_INT_ARGB), java.awt.Point(0, 0), "none"))),
     ) {
         video.frame.value?.let { img ->
             Image(img, null, contentScale = when (format) { 1 -> ContentScale.Crop; 2 -> ContentScale.FillBounds; else -> ContentScale.Fit }, modifier = Modifier.fillMaxSize()
                 .clickable(indication = null, interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }) {
-                    if (menu != null) menu = null else togglePause()
+                    when {
+                        mini -> PlayerHost.mini = false
+                        menu != null -> menu = null
+                        else -> togglePause()
+                    }
                 })
         }
         if (buffering && error == null) Loading()
@@ -372,6 +379,22 @@ fun PlayerScreen(start: PlayRequest) {
             }
         }
 
+        if (mini) {
+            // Minimizado: controles pequeños al pasar el ratón (ampliar, pausa, cerrar)
+            val hs = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+            val hov by hs.collectIsHoveredAsState()
+            Box(Modifier.fillMaxSize().hoverable(hs)) {
+                if (hov) Row(Modifier.align(Alignment.Center), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    RoundIcon(Icons.Filled.OpenInFull, "Ampliar") { PlayerHost.mini = false }
+                    RoundIcon(if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow, "Pausa") { togglePause() }
+                    RoundIcon(Icons.Filled.Close, "Cerrar") { exit() }
+                }
+                if (!req.isLive && length > 0) Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(3.dp).background(Color.White.copy(alpha = 0.2f))) {
+                    Box(Modifier.fillMaxWidth((time.toFloat() / length).coerceIn(0f, 1f)).fillMaxHeight().background(Color.White))
+                }
+            }
+            return@Box
+        }
         AnimatedVisibility(showControls, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.fillMaxSize()) {
             Box(Modifier.fillMaxSize()) {
                 // Arriba: volver + título
@@ -381,6 +404,13 @@ fun PlayerScreen(start: PlayRequest) {
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     RoundIcon(Icons.AutoMirrored.Filled.ArrowBack, "Volver") { exit() }
+                    Spacer(Modifier.width(8.dp))
+                    // Minimizar: el vídeo sigue en una esquina mientras navegas por la app
+                    RoundIcon(Icons.Filled.PictureInPictureAlt, "Minimizar") {
+                        menu = null
+                        if (window.placement == WindowPlacement.Fullscreen && base != WindowPlacement.Fullscreen) window.placement = base
+                        PlayerHost.mini = true
+                    }
                     Column(Modifier.padding(start = 16.dp)) {
                         Text(req.title, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         if (req.isLive) Text("EN DIRECTO  ·  ← → cambiar de canal", color = Col.Sub, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
@@ -463,11 +493,6 @@ fun PlayerScreen(start: PlayRequest) {
             Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(3.dp).background(Color.White.copy(alpha = 0.18f))) {
                 Box(Modifier.fillMaxWidth((time.toFloat() / length).coerceIn(0f, 1f)).fillMaxHeight().background(Color.White.copy(alpha = 0.85f)))
             }
-        }
-        if (pendingSeek > 0) {
-            Text("Volviendo a ${fmtTime(pendingSeek)}…", color = Color.White, fontSize = 14.sp,
-                modifier = Modifier.align(Alignment.TopCenter).padding(top = 90.dp).clip(RoundedCornerShape(50))
-                    .background(Color.Black.copy(alpha = 0.6f)).padding(horizontal = 16.dp, vertical = 7.dp))
         }
         toast?.let {
             Text(it, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
@@ -620,8 +645,12 @@ private fun SubOptions(video: VlcVideo, onStyle: () -> Unit) {
 fun SubPreview(ch: Int) {
     if (ch < 0) return
     val family = remember(Store.subFont) {
-        runCatching { androidx.compose.ui.text.font.FontFamily(androidx.compose.ui.text.platform.SystemFont(Store.subFont)) }
-            .getOrDefault(androidx.compose.ui.text.font.FontFamily.SansSerif)
+        when (Store.subFont) {
+            "Inter" -> Inter
+            "Atkinson Hyperlegible" -> androidx.compose.ui.text.font.FontFamily(androidx.compose.ui.text.platform.Font("font/atkinson_regular.ttf"))
+            else -> runCatching { androidx.compose.ui.text.font.FontFamily(androidx.compose.ui.text.platform.SystemFont(Store.subFont)) }
+                .getOrDefault(androidx.compose.ui.text.font.FontFamily.SansSerif)
+        }
     }
     val color = Color.White
     val size = (18f * Store.subScale / 100f).sp

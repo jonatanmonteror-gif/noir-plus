@@ -6,6 +6,8 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -75,17 +77,18 @@ private fun Shell() {
 
     // Esc / Retroceso = volver atrás
     KeyHandler { e ->
-        if (e.type == KeyEventType.KeyDown && (e.key == Key.Escape || e.key == Key.Backspace) && nav.current !is Screen.Player) {
+        if (e.type == KeyEventType.KeyDown && (e.key == Key.Escape || e.key == Key.Backspace) && (PlayerHost.req == null || PlayerHost.mini)) {
             if (nav.stack.size > 1) { nav.pop(); true } else false
         } else false
     }
 
     CompositionLocalProvider(LocalNav provides nav) {
         val cur = nav.current
-        if (cur is Screen.Player) {
-            PlayerScreen(cur.req)
-            return@CompositionLocalProvider
+        // El reproductor vive fuera de la navegación: así se puede minimizar y seguir navegando
+        LaunchedEffect(cur) {
+            if (cur is Screen.Player) { PlayerHost.open(cur.req); nav.pop() }
         }
+        Box(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxSize()) {
             Sidebar(nav)
             Box(Modifier.weight(1f).fillMaxHeight()) {
@@ -111,6 +114,18 @@ private fun Shell() {
                     UpdateBanner(r, Modifier.align(Alignment.BottomEnd).padding(24.dp)) { update = null }
                 }
             }
+        }
+        PlayerHost.req?.let { r ->
+            key(PlayerHost.session) {
+                val mini = PlayerHost.mini
+                Box(
+                    if (mini) Modifier.align(Alignment.BottomEnd).padding(24.dp).size(440.dp, 248.dp)
+                        .shadow(24.dp, RoundedCornerShape(14.dp)).clip(RoundedCornerShape(14.dp))
+                        .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(14.dp))
+                    else Modifier.fillMaxSize()
+                ) { PlayerScreen(r, mini) }
+            }
+        }
         }
     }
 }
@@ -229,4 +244,16 @@ private fun CrashNotice() {
             }
         }
     }
+}
+
+
+/** Reproductor activo (a pantalla completa o minimizado en una esquina). */
+object PlayerHost {
+    var req by mutableStateOf<com.noirplus.desktop.data.PlayRequest?>(null)
+        private set
+    var mini by mutableStateOf(false)
+    var session by mutableIntStateOf(0)
+        private set
+    fun open(r: com.noirplus.desktop.data.PlayRequest) { req = r; mini = false; session++ }
+    fun close() { req = null; mini = false }
 }

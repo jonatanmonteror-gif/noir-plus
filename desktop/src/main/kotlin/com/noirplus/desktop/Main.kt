@@ -28,6 +28,7 @@ val LocalWindowState = staticCompositionLocalOf<WindowState> { error("sin ventan
 fun main() {
     com.noirplus.desktop.data.Startup.mainAt = System.currentTimeMillis()
     com.noirplus.desktop.data.ErrorLog.install()
+    Thread { com.noirplus.desktop.data.Fonts.installForUser() }.start()
     System.setProperty("skiko.renderApi", System.getProperty("skiko.renderApi") ?: "DIRECT3D")
     Repo.rebuild()
     application {
