@@ -16,10 +16,15 @@ object Tmdb {
 
     private val cache = ConcurrentHashMap<String, List<Provider>>()
 
-    fun configured(): Boolean = Repo.prefs.tmdbKey.isNotBlank()
+    /** Clave incluida en la app: así funciona en todos los dispositivos sin configurar nada. */
+    private const val BUILT_IN_KEY = "b5a63bce5d9e66d0a925f9736bd5d403"
+    /** Clave en uso: la que el usuario haya puesto en Ajustes, o la incluida. */
+    val key: String get() = Repo.prefs.tmdbKey.ifBlank { BUILT_IN_KEY.takeUnless { it.startsWith("__") } ?: "" }
+
+    fun configured(): Boolean = key.isNotBlank()
     fun clear() = cache.clear()
 
-    private suspend fun get(path: String, params: String = "", key: String = Repo.prefs.tmdbKey): JSONObject? = withContext(Dispatchers.IO) {
+    private suspend fun get(path: String, params: String = "", key: String = this.key): JSONObject? = withContext(Dispatchers.IO) {
         if (key.isBlank()) return@withContext null
         val v4 = key.length > 40 // el token de lectura (v4) es largo; la API key (v3) tiene 32 caracteres
         val q = buildString {

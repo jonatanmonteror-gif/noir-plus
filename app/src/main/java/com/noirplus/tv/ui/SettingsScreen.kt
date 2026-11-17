@@ -207,8 +207,8 @@ fun SettingsContent() {
                 refreshStatus?.let { Note(it) }
             }
 
-            Section("Plataformas (TMDB)") {
-                TmdbSettings()
+            Section("Plataformas") {
+                Note("Cada película y serie muestra en qué plataforma está en España. Datos de TMDB (themoviedb.org) y JustWatch. Este producto usa la API de TMDB pero no está respaldado ni certificado por TMDB.")
             }
 
             Section("Reproductor") {
@@ -347,76 +347,3 @@ private fun QuickToggle(label: String, k: String) {
     ChoiceRow(label, listOf("Botón", "En la ruedita"), if (on) 0 else 1, "q-$k") { prefs.setQuick(k, it == 0) }
 }
 
-/** Clave de TMDB: escribirla/pegarla aquí o, en la tele, desde el móvil con un QR. */
-@Composable
-private fun TmdbSettings() {
-    val prefs = Repo.prefs
-    val d = LocalDims.current
-    val scope = rememberCoroutineScope()
-    var key by remember { mutableStateOf(prefs.tmdbKey) }
-    var status by remember { mutableStateOf<String?>(if (prefs.tmdbKey.isBlank()) null else "Conectado") }
-    var qr by remember { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
-
-    fun save(k: String) {
-        status = "Comprobando…"
-        scope.launch {
-            if (com.noirplus.tv.data.Tmdb.test(k)) {
-                prefs.tmdbKey = k
-                key = k
-                com.noirplus.tv.data.Platforms.clear()
-                status = "Conectado"
-            } else {
-                status = "La clave no funciona. Revisa que esté completa."
-            }
-        }
-    }
-
-    Note("Con una clave gratuita de TMDB, cada película y serie muestra en qué plataforma está en España (Netflix, Disney+…).")
-    if (prefs.tmdbKey.isBlank() && d.tv) {
-        androidx.compose.runtime.DisposableEffect(Unit) {
-            val server = com.noirplus.tv.data.PairServer(
-                title = "Clave de TMDB",
-                customForm = """<form method=post><label>Clave de TMDB (API key o token de lectura)<input name=key autocapitalize=off autocomplete=off></label>
-<button>Enviar a la tele</button></form><p class=s>Se guarda solo en tu tele.</p>""",
-            ) { form ->
-                val k = form["key"].orEmpty().trim()
-                if (com.noirplus.tv.data.Tmdb.test(k)) {
-                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                        prefs.tmdbKey = k; key = k; com.noirplus.tv.data.Platforms.clear(); status = "Conectado"
-                    }
-                    null
-                } else "La clave no funciona. Revisa que esté completa."
-            }
-            val u = server.start(scope)
-            if (u != null) qr = qrBitmap(u, 300)
-            onDispose { server.stop() }
-        }
-        qr?.let { bmp ->
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(96.dp).clip(RoundedCornerShape(8.dp)).background(Color.White).padding(5.dp)) {
-                    androidx.compose.foundation.Image(bmp, "QR", Modifier.fillMaxSize(), filterQuality = androidx.compose.ui.graphics.FilterQuality.None)
-                }
-                Note("  Escanea con el móvil y pega allí la clave (misma wifi).")
-            }
-        }
-    }
-    SettingRow("Clave de TMDB") {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            OutlinedTextField(
-                value = key, onValueChange = { key = it }, singleLine = true,
-                placeholder = { Text("Pega aquí tu clave") },
-                modifier = Modifier.weight(1f), colors = fieldColors(),
-            )
-            if (key.trim() != prefs.tmdbKey && key.isNotBlank()) {
-                ActionButton("Guardar", primary = true, modifier = Modifier.padding(start = 8.dp)) { save(key.trim()) }
-            }
-        }
-    }
-    status?.let { Note(it) }
-    if (prefs.tmdbKey.isNotBlank()) {
-        LinkRow("Quitar clave", key = "tmdb-rm", danger = true) {
-            prefs.tmdbKey = ""; key = ""; status = null; com.noirplus.tv.data.Platforms.clear()
-        }
-    }
-    Note("Cómo conseguirla: crea una cuenta gratis en themoviedb.org → Ajustes → API → solicita una clave de uso personal.")
-}
