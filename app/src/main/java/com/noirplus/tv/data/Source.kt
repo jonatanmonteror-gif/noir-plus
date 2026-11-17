@@ -155,14 +155,16 @@ class XtreamSource(
                     val id = o.str("stream_id") ?: continue
                     out.add(Item(id = id, name = o.str("name") ?: "Película", image = o.str("stream_icon") ?: o.str("cover"),
                         kind = kind, categoryId = o.str("category_id") ?: "", rating = o.str("rating"),
-                        ext = o.str("container_extension"), added = o.str("added")?.toLongOrNull() ?: 0L, year = o.str("year")))
+                        ext = o.str("container_extension"), added = o.str("added")?.toLongOrNull() ?: 0L, year = o.str("year"),
+                        tmdb = (o.str("tmdb") ?: o.str("tmdb_id"))?.takeIf { it != "0" }))
                 }
                 Kind.SERIES -> {
                     val id = o.str("series_id") ?: continue
                     out.add(Item(id = id, name = o.str("name") ?: "Serie", image = o.str("cover"), kind = kind,
                         categoryId = o.str("category_id") ?: "", rating = o.str("rating"),
                         added = o.str("last_modified")?.toLongOrNull() ?: 0L, plot = o.str("plot"),
-                        year = (o.str("releaseDate") ?: o.str("release_date") ?: o.str("year"))?.take(4)))
+                        year = (o.str("releaseDate") ?: o.str("release_date") ?: o.str("year"))?.take(4),
+                        tmdb = (o.str("tmdb") ?: o.str("tmdb_id"))?.takeIf { it != "0" }))
                 }
             }
         }

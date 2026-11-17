@@ -85,3 +85,40 @@ fun SortButton(mode: SortMode, onChange: (SortMode) -> Unit) {
         }
     }
 }
+
+/** Icono "plataformas" (una tele con un triángulo de play). */
+val PlatformIcon: ImageVector = materialIcon(name = "Filled.Platforms") {
+    materialPath {
+        // marco de la pantalla
+        moveTo(3f, 5f); horizontalLineTo(21f); verticalLineTo(17f); horizontalLineTo(3f); close()
+        moveTo(5f, 7f); verticalLineTo(15f); horizontalLineTo(19f); verticalLineTo(7f); close()
+        // play
+        moveTo(10f, 8.5f); lineTo(15f, 11f); lineTo(10f, 13.5f); close()
+        // peana
+        moveTo(8f, 19f); horizontalLineTo(16f); verticalLineTo(21f); horizontalLineTo(8f); close()
+    }
+}
+
+/** Botón de filtrar por plataforma (datos de TMDB) con su menú. null = todas. */
+@Composable
+fun PlatformButton(selected: String?, options: List<String>, onChange: (String?) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        RoundIconButton(PlatformIcon, "Plataforma", active = selected != null) { open = true }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }, modifier = Modifier.background(Col.Surface2)) {
+            (listOf<String?>(null) + options).forEach { p ->
+                val sel = p == selected
+                DropdownMenuItem(
+                    text = {
+                        Text(p ?: "Todas las plataformas", color = if (sel) Color.White else Col.Sub, fontSize = 14.sp,
+                            fontWeight = if (sel) FontWeight.SemiBold else FontWeight.Normal)
+                    },
+                    onClick = {
+                        onChange(p)
+                        open = false
+                    },
+                )
+            }
+        }
+    }
+}

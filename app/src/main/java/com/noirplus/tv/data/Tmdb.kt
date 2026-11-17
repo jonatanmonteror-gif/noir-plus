@@ -5,7 +5,14 @@ import kotlinx.coroutines.withContext
 import okhttp3.Request
 import org.json.JSONObject
 import java.net.URLEncoder
+import java.io.File
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 
 /**
  * TMDB (The Movie Database): en qué plataformas está cada película o serie en España.
@@ -23,6 +30,64 @@ object Tmdb {
 
     fun configured(): Boolean = key.isNotBlank()
     fun clear() = cache.clear()
+
+    // --- Memoria en disco de las plataformas de cada título (para filtrar sin volver a preguntar) ---
+    private const val WEEK = 7L * 24 * 3600 * 1000
+    private var file: File? = null
+    private val names = ConcurrentHashMap<String, Pair<Long, List<String>>>()
+    @Volatile private var dirty = false
+
+    fun init(ctx: android.content.Context) {
+        file = File(ctx.filesDir, "tmdb_platforms.json")
+        runCatching {
+            val o = JSONObject(file!!.readText())
+            val now = System.currentTimeMillis()
+            for (k in o.keys()) {
+                val e = o.optJSONObject(k) ?: continue
+                val t = e.optLong("t")
+                if (now - t > WEEK) continue // las plataformas cambian: se renuevan cada semana
+                val arr = e.optJSONArray("p")
+                names[k] = t to (0 until (arr?.length() ?: 0)).map { arr!!.optString(it) }
+            }
+        }
+    }
+
+    private fun remember(key: String, list: List<Provider>) {
+        names[key] = System.currentTimeMillis() to list.map { it.name }
+        dirty = true
+    }
+
+    fun save() {
+        val f = file ?: return
+        if (!dirty) return
+        dirty = false
+        runCatching {
+            val o = JSONObject()
+            for ((k, v) in names) o.put(k, JSONObject().put("t", v.first).put("p", org.json.JSONArray(v.second)))
+            f.writeText(o.toString())
+        }
+    }
+
+    /** Plataformas ya conocidas de un título (null = aún no se ha consultado). */
+    fun known(item: Item): List<String>? = cache[item.key]?.map { it.name } ?: names[item.key]?.second
+
+    /**
+     * Consulta las plataformas de muchos títulos a la vez (para el filtro).
+     * Sin pedir la ficha al proveedor IPTV, para no saturarlo. Lo ya consultado no se repite.
+     */
+    suspend fun resolve(items: List<Item>, onProgress: (Int) -> Unit) = coroutineScope {
+        val sem = Semaphore(8)
+        val done = AtomicInteger(0)
+        items.map { item ->
+            async(Dispatchers.IO) {
+                if (known(item) == null) sem.withPermit { runCatching { providers(item, fast = true) } }
+                val n = done.incrementAndGet()
+                if (n % 25 == 0) save()
+                onProgress(n)
+            }
+        }.awaitAll()
+        save()
+    }
 
     private suspend fun get(path: String, params: String = "", key: String = this.key): JSONObject? = withContext(Dispatchers.IO) {
         if (key.isBlank()) return@withContext null
@@ -58,23 +123,23 @@ object Tmdb {
         return t to year
     }
 
-    suspend fun providers(item: Item): List<Provider> {
+    suspend fun providers(item: Item, fast: Boolean = false): List<Provider> {
         if (!configured() || item.kind == Kind.LIVE) return emptyList()
         cache[item.key]?.let { return it }
         val type = if (item.kind == Kind.SERIES) "tv" else "movie"
         val src = Repo.source
-        var id: String? = runCatching {
+        var id: String? = item.tmdb?.takeIf { it.isNotBlank() && it != "0" } ?: if (fast) null else runCatching {
             if (item.kind == Kind.MOVIE) src?.movieDetails(item)?.tmdbId else src?.seriesDetails(item)?.details?.tmdbId
         }.getOrNull()?.takeIf { it.isNotBlank() && it != "0" }
         if (id == null) {
             val (q, year) = clean(item.name)
             if (q.isBlank()) return emptyList()
             val yp = year?.let { if (type == "tv") "&first_air_date_year=$it" else "&year=$it" } ?: ""
-            val res = get("/search/$type", "query=${enc(q)}&include_adult=false$yp")?.optJSONArray("results")
+            val res = (get("/search/$type", "query=${enc(q)}&include_adult=false$yp") ?: return emptyList()).optJSONArray("results")
             id = res?.optJSONObject(0)?.optString("id")?.takeIf { it.isNotBlank() }
         }
-        if (id == null) return emptyList<Provider>().also { cache[item.key] = it }
-        val es = get("/$type/$id/watch/providers")?.optJSONObject("results")?.optJSONObject("ES")
+        if (id == null) return emptyList<Provider>().also { cache[item.key] = it; remember(item.key, it) }
+        val es = (get("/$type/$id/watch/providers") ?: return emptyList()).optJSONObject("results")?.optJSONObject("ES")
         val list = ArrayList<Provider>()
         for (kindKey in listOf("flatrate", "free", "ads")) {
             val arr = es?.optJSONArray(kindKey) ?: continue
@@ -88,6 +153,7 @@ object Tmdb {
             }
         }
         cache[item.key] = list
+        remember(item.key, list)
         return list
     }
 }

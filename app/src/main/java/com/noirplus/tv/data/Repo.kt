@@ -57,6 +57,7 @@ object Repo {
         if (!::prefs.isInitialized) {
             prefs = Prefs(ctx.applicationContext)
             setupImages(ctx.applicationContext)
+            Tmdb.init(ctx.applicationContext)
             rebuild()
         }
     }

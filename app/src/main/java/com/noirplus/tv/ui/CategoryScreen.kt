@@ -55,7 +55,10 @@ import androidx.compose.ui.unit.sp
 import com.noirplus.tv.data.Category
 import com.noirplus.tv.data.Item
 import com.noirplus.tv.data.Kind
+import com.noirplus.tv.data.Platforms
 import com.noirplus.tv.data.Repo
+import com.noirplus.tv.data.Tmdb
+import androidx.compose.runtime.mutableIntStateOf
 import kotlinx.coroutines.delay
 
 /** Carpeta completa: cuadrícula con buscador dentro de la carpeta y orden. */
@@ -76,6 +79,32 @@ fun CategoryScreen(kind: Kind, cat: Category, startSearch: Boolean = false) {
     var searching by rememberSaveable { mutableStateOf(startSearch) }
     var query by rememberSaveable { mutableStateOf("") }
     var sort by rememberSaveable { mutableStateOf(SortMode.DEFAULT) }
+    // Filtro por plataforma (TMDB). Las plataformas de cada título se consultan una vez y se recuerdan.
+    val canFilter = kind != Kind.LIVE && Tmdb.configured()
+    var platform by rememberSaveable { mutableStateOf<String?>(null) }
+    var checked by remember { mutableIntStateOf(0) }
+    var checking by remember { mutableStateOf(false) }
+    LaunchedEffect(platform, items) {
+        val all = items ?: return@LaunchedEffect
+        if (platform == null) return@LaunchedEffect
+        val pending = all.filter { Tmdb.known(it) == null }
+        if (pending.isEmpty()) { checked = all.size; return@LaunchedEffect }
+        checking = true
+        val base = all.size - pending.size
+        checked = base
+        try {
+            Tmdb.resolve(pending) { n -> if (n % 10 == 0 || n == pending.size) checked = base + n }
+            checked = all.size
+        } finally {
+            checking = false
+            Tmdb.save()
+        }
+    }
+    val platformOptions = remember(items, checked) {
+        val seen = LinkedHashSet<String>()
+        items?.forEach { i -> Tmdb.known(i)?.forEach { seen.add(Platforms.group(it)) } }
+        Platforms.main + seen.filter { it !in Platforms.main }.sorted()
+    }
     val fieldFr = remember { FocusRequester() }
     LaunchedEffect(searching) {
         if (searching) {
@@ -83,9 +112,13 @@ fun CategoryScreen(kind: Kind, cat: Category, startSearch: Boolean = false) {
             runCatching { fieldFr.requestFocus() }
         }
     }
-    val shown = remember(items, query, sort) {
+    val shown = remember(items, query, sort, platform, checked) {
         val q = normText(query.trim())
-        items?.let { all -> (if (q.isEmpty()) all else all.filter { normText(it.name).contains(q) }).sortedFor(sort) }
+        items?.let { all ->
+            var l = if (q.isEmpty()) all else all.filter { normText(it.name).contains(q) }
+            platform?.let { p -> l = l.filter { i -> Tmdb.known(i)?.any { Platforms.group(it) == p } == true } }
+            l.sortedFor(sort)
+        }
     }
 
     Column(Modifier.fillMaxSize()) {
@@ -136,13 +169,19 @@ fun CategoryScreen(kind: Kind, cat: Category, startSearch: Boolean = false) {
                 )
                 RoundIconButton(Icons.Filled.Search, "Buscar") { searching = true }
             }
+            if (canFilter) {
+                Spacer(Modifier.width(8.dp))
+                PlatformButton(platform, platformOptions) { platform = it }
+            }
             Spacer(Modifier.width(8.dp))
             SortButton(sort) { sort = it }
         }
-        if (sort != SortMode.DEFAULT || query.isNotBlank()) {
+        if (sort != SortMode.DEFAULT || query.isNotBlank() || platform != null) {
             Text(
                 listOfNotNull(
                     shown?.let { "${it.size} resultados" },
+                    platform,
+                    if (checking) "buscando plataformas ${checked}/${items?.size ?: 0}…" else null,
                     sort.takeIf { it != SortMode.DEFAULT }?.label,
                 ).joinToString("  ·  "),
                 color = Col.Sub, fontSize = 12.sp, modifier = Modifier.padding(start = d.edge, bottom = 6.dp),
@@ -151,7 +190,12 @@ fun CategoryScreen(kind: Kind, cat: Category, startSearch: Boolean = false) {
         val list = shown
         when {
             list == null -> Loading()
-            list.isEmpty() -> Message(if (query.isBlank()) "No hay contenido en esta categoría" else "Sin resultados para «${query.trim()}»")
+            list.isEmpty() && checking -> Loading()
+            list.isEmpty() -> Message(when {
+                query.isNotBlank() -> "Sin resultados para «${query.trim()}»"
+                platform != null -> "Nada de $platform en esta carpeta"
+                else -> "No hay contenido en esta categoría"
+            })
             else -> LazyVerticalGrid(
                 columns = if (LocalDims.current.compact) GridCells.Fixed(Repo.prefs.gridCols) else GridCells.Adaptive(LocalDims.current.poster),
                 modifier = Modifier.fillMaxSize(),

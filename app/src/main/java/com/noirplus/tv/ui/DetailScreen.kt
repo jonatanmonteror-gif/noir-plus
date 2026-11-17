@@ -147,25 +147,36 @@ private fun SeasonChip(label: String, selected: Boolean, memKey: String, onFocus
 @Composable
 private fun PhoneHeader(item: Item, details: Details?, extra: String? = null) {
     val nav = LocalNav.current
-    Box(Modifier.fillMaxWidth().aspectRatio(0.92f)) {
-        AsyncImage(
-            model = details?.backdrop ?: item.image, contentDescription = null, contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize(),
-        )
-        Box(
-            Modifier.matchParentSize().background(
-                Brush.verticalGradient(
-                    0f to Color.Black.copy(alpha = 0.45f), 0.22f to Color.Transparent, 0.6f to Color.Transparent, 1f to Col.Bg,
+    // La imagen ocupa la parte de arriba y el bloque de texto empieza por encima de su borde inferior,
+    // un poco por encima de la mitad de la pantalla. La imagen se oscurece antes para leer bien el título.
+    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val imageH = maxWidth / 0.92f
+        val lift = 100.dp
+        Box(Modifier.fillMaxWidth().height(imageH)) {
+            AsyncImage(
+                model = details?.backdrop ?: item.image, contentDescription = null, contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+            Box(
+                Modifier.matchParentSize().background(
+                    Brush.verticalGradient(
+                        0f to Color.Black.copy(alpha = 0.45f),
+                        0.18f to Color.Transparent,
+                        0.38f to Col.Bg.copy(alpha = 0.15f),
+                        0.55f to Col.Bg.copy(alpha = 0.6f),
+                        0.7f to Col.Bg.copy(alpha = 0.88f),
+                        0.85f to Col.Bg,
+                        1f to Col.Bg,
+                    )
                 )
             )
-        )
-        Box(
-            Modifier.padding(12.dp).size(40.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.45f)).clickable { nav.pop() },
-            contentAlignment = Alignment.Center,
-        ) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Atrás", tint = Color.White) }
-    }
+            Box(
+                Modifier.padding(12.dp).size(40.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.45f)).clickable { nav.pop() },
+                contentAlignment = Alignment.Center,
+            ) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Atrás", tint = Color.White) }
+        }
     Column(
-        Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(top = 0.dp),
+        Modifier.fillMaxWidth().padding(top = imageH - lift).padding(horizontal = 20.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Reveal(80) {
@@ -182,6 +193,7 @@ private fun PhoneHeader(item: Item, details: Details?, extra: String? = null) {
         StarRow(details?.rating ?: item.rating, size = 20.dp, modifier = Modifier.padding(top = 12.dp))
         GenreChips(details?.genre, Modifier.padding(top = 12.dp), max = 3)
         PlatformBadge(item, Modifier.padding(top = 10.dp))
+    }
     }
 }
 

@@ -19,6 +19,7 @@ data class Item(
     val added: Long = 0L,
     val plot: String? = null,
     val year: String? = null,
+    val tmdb: String? = null,
 ) {
     val key: String get() = "${kind.name}:$id"
 
@@ -33,6 +34,7 @@ data class Item(
         .put("url", url ?: "")
         .put("plot", plot ?: "")
         .put("year", year ?: "")
+        .put("tmdb", tmdb ?: "")
 
     companion object {
         fun fromJson(o: JSONObject): Item = Item(
@@ -46,6 +48,7 @@ data class Item(
             url = o.str("url"),
             plot = o.str("plot"),
             year = o.str("year"),
+            tmdb = o.str("tmdb"),
         )
     }
 }

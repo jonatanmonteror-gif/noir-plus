@@ -26,6 +26,12 @@ object Platforms {
         Regex("""\bdazn\b""") to "DAZN",
     )
 
+    /** Nombre de plataforma unificado ("Amazon Prime Video with Ads" → "Prime Video"). */
+    fun group(name: String): String = fromFolder(name) ?: name.replace(Regex("""(?i)\s+(with ads|basic with ads|standard with ads|amazon channel)$"""), "").trim()
+
+    /** Plataformas que se ofrecen siempre en el filtro, en este orden. */
+    val main = listOf("Netflix", "Disney+", "Max", "Prime Video", "Apple TV+", "Movistar Plus+", "SkyShowtime", "Filmin")
+
     private val marks = Regex("\\p{Mn}+")
     private fun norm(s: String) = marks.replace(Normalizer.normalize(s, Normalizer.Form.NFD), "").lowercase()
 
