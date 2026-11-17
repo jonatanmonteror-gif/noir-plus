@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class, androidx.compose.ui.text.ExperimentalTextApi::class)
+
 package com.noirplus.desktop.ui
 
 import androidx.compose.animation.AnimatedVisibility
