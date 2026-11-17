@@ -42,7 +42,7 @@ object Updater {
     }
 
     /** Descarga, verifica y lanza el instalador. onProgress de 0 a 1. */
-    suspend fun install(r: Release, onProgress: (Float) -> Unit) = withContext(Dispatchers.IO) {
+    suspend fun install(r: Release, onProgress: (Float) -> Unit): Unit = withContext(Dispatchers.IO) {
         val out = File(System.getProperty("java.io.tmpdir"), "NoirPlus-Setup-${r.version}.exe")
         val req = Request.Builder().url(r.exeUrl).header("User-Agent", "NoirPlus-Desktop").build()
         val md = MessageDigest.getInstance("SHA-256")
@@ -71,6 +71,6 @@ object Updater {
             }
         }
         ProcessBuilder(out.absolutePath).start()
-        kotlin.system.exitProcess(0)
+        Runtime.getRuntime().halt(0)
     }
 }
