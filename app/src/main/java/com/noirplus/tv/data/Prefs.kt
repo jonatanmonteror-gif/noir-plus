@@ -83,6 +83,15 @@ class Prefs(ctx: Context) {
         get() = sp.getLong("lastVisit", 0L)
         set(v) { sp.edit().putLong("lastVisit", v).apply() }
 
+    /** Clave de TMDB (API key v3 o token de lectura v4) para saber en qué plataforma está cada título. */
+    var tmdbKey: String
+        get() = s("tmdbKey")
+        set(v) { sp.edit().putString("tmdbKey", v.trim()).apply(); bump() }
+
+    /** Accesos rápidos del reproductor (botones junto a la ruedita). */
+    fun quick(k: String): Boolean = sp.getBoolean("quick_$k", k == "cc" || k == "subopts" || k == "format")
+    fun setQuick(k: String, v: Boolean) { sp.edit().putBoolean("quick_$k", v).apply(); bump() }
+
     // ---------- Perfil ----------
     var name: String
         get() = s("name")

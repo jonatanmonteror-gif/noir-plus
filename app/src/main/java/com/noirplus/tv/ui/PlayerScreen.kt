@@ -110,6 +110,13 @@ fun PlayerScreen(req: PlayRequest) {
     var infoVisible by remember { mutableStateOf(true) }
     var controlsVisible by remember { mutableStateOf(false) }
     var panelOpen by remember { mutableStateOf(false) }
+    var panelSection by remember { mutableStateOf("all") }
+    var speed by remember { mutableFloatStateOf(1f) }
+    var tracksTick by remember { mutableIntStateOf(0) }
+    fun openPanel(sec: String) {
+        panelSection = sec
+        panelOpen = true
+    }
     var cues by remember { mutableStateOf<List<Cue>>(emptyList()) }
     var sessionDelay by remember { mutableIntStateOf(prefs.subDelayMs) }
     var resize by remember { mutableIntStateOf(0) }
@@ -226,7 +233,7 @@ fun PlayerScreen(req: PlayRequest) {
         if (ev.keyCode == KeyEvent.KEYCODE_MENU || ev.keyCode == KeyEvent.KEYCODE_CAPTIONS || ev.keyCode == KeyEvent.KEYCODE_SETTINGS ||
             ev.keyCode == KeyEvent.KEYCODE_INFO
         ) {
-            if (down) panelOpen = true
+            if (down) openPanel("all")
             return true
         }
         if (nextCountdown >= 0 && down && (ev.keyCode == KeyEvent.KEYCODE_DPAD_CENTER || ev.keyCode == KeyEvent.KEYCODE_ENTER)) {
@@ -311,6 +318,8 @@ fun PlayerScreen(req: PlayRequest) {
         }
     }
 
+    LaunchedEffect(speed) { exo.setPlaybackSpeed(speed) }
+
     LaunchedEffect(formatToast) {
         if (formatToast > 0) {
             showFormat = true
@@ -360,6 +369,10 @@ fun PlayerScreen(req: PlayRequest) {
                 }
             }
 
+            override fun onTracksChanged(tracks: androidx.media3.common.Tracks) {
+                tracksTick++
+            }
+
             override fun onCues(cueGroup: CueGroup) {
                 cues = cueGroup.cues
             }
@@ -395,21 +408,30 @@ fun PlayerScreen(req: PlayRequest) {
                     isFocusableInTouchMode = true
                     subtitleView?.visibility = View.GONE // los subtítulos los dibuja la app
                     setShowSubtitleButton(true)
-                    // Botones propios junto a la ruedita: ajustes de subtítulos y formato de imagen
+                    // Barra de controles: nuestra ruedita (con todas las opciones) y los accesos rápidos elegidos en Ajustes
                     val gear = findViewById<View>(androidx.media3.ui.R.id.exo_settings)
+                    val ccBtn = findViewById<View>(androidx.media3.ui.R.id.exo_subtitle)
                     (gear?.parent as? android.view.ViewGroup)?.let { bar ->
+                        if (ccBtn != null && ccBtn.parent === bar) bar.removeView(ccBtn)
+                        var pos = bar.indexOfChild(gear).coerceAtLeast(0)
+                        bar.removeView(gear)
                         fun add(icon: Int, desc: String, onTap: () -> Unit) {
                             val b = android.widget.ImageButton(c, null, 0, androidx.media3.ui.R.style.ExoStyledControls_Button_Bottom)
                             b.setImageResource(icon)
                             b.contentDescription = desc
                             b.setOnClickListener { onTap() }
-                            bar.addView(b, bar.indexOfChild(gear))
+                            bar.addView(b, pos.coerceAtMost(bar.childCount))
+                            pos++
                         }
-                        add(com.noirplus.tv.R.drawable.ic_subtitle_tune, "Ajustes de subtítulos") { panelOpen = true }
-                        add(com.noirplus.tv.R.drawable.ic_aspect, "Formato de imagen") {
+                        if (prefs.quick("cc")) add(com.noirplus.tv.R.drawable.ic_cc, "Subtítulos") { openPanel("cc") }
+                        if (prefs.quick("subopts")) add(com.noirplus.tv.R.drawable.ic_subtitle_tune, "Opciones de subtítulos") { openPanel("subopts") }
+                        if (prefs.quick("audio")) add(com.noirplus.tv.R.drawable.ic_audio, "Audio") { openPanel("audio") }
+                        if (prefs.quick("speed")) add(com.noirplus.tv.R.drawable.ic_speed, "Velocidad") { openPanel("speed") }
+                        if (prefs.quick("format")) add(com.noirplus.tv.R.drawable.ic_aspect, "Formato de imagen") {
                             resize = (resize + 1) % ResizeModes.size
                             formatToast++
                         }
+                        add(com.noirplus.tv.R.drawable.ic_gear, "Opciones") { openPanel("all") }
                     }
                     setControllerVisibilityListener(
                         PlayerView.ControllerVisibilityListener { v -> controlsVisible = v == View.VISIBLE }
@@ -595,51 +617,70 @@ fun PlayerScreen(req: PlayRequest) {
             }
         }
 
-        // Panel rápido de subtítulos (compacto)
+        // Panel de opciones (compacto): todo desde la ruedita, o una sección desde su acceso rápido
         if (panelOpen) {
-            LaunchedEffect(Unit) {
+            LaunchedEffect(panelSection) {
                 delay(120)
                 runCatching { panelFr.requestFocus() }
             }
+            val sec = panelSection
+            val all = sec == "all"
             Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.25f)).pointerInput(Unit) { detectTapGestures { panelOpen = false } })
             Column(
-                Modifier.align(Alignment.CenterEnd).padding(14.dp).width(if (dims.tv) 330.dp else 290.dp)
+                Modifier.align(Alignment.CenterEnd).padding(14.dp).width(if (dims.tv) 340.dp else 300.dp)
                     .clip(RoundedCornerShape(16.dp)).background(Col.Surface.copy(alpha = 0.96f))
                     .pointerInput(Unit) { detectTapGestures { } }
                     .verticalScroll(rememberScrollState())
                     .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Subtítulos", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                    Text("Pista: botón CC", color = Col.Sub, fontSize = 11.sp)
+                Text(
+                    when (sec) {
+                        "cc" -> "Subtítulos"
+                        "subopts" -> "Opciones de subtítulos"
+                        "audio" -> "Audio"
+                        "speed" -> "Velocidad"
+                        "format" -> "Formato de imagen"
+                        else -> "Opciones"
+                    },
+                    color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
+                )
+                var first = true
+                fun fr(): FocusRequester? = if (first) { first = false; panelFr } else null
+                if (all || sec == "cc") {
+                    if (all) PanelLabel("Subtítulos")
+                    TrackChoices(exo, MC.TRACK_TYPE_TEXT, tracksTick, allowOff = true, focus = fr())
                 }
-                Text("Retardo", color = Col.Sub, fontSize = 12.sp)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Focusable(key = "pd-minus", shape = RoundedCornerShape(8.dp), focusScale = 1f, focusRequester = panelFr,
-                        onClick = { sessionDelay = (sessionDelay - 100).coerceAtLeast(-2000) }) { f ->
-                        Text("−", Modifier.background(if (f) Color.White else Color.White.copy(alpha = 0.1f)).padding(horizontal = 16.dp, vertical = 5.dp),
-                            color = if (f) Color.Black else Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                    }
-                    Text(fmtDelay(sessionDelay), color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
-                        textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
-                    Focusable(key = "pd-plus", shape = RoundedCornerShape(8.dp), focusScale = 1f,
-                        onClick = { sessionDelay = (sessionDelay + 100).coerceAtMost(2000) }) { f ->
-                        Text("+", Modifier.background(if (f) Color.White else Color.White.copy(alpha = 0.1f)).padding(horizontal = 16.dp, vertical = 5.dp),
-                            color = if (f) Color.Black else Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                    }
+                if (all || sec == "audio") {
+                    if (all) PanelLabel("Audio")
+                    TrackChoices(exo, MC.TRACK_TYPE_AUDIO, tracksTick, allowOff = false, focus = fr())
                 }
-                Text("Posición", color = Col.Sub, fontSize = 12.sp)
-                Segmented(SubPositions, prefs.subPos, "pp") { prefs.subPos = it }
-                Text("Altura", color = Col.Sub, fontSize = 12.sp)
-                MiniStepper("${if (prefs.subOffset > 0) "+" else ""}${prefs.subOffset}", "ph", { prefs.subOffset -= 4 }, { prefs.subOffset += 4 })
-                Text("Tamaño", color = Col.Sub, fontSize = 12.sp)
-                MiniStepper("${prefs.subSizeSp}", "ps", { prefs.subSizeSp -= 1 }, { prefs.subSizeSp += 1 })
-                Text("Tipografía", color = Col.Sub, fontSize = 12.sp)
-                FontPicker(prefs.subFont, "pf") { prefs.subFont = it }
-                Text("Fondo", color = Col.Sub, fontSize = 12.sp)
-                Segmented(listOf("Sombra", "Caja"), prefs.subBg, "pb") { prefs.subBg = it }
-                Text("El retardo solo cambia esta reproducción; el resto queda guardado.", color = Col.Sub, fontSize = 10.sp, lineHeight = 13.sp)
+                if (all || sec == "subopts") {
+                    if (all) PanelLabel("Opciones de subtítulos")
+                    Text("Retardo", color = Col.Sub, fontSize = 12.sp)
+                    MiniStepper(fmtDelay(sessionDelay), "pd", { sessionDelay = (sessionDelay - 100).coerceAtLeast(-2000) },
+                        { sessionDelay = (sessionDelay + 100).coerceAtMost(2000) }, focus = fr())
+                    Text("Posición", color = Col.Sub, fontSize = 12.sp)
+                    Segmented(SubPositions, prefs.subPos, "pp") { prefs.subPos = it }
+                    Text("Altura", color = Col.Sub, fontSize = 12.sp)
+                    MiniStepper("${if (prefs.subOffset > 0) "+" else ""}${prefs.subOffset}", "ph", { prefs.subOffset -= 4 }, { prefs.subOffset += 4 })
+                    Text("Tamaño", color = Col.Sub, fontSize = 12.sp)
+                    MiniStepper("${prefs.subSizeSp}", "ps", { prefs.subSizeSp -= 1 }, { prefs.subSizeSp += 1 })
+                    Text("Tipografía", color = Col.Sub, fontSize = 12.sp)
+                    FontPicker(prefs.subFont, "pf") { prefs.subFont = it }
+                    Text("Fondo", color = Col.Sub, fontSize = 12.sp)
+                    Segmented(listOf("Sombra", "Caja"), prefs.subBg, "pb") { prefs.subBg = it }
+                }
+                if (all || sec == "speed") {
+                    if (all) PanelLabel("Velocidad")
+                    MiniStepper(String.format(java.util.Locale("es", "ES"), "%.1f×", speed), "sp",
+                        { speed = ((speed * 10f).roundToInt() - 1).coerceAtLeast(5) / 10f },
+                        { speed = ((speed * 10f).roundToInt() + 1).coerceAtMost(20) / 10f }, focus = fr())
+                }
+                if (all || sec == "format") {
+                    if (all) PanelLabel("Formato de imagen")
+                    Segmented(ResizeModes.map { it.second }, resize, "pr") { resize = it }
+                }
             }
         }
 
@@ -705,4 +746,72 @@ private fun buildPlayer(ctx: Context, live: Boolean): ExoPlayer {
         .build()
     player.videoScalingMode = MC.VIDEO_SCALING_MODE_SCALE_TO_FIT
     return player
+}
+
+@Composable
+private fun PanelLabel(t: String) {
+    Text(t.uppercase(), color = Col.Sub, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.2.sp,
+        modifier = Modifier.padding(top = 6.dp))
+}
+
+/** Nombre legible de una pista: etiqueta, idioma y canales (5.1…). */
+private fun trackName(f: androidx.media3.common.Format, i: Int): String {
+    val lang = f.language?.takeIf { it.isNotBlank() && it != "und" }?.let {
+        java.util.Locale.forLanguageTag(it).getDisplayLanguage(java.util.Locale("es", "ES")).replaceFirstChar { c -> c.titlecase() }
+    }
+    val label = f.label?.takeIf { it.isNotBlank() }
+    val base = listOfNotNull(label, lang?.takeIf { label == null || !label.contains(it, true) }).joinToString(" · ").ifBlank { "Pista ${i + 1}" }
+    val ch = when (f.channelCount) {
+        6 -> " (5.1)"
+        8 -> " (7.1)"
+        2 -> ""
+        else -> ""
+    }
+    return base + ch
+}
+
+/** Lista de pistas (subtítulos o audio) del vídeo actual, con la elegida marcada. */
+@OptIn(UnstableApi::class)
+@Composable
+private fun TrackChoices(exo: ExoPlayer, type: Int, tick: Int, allowOff: Boolean, focus: FocusRequester?) {
+    val groups = remember(tick) { exo.currentTracks.groups.filter { it.type == type } }
+    val disabled = remember(tick) { exo.trackSelectionParameters.disabledTrackTypes.contains(type) }
+    val anySelected = groups.any { g -> (0 until g.length).any { g.isTrackSelected(it) } }
+    val options = buildList {
+        groups.forEach { g -> for (i in 0 until g.length) if (g.isTrackSupported(i)) add(Triple(g, i, trackName(g.getTrackFormat(i), size))) }
+    }
+    if (options.isEmpty()) {
+        Text(if (type == MC.TRACK_TYPE_TEXT) "Este vídeo no trae subtítulos." else "Solo hay una pista de audio.", color = Col.Sub, fontSize = 12.sp)
+        return
+    }
+    var first = focus
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        if (allowOff) {
+            TrackRow("Desactivados", selected = disabled || !anySelected, focus = first.also { first = null }) {
+                exo.trackSelectionParameters = exo.trackSelectionParameters.buildUpon().setTrackTypeDisabled(type, true).build()
+            }
+        }
+        options.forEach { (g, i, name) ->
+            TrackRow(name, selected = !disabled && g.isTrackSelected(i), focus = first.also { first = null }) {
+                exo.trackSelectionParameters = exo.trackSelectionParameters.buildUpon()
+                    .setTrackTypeDisabled(type, false)
+                    .setOverrideForType(androidx.media3.common.TrackSelectionOverride(g.mediaTrackGroup, i))
+                    .build()
+            }
+        }
+    }
+}
+
+@Composable
+private fun TrackRow(name: String, selected: Boolean, focus: FocusRequester?, onClick: () -> Unit) {
+    Focusable(Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp), focusScale = 1f, focusRequester = focus, onClick = onClick) { f ->
+        Row(
+            Modifier.fillMaxWidth().background(if (f) Color.White else Color.Transparent).padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(if (selected) "✓" else "", color = if (f) Color.Black else Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold,
+                modifier = Modifier.width(20.dp))
+            Text(name, color = if (f) Color.Black else Color.White, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
 }

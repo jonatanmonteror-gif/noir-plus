@@ -804,20 +804,25 @@ private fun FeaturedPage(item: Item, label: String, onClick: () -> Unit) {
     }
 }
 
-/** Pastilla "Disponible en Netflix / Disney+ …" (solo si se puede deducir de tus carpetas). */
+/** Pastilla "Disponible en Netflix / Disney+ …": con TMDB son datos reales de España; si no, se deduce de las carpetas. */
 @Composable
 fun PlatformBadge(item: Item?, modifier: Modifier = Modifier) {
-    val p by produceState<String?>(null, item?.key, Repo.dataVersion.intValue) {
-        value = item?.let { com.noirplus.tv.data.Platforms.of(it) }
+    val list by produceState<List<com.noirplus.tv.data.Tmdb.Provider>>(emptyList(), item?.key, Repo.dataVersion.intValue, Repo.prefs.tmdbKey) {
+        value = item?.let { com.noirplus.tv.data.Platforms.providers(it) } ?: emptyList()
     }
-    androidx.compose.animation.AnimatedVisibility(p != null, modifier = modifier, enter = androidx.compose.animation.fadeIn(tween(300))) {
+    androidx.compose.animation.AnimatedVisibility(list.isNotEmpty(), modifier = modifier, enter = androidx.compose.animation.fadeIn(tween(300))) {
         Row(
             Modifier.clip(RoundedCornerShape(50)).background(Color.White.copy(alpha = 0.12f))
-                .border(0.8.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(50)).padding(horizontal = 10.dp, vertical = 4.dp),
+                .border(0.8.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(50)).padding(start = 4.dp, end = 10.dp, top = 3.dp, bottom = 3.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("Disponible en ", color = Col.Sub, fontSize = 11.sp)
-            Text(p ?: "", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            list.take(3).forEach { p ->
+                if (p.logo != null) {
+                    AsyncImage(p.logo, p.name, modifier = Modifier.padding(end = 4.dp).size(18.dp).clip(RoundedCornerShape(4.dp)))
+                }
+            }
+            Text(if (list.first().logo == null) "  Disponible en " else " ", color = Col.Sub, fontSize = 11.sp)
+            Text(list.first().name + if (list.size > 1) "  +${list.size - 1}" else "", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
         }
     }
 }

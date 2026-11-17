@@ -59,6 +59,7 @@ data class Details(
     val year: String?,
     val rating: String?,
     val duration: String?,
+    val tmdbId: String? = null,
 )
 
 data class Episode(

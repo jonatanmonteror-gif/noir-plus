@@ -18,7 +18,11 @@ import java.security.SecureRandom
  * El QR lleva un código aleatorio en la dirección: sin él no se acepta nada.
  * Se apaga al salir de la pantalla de inicio de sesión.
  */
-class PairServer(private val onSubmit: suspend (Map<String, String>) -> String?) {
+class PairServer(
+    private val title: String = "Conectar la tele",
+    private val customForm: String? = null,
+    private val onSubmit: suspend (Map<String, String>) -> String?,
+) {
     val token: String = run {
         val a = "abcdefghjkmnpqrstuvwxyz23456789"
         val r = SecureRandom()
@@ -97,7 +101,7 @@ class PairServer(private val onSubmit: suspend (Map<String, String>) -> String?)
 <meta name=viewport content="width=device-width,initial-scale=1"><title>Noir+</title>$CSS
 <body><main><h1>Noir<sup>+</sup></h1><h2>${esc(title)}</h2>$body</main></body></html>"""
 
-    private fun formPage() = page("Conectar la tele", """
+    private fun formPage() = if (customForm != null) page(title, customForm) else page(title, """
 <form method=post>
 <label>Tu nombre<input name=name autocomplete=given-name></label>
 <label>Servidor<input name=server placeholder="http://dominio.com:8080" inputmode=url autocapitalize=off></label>

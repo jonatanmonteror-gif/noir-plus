@@ -200,12 +200,12 @@ fun Segmented(options: List<String>, selected: Int, keyPrefix: String, onSelect:
 
 /** − valor + compacto. */
 @Composable
-fun MiniStepper(value: String, keyPrefix: String, onMinus: () -> Unit, onPlus: () -> Unit) {
+fun MiniStepper(value: String, keyPrefix: String, onMinus: () -> Unit, onPlus: () -> Unit, focus: androidx.compose.ui.focus.FocusRequester? = null) {
     Row(
         Modifier.clip(RoundedCornerShape(10.dp)).background(Col.Bg.copy(alpha = 0.55f)).padding(3.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        StepBtn("−", "$keyPrefix-minus", onMinus)
+        StepBtn("−", "$keyPrefix-minus", onMinus, focus)
         Text(value, color = Col.Text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center,
             modifier = Modifier.widthIn(min = 70.dp).padding(horizontal = 6.dp))
         StepBtn("+", "$keyPrefix-plus", onPlus)
@@ -213,8 +213,8 @@ fun MiniStepper(value: String, keyPrefix: String, onMinus: () -> Unit, onPlus: (
 }
 
 @Composable
-private fun StepBtn(t: String, key: String, onClick: () -> Unit) {
-    Focusable(key = key, shape = RoundedCornerShape(8.dp), focusScale = 1f, onClick = onClick) { focused ->
+private fun StepBtn(t: String, key: String, onClick: () -> Unit, focus: androidx.compose.ui.focus.FocusRequester? = null) {
+    Focusable(key = key, shape = RoundedCornerShape(8.dp), focusScale = 1f, focusRequester = focus, onClick = onClick) { focused ->
         Text(t, Modifier.background(if (focused) Color.White else Color.White.copy(alpha = 0.1f)).padding(horizontal = 14.dp, vertical = 5.dp),
             color = if (focused) Color.Black else Col.Text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
     }

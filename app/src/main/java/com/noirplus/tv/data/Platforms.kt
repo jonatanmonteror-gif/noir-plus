@@ -45,7 +45,19 @@ object Platforms {
 
     private val index = ConcurrentHashMap<Kind, Map<String, String>>()
 
-    fun clear() = index.clear()
+    fun clear() {
+        index.clear()
+        Tmdb.clear()
+    }
+
+    /** Con clave de TMDB: plataformas reales en España. Sin clave: deducción por carpetas. */
+    suspend fun providers(item: Item): List<Tmdb.Provider> {
+        if (Tmdb.configured()) {
+            val t = Tmdb.providers(item)
+            if (t.isNotEmpty()) return t
+        }
+        return of(item)?.let { listOf(Tmdb.Provider(it, null)) } ?: emptyList()
+    }
 
     suspend fun of(item: Item): String? {
         if (item.kind == Kind.LIVE) return null
