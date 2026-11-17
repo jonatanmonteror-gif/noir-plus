@@ -47,11 +47,24 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private var lastRepeatAt = 0L
+
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         val handler = keyHandler
         if (handler != null && handler(event)) return true
+        // Al mantener pulsada una flecha, el mando repite muy rápido y las filas se quedaban
+        // "moviéndose solas" después de soltar. Se deja pasar como mucho un paso cada 130 ms.
+        if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount > 0 && event.keyCode in arrowKeys) {
+            val now = android.os.SystemClock.uptimeMillis()
+            if (now - lastRepeatAt < 130) return true
+            lastRepeatAt = now
+        }
         return super.dispatchKeyEvent(event)
     }
+
+    private val arrowKeys = setOf(
+        KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN,
+    )
 
     companion object {
         /** El reproductor lo usa para capturar el mando (cambiar de canal, avanzar, etc.). */

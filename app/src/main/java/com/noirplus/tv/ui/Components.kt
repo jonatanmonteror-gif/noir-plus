@@ -739,7 +739,7 @@ fun Backdrop(url: String?) {
 @OptIn(ExperimentalFoundationApi::class)
 class PeekSpec(private val leadPx: Float) : BringIntoViewSpec {
     @Suppress("OVERRIDE_DEPRECATION", "DEPRECATION")
-    override val scrollAnimationSpec: AnimationSpec<Float> = tween(420, easing = FastOutSlowInEasing)
+    override val scrollAnimationSpec: AnimationSpec<Float> = tween(190, easing = FastOutSlowInEasing)
 
     override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float {
         if (size >= containerSize) return offset

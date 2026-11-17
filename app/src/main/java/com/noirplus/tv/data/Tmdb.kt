@@ -85,11 +85,13 @@ object Tmdb {
     /** Lo que hay en una plataforma: fichas por id de TMDB y, por cada título normalizado, sus ids. */
     class Catalog(val entries: Map<String, Entry>, val titles: Map<String, List<String>>) {
         /** Id de TMDB de un título de tu lista dentro de este catálogo, o null si no está. */
-        fun match(item: Item): String? {
-            item.tmdb?.let { if (entries.containsKey(it)) return it }
-            val (q, y) = clean(item.name)
-            val ids = titles[titleKey(q)] ?: return null
-            val year = (item.year ?: y)?.take(4)?.toIntOrNull() ?: return ids.firstOrNull()
+        fun match(item: Item): String? = match(prep(item))
+
+        /** Igual, con el título ya limpiado (mucho más rápido para listas grandes). */
+        fun match(p: Prep): String? {
+            p.tmdb?.let { if (entries.containsKey(it)) return it }
+            val ids = titles[p.key] ?: return null
+            val year = p.year ?: return ids.firstOrNull()
             return ids.firstOrNull { val e = entries[it]; e == null || e.year == 0 || kotlin.math.abs(e.year - year) <= 1 }
         }
         fun has(item: Item): Boolean = match(item) != null
@@ -98,7 +100,69 @@ object Tmdb {
         fun dateOf(item: Item): Int = match(item)?.let { entries[it]?.date } ?: 0
     }
 
+    /** Título de tu lista ya preparado para cruzarlo con los catálogos (se calcula una vez). */
+    class Prep(val item: Item, val key: String, val year: Int?, val tmdb: String?)
+
+    private val preps = ConcurrentHashMap<String, Prep>()
+    fun prep(item: Item): Prep = preps.getOrPut(item.key + "|" + item.name) {
+        val (q, y) = clean(item.name)
+        Prep(item, titleKey(q), (item.year ?: y)?.take(4)?.toIntOrNull(), item.tmdb?.takeIf { it.isNotBlank() && it != "0" })
+    }
+
     private val catalogs = ConcurrentHashMap<String, Catalog>()
+
+    // --- Catálogo preparado cada día en GitHub (un solo archivo pequeño por tipo) ---
+    private const val BUNDLE_URL = "https://github.com/jonatanmonteror-gif/noir-plus/releases/download/catalog/catalog-"
+    private val bundleLock = kotlinx.coroutines.sync.Mutex()
+    private val bundleTried = ConcurrentHashMap<String, Boolean>()
+
+    /**
+     * Descarga (como mucho una vez al día) el catálogo ya preparado de todas las plataformas y lo deja en memoria.
+     * Si falla, la app sigue con el método antiguo (consultas a TMDB).
+     */
+    private suspend fun loadBundle(type: String): Boolean = bundleLock.withLock {
+        if (catalogs.keys.any { it.startsWith("$type:") } && bundleTried[type] == true) return@withLock true
+        val dir = file?.parentFile ?: return@withLock false
+        val f = File(dir, "tmdb_bundle_$type.json.gz")
+        val fresh = f.exists() && System.currentTimeMillis() - f.lastModified() < 24L * 3600 * 1000
+        if (!fresh && bundleTried[type] != true) {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val req = Request.Builder().url("$BUNDLE_URL$type.json.gz").header("User-Agent", Http.UA).build()
+                    Http.client.newCall(req).execute().use { r ->
+                        if (r.isSuccessful) {
+                            val tmp = File(dir, "tmdb_bundle_$type.tmp")
+                            r.body?.byteStream()?.use { input -> tmp.outputStream().use { input.copyTo(it) } }
+                            if (tmp.length() > 0) { f.delete(); tmp.renameTo(f) }
+                        }
+                    }
+                }
+            }
+        }
+        bundleTried[type] = true
+        if (!f.exists()) return@withLock false
+        runCatching {
+            withContext(Dispatchers.IO) {
+                val text = java.util.zip.GZIPInputStream(f.inputStream()).bufferedReader().use { it.readText() }
+                val g = JSONObject(text).getJSONObject("g")
+                for (group in g.keys()) {
+                    val arr = g.getJSONArray(group)
+                    val entries = HashMap<String, Entry>(arr.length() * 2)
+                    val titles = HashMap<String, MutableList<String>>(arr.length() * 3)
+                    for (i in 0 until arr.length()) {
+                        val e = arr.getJSONArray(i)
+                        val id = e.optString(0)
+                        val date = e.optInt(1)
+                        val ga = e.optJSONArray(2)
+                        entries[id] = Entry(date / 10000, (0 until (ga?.length() ?: 0)).map { ga!!.optInt(it) }, date)
+                        val ta = e.optJSONArray(3) ?: continue
+                        for (j in 0 until ta.length()) titles.getOrPut(ta.optString(j)) { ArrayList(1) }.add(id)
+                    }
+                    catalogs["$type:$group"] = Catalog(entries, titles)
+                }
+            }
+        }.isSuccess
+    }
     private val marks = Regex("\\p{Mn}+")
     fun titleKey(s: String): String =
         marks.replace(java.text.Normalizer.normalize(s, java.text.Normalizer.Form.NFD), "").lowercase()
@@ -216,6 +280,8 @@ object Tmdb {
         val type = if (kind == Kind.SERIES) "tv" else "movie"
         val id = "$type:$group"
         catalogs[id]?.let { return@coroutineScope it }
+        // Lo más rápido: el catálogo ya preparado (un archivo para todas las plataformas)
+        if (loadBundle(type)) catalogs[id]?.let { return@coroutineScope it }
         val f = catFile(kind, group)
         // Copia guardada en el móvil/tele
         runCatching {
@@ -334,7 +400,8 @@ object Tmdb {
 
     /** Géneros de un título: de los catálogos (si se pasan) o de lo ya clasificado. null = aún sin clasificar. */
     fun genresOf(item: Item, cats: Collection<Catalog>): List<Int>? {
-        for (c in cats) c.genresOf(item)?.let { return it }
+        val p = prep(item)
+        for (c in cats) c.match(p)?.let { id -> c.entries[id]?.genres?.let { return it } }
         return genreMeta[item.key]
     }
 
