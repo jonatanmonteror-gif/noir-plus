@@ -213,9 +213,9 @@ fun SettingsContent() {
 
             Section("Reproductor") {
                 Note("Botones de acceso rápido junto a la ruedita del reproductor. Lo que no actives queda dentro de la ruedita.")
+                QuickToggle("Audio (idioma)", "audio")
                 QuickToggle("Subtítulos (elegir pista)", "cc")
                 QuickToggle("Opciones de subtítulos", "subopts")
-                QuickToggle("Audio (idioma)", "audio")
                 QuickToggle("Velocidad", "speed")
                 QuickToggle("Formato de imagen", "format")
             }

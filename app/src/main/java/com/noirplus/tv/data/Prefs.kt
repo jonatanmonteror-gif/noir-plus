@@ -89,7 +89,7 @@ class Prefs(ctx: Context) {
         set(v) { sp.edit().putString("tmdbKey", v.trim()).apply(); bump() }
 
     /** Accesos rápidos del reproductor (botones junto a la ruedita). */
-    fun quick(k: String): Boolean = sp.getBoolean("quick_$k", k == "cc" || k == "subopts" || k == "format")
+    fun quick(k: String): Boolean = sp.getBoolean("quick_$k", false)
     fun setQuick(k: String, v: Boolean) { sp.edit().putBoolean("quick_$k", v).apply(); bump() }
 
     // ---------- Perfil ----------

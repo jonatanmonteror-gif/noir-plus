@@ -748,29 +748,7 @@ fun FeaturedPager(items: List<Item>, label: String = "Recién llegados") {
     }
     Box(Modifier.fillMaxWidth()) {
         HorizontalPager(state = pager, modifier = Modifier.fillMaxWidth(), beyondViewportPageCount = 1) { page ->
-            Box(
-                Modifier
-                    .graphicsLayer {
-                        val off = (pager.currentPage - page) + pager.currentPageOffsetFraction
-                        // Las dos portadas se acercan un 30 % para solaparse en la zona de unión
-                        translationX = off * size.width * 0.3f
-                        compositingStrategy = CompositingStrategy.Offscreen
-                    }
-                    .drawWithContent {
-                        drawContent()
-                        val off = (pager.currentPage - page) + pager.currentPageOffsetFraction
-                        if (kotlin.math.abs(off) > 0.001f) {
-                            // Borde difuminado en el lado de la unión: fusión lateral suave entre portadas
-                            val f = 0.38f
-                            val mask = if (off < 0f) {
-                                Brush.horizontalGradient(0f to Color.Transparent, f to Color.Black, 1f to Color.Black)
-                            } else {
-                                Brush.horizontalGradient(0f to Color.Black, 1f - f to Color.Black, 1f to Color.Transparent)
-                            }
-                            drawRect(mask, blendMode = BlendMode.DstIn)
-                        }
-                    }
-            ) {
+            Box {
                 FeaturedPage(items[page], label) { nav.push(Screen.Detail(items[page])) }
             }
         }

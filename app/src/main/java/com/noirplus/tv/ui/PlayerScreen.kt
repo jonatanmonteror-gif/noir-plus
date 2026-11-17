@@ -423,9 +423,9 @@ fun PlayerScreen(req: PlayRequest) {
                             bar.addView(b, pos.coerceAtMost(bar.childCount))
                             pos++
                         }
+                        if (prefs.quick("audio")) add(com.noirplus.tv.R.drawable.ic_audio, "Audio") { openPanel("audio") }
                         if (prefs.quick("cc")) add(com.noirplus.tv.R.drawable.ic_cc, "Subtítulos") { openPanel("cc") }
                         if (prefs.quick("subopts")) add(com.noirplus.tv.R.drawable.ic_subtitle_tune, "Opciones de subtítulos") { openPanel("subopts") }
-                        if (prefs.quick("audio")) add(com.noirplus.tv.R.drawable.ic_audio, "Audio") { openPanel("audio") }
                         if (prefs.quick("speed")) add(com.noirplus.tv.R.drawable.ic_speed, "Velocidad") { openPanel("speed") }
                         if (prefs.quick("format")) add(com.noirplus.tv.R.drawable.ic_aspect, "Formato de imagen") {
                             resize = (resize + 1) % ResizeModes.size
@@ -647,13 +647,13 @@ fun PlayerScreen(req: PlayRequest) {
                 )
                 var first = true
                 fun fr(): FocusRequester? = if (first) { first = false; panelFr } else null
-                if (all || sec == "cc") {
-                    if (all) PanelLabel("Subtítulos")
-                    TrackChoices(exo, MC.TRACK_TYPE_TEXT, tracksTick, allowOff = true, focus = fr())
-                }
                 if (all || sec == "audio") {
                     if (all) PanelLabel("Audio")
                     TrackChoices(exo, MC.TRACK_TYPE_AUDIO, tracksTick, allowOff = false, focus = fr())
+                }
+                if (all || sec == "cc") {
+                    if (all) PanelLabel("Subtítulos")
+                    TrackChoices(exo, MC.TRACK_TYPE_TEXT, tracksTick, allowOff = true, focus = fr())
                 }
                 if (all || sec == "subopts") {
                     if (all) PanelLabel("Opciones de subtítulos")
