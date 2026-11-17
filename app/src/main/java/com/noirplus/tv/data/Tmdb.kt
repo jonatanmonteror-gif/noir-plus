@@ -9,6 +9,7 @@ import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Semaphore
@@ -103,11 +104,41 @@ object Tmdb {
     }
 
     /** Catálogo de una plataforma (se guarda una semana). onProgress(hechas, total) en páginas. */
-    suspend fun catalog(kind: Kind, group: String, onProgress: (Int, Int) -> Unit = { _, _ -> }): Catalog? = coroutineScope {
+    private fun catFile(kind: Kind, group: String): File? {
+        val type = if (kind == Kind.SERIES) "tv" else "movie"
+        return file?.parentFile?.let { File(it, "tmdb_cat_" + titleKey("$type:$group").replace(' ', '_') + ".json") }
+    }
+
+    private fun isFresh(kind: Kind, group: String): Boolean =
+        catFile(kind, group)?.let { it.exists() && System.currentTimeMillis() - it.lastModified() < WEEK } == true
+
+    /**
+     * Precarga en segundo plano de todos los catálogos, poco a poco (≈4 consultas por segundo),
+     * empezando unos segundos después de abrir la app. Solo descarga los que tienen más de una semana.
+     */
+    fun preloadLater() {
+        if (preloadStarted) return
+        preloadStarted = true
+        bg.launch {
+            kotlinx.coroutines.delay(12_000)
+            for (kind in listOf(Kind.MOVIE, Kind.SERIES)) for (group in Platforms.main) {
+                if (!configured()) return@launch
+                val type = if (kind == Kind.SERIES) "tv" else "movie"
+                if (isFresh(kind, group) || catalogs.containsKey("$type:$group")) continue
+                runCatching { catalog(kind, group, slow = true) }
+                catalogs.remove("$type:$group") // no se queda en memoria: se lee del disco cuando haga falta
+                kotlinx.coroutines.delay(2_000)
+            }
+        }
+    }
+    @Volatile private var preloadStarted = false
+    private val bg = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + Dispatchers.IO)
+
+    suspend fun catalog(kind: Kind, group: String, slow: Boolean = false, onProgress: (Int, Int) -> Unit = { _, _ -> }): Catalog? = coroutineScope {
         val type = if (kind == Kind.SERIES) "tv" else "movie"
         val id = "$type:$group"
         catalogs[id]?.let { return@coroutineScope it }
-        val f = file?.parentFile?.let { File(it, "tmdb_cat_" + titleKey(id).replace(' ', '_') + ".json") }
+        val f = catFile(kind, group)
         // Copia guardada en el móvil/tele
         runCatching {
             if (f != null && f.exists() && System.currentTimeMillis() - f.lastModified() < WEEK) {
@@ -128,10 +159,11 @@ object Tmdb {
         first.optJSONArray("results")?.let { results[1] = it }
         val done = AtomicInteger(1)
         onProgress(1, pages)
-        val sem = Semaphore(16)
+        val sem = Semaphore(if (slow) 2 else 16)
         (2..pages).map { pg ->
             async(Dispatchers.IO) {
                 sem.withPermit {
+                    if (slow) kotlinx.coroutines.delay(400)
                     var r: JSONObject? = null
                     for (attempt in 0 until 3) { r = get("/discover/$type", "$base&page=$pg"); if (r != null) break; kotlinx.coroutines.delay(400L * (attempt + 1)) }
                     r?.optJSONArray("results")?.let { results[pg] = it }

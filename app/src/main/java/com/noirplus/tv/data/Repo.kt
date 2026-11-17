@@ -58,6 +58,7 @@ object Repo {
             prefs = Prefs(ctx.applicationContext)
             setupImages(ctx.applicationContext)
             Tmdb.init(ctx.applicationContext)
+            Tmdb.preloadLater()
             rebuild()
         }
     }
