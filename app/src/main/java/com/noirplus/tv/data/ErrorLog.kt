@@ -58,6 +58,17 @@ object ErrorLog {
         }
     }
 
+    /** Texto del último cierre inesperado, si es posterior a [since] (ms). */
+    fun lastCrash(since: Long): Pair<Long, String>? {
+        val text = read()
+        val fmt = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
+        return text.split(Regex("""(?m)^(?=\[\d{4}-)""")).filter { it.contains("Cierre inesperado") }.mapNotNull { block ->
+            val ts = Regex("""^\[([^\]]+)\]""").find(block)?.groupValues?.get(1) ?: return@mapNotNull null
+            val t = runCatching { fmt.parse(ts)?.time }.getOrNull() ?: return@mapNotNull null
+            if (t > since) t to block.trim() else null
+        }.maxByOrNull { it.first }
+    }
+
     fun read(): String = runCatching { file?.takeIf { it.exists() }?.readText() }.getOrNull().orEmpty()
 
     fun count(): Int = Regex("""(?m)^\[\d{4}-""").findAll(read()).count()

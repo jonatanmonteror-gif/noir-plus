@@ -10,6 +10,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
@@ -155,6 +160,7 @@ fun App() {
                 mem.restore = false
             }
             if (top == Screen.Main) UpdateNotice()
+            CrashNotice()
             // Vuelta a la app tras varias horas: saludo de nuevo (salvo si se está viendo algo)
             val wr = Repo.welcomeRequest.intValue
             LaunchedEffect(wr) {
@@ -218,6 +224,46 @@ private fun UpdateNotice() {
             }
             Spacer(Modifier.width(8.dp))
             ActionButton("Luego", key = "upd-later") { visible = false }
+        }
+    }
+}
+
+
+/**
+ * Si la app se cerró sola la última vez, al abrirla se muestra el error para poder copiarlo o enviarlo
+ * (aunque no se pueda llegar a Ajustes).
+ */
+@Composable
+private fun CrashNotice() {
+    val ctx = LocalContext.current
+    val crash = remember { com.noirplus.tv.data.ErrorLog.lastCrash(Repo.prefs.lastCrashSeen) }
+    var open by remember { mutableStateOf(crash != null) }
+    if (!open || crash == null) return
+    fun close() { Repo.prefs.lastCrashSeen = crash.first; open = false }
+    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.7f)), contentAlignment = Alignment.Center) {
+        Column(
+            Modifier.padding(20.dp).widthIn(max = 520.dp).clip(RoundedCornerShape(16.dp)).background(Col.Surface2).padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text("Noir+ se cerró la última vez", color = Col.Text, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+            Text("Envía este informe para arreglarlo. No incluye tu usuario, contraseña ni servidor.", color = Col.Sub, fontSize = 13.sp)
+            Text(crash.second.take(900), color = Col.Sub, fontSize = 10.sp, lineHeight = 13.sp,
+                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                modifier = Modifier.heightIn(max = 220.dp).verticalScroll(androidx.compose.foundation.rememberScrollState()))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ActionButton("Compartir", primary = true, key = "crash-share") {
+                    val i = android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/plain")
+                        .putExtra(android.content.Intent.EXTRA_SUBJECT, "Noir+ · error")
+                        .putExtra(android.content.Intent.EXTRA_TEXT, crash.second)
+                    runCatching { ctx.startActivity(android.content.Intent.createChooser(i, "Enviar informe").addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                }
+                ActionButton("Copiar", key = "crash-copy") {
+                    val cm = ctx.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                    cm.setPrimaryClip(android.content.ClipData.newPlainText("Noir+ error", crash.second))
+                    android.widget.Toast.makeText(ctx, "Copiado", android.widget.Toast.LENGTH_SHORT).show()
+                }
+                ActionButton("Cerrar", key = "crash-close") { close() }
+            }
         }
     }
 }

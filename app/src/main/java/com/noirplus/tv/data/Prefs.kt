@@ -78,6 +78,11 @@ class Prefs(ctx: Context) {
         (ctx.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager).isLowRamDevice
     }.getOrDefault(false)
 
+    /** Último cierre inesperado ya mostrado al usuario (para no repetir el aviso). */
+    var lastCrashSeen: Long
+        get() = sp.getLong("lastCrashSeen", 0L)
+        set(v) { sp.edit().putLong("lastCrashSeen", v).apply() }
+
     /** Valoraciones visibles. Por defecto: sí en el móvil, no en la tele. */
     var ratingsEnabled: Boolean
         get() = if (sp.contains("ratings")) sp.getBoolean("ratings", true) else !isTv

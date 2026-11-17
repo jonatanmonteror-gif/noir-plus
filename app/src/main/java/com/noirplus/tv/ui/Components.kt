@@ -626,11 +626,12 @@ fun HeroArea(item0: Item?, emptyTitle: String, emptySubtitle: String) {
     val d = LocalDims.current
     // En la tele la cabecera espera a que te detengas un instante en una carátula:
     // así, al recorrer una fila, no se recarga en cada paso (más fluido y sin tirones).
-    var item by remember { mutableStateOf(item0) }
+    var shownItem by remember { mutableStateOf(item0) }
     LaunchedEffect(item0?.key) {
-        if (d.tv && item != null) delay(320)
-        item = item0
+        if (d.tv && shownItem != null) delay(320)
+        shownItem = item0
     }
+    val item = shownItem
     val src = Repo.source
     val nav = LocalNav.current
     val details by produceState<Details?>(null, item?.key) {
@@ -763,6 +764,7 @@ class PeekSpec(private val leadPx: Float) : BringIntoViewSpec {
  * visibles y la fila solo se desliza (con suavidad) cuando el foco llega cerca del borde,
  * dejando ver un trozo de la siguiente. Así no da saltos.
  */
+@OptIn(ExperimentalFoundationApi::class)
 class EdgeSpec(private val marginPx: Float) : BringIntoViewSpec {
     @Suppress("OVERRIDE_DEPRECATION", "DEPRECATION")
     override val scrollAnimationSpec: AnimationSpec<Float> = spring(dampingRatio = 1f, stiffness = 300f)
