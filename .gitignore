@@ -4,3 +4,9 @@ local.properties
 .idea/
 *.iml
 .DS_Store
+
+# Claves de firma: nunca en claro en el repositorio
+*.jks
+*.keystore
+!*.jks.enc
+!app/legacy.jks

@@ -13,6 +13,13 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -213,9 +220,29 @@ fun Focusable(
 
 @Composable
 fun Logo(size: Int = 24) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Text("Noir", color = Col.Text, fontFamily = InterDisplay, fontWeight = FontWeight.SemiBold, fontSize = size.sp, letterSpacing = (-0.5).sp)
-        Text("+", color = Col.Text, fontFamily = InterDisplay, fontWeight = FontWeight.Light, fontSize = size.sp)
+    Row(verticalAlignment = Alignment.Top) {
+        Text("Noir", color = Col.Text, fontFamily = InterDisplay, fontWeight = FontWeight.SemiBold, fontSize = size.sp,
+            letterSpacing = (-0.5).sp, lineHeight = size.sp)
+        PlusMark(Modifier.padding(start = (size * 0.06f).dp, top = (size * 0.08f).dp).size((size * 0.34f).dp))
+    }
+}
+
+/** El "+" de Noir+: fino, con puntas redondeadas, degradado plateado, leve brillo y punto de luz central. */
+@Composable
+fun PlusMark(modifier: Modifier = Modifier) {
+    Canvas(modifier) {
+        val w = size.minDimension
+        val c = Offset(size.width / 2f, size.height / 2f)
+        val stroke = w * 0.17f
+        val half = w / 2f - stroke / 2f
+        drawCircle(
+            brush = Brush.radialGradient(listOf(Color.White.copy(alpha = 0.22f), Color.Transparent), center = c, radius = w * 0.9f),
+            radius = w * 0.9f, center = c,
+        )
+        val silver = Brush.verticalGradient(listOf(Color.White, Color(0xFF9A9AA0)), startY = c.y - half, endY = c.y + half)
+        drawLine(silver, Offset(c.x - half, c.y), Offset(c.x + half, c.y), strokeWidth = stroke, cap = StrokeCap.Round)
+        drawLine(silver, Offset(c.x, c.y - half), Offset(c.x, c.y + half), strokeWidth = stroke, cap = StrokeCap.Round)
+        drawCircle(Color.White, radius = stroke * 0.42f, center = c)
     }
 }
 
@@ -250,18 +277,34 @@ fun ActionButton(
 }
 
 @Composable
-fun SectionTitle(text: String, onSeeAll: (() -> Unit)? = null) {
+fun SectionTitle(text: String, onSeeAll: (() -> Unit)? = null, year: String? = null, tag: String? = null) {
+    val compact = LocalDims.current.compact
+    val size = if (compact) 15 else 17
     Row(Modifier.fillMaxWidth().padding(start = edge, top = 10.dp, end = edge), verticalAlignment = Alignment.CenterVertically) {
         Text(
-            text,
+            buildAnnotatedString {
+                append(text)
+                if (year != null) {
+                    withStyle(SpanStyle(fontSize = (size - 4).sp, color = Col.Sub, fontWeight = FontWeight.Medium)) { append("  ($year)") }
+                }
+            },
             color = Col.Text,
-            fontSize = if (LocalDims.current.compact) 15.sp else 17.sp,
+            fontSize = size.sp,
             fontWeight = FontWeight.SemiBold,
             letterSpacing = (-0.2).sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f, fill = false),
         )
+        if (tag != null) {
+            Text(
+                tag.uppercase(),
+                Modifier.padding(start = 8.dp).border(0.8.dp, Col.Sub.copy(alpha = 0.6f), RoundedCornerShape(4.dp))
+                    .padding(horizontal = 5.dp, vertical = 1.dp),
+                color = Col.Sub, fontSize = 9.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.6.sp,
+            )
+        }
+        Spacer(Modifier.weight(1f))
         if (onSeeAll != null) {
             Text(
                 "Ver todo",
@@ -460,7 +503,7 @@ fun PosterRow(rowId: String, items: List<Item>, onFocus: (Item) -> Unit, onClick
 fun CategoryRow(
     kind: Kind,
     cat: Category,
-    titlePrefix: String = "",
+    tag: String? = null,
     onLoaded: ((Item) -> Unit)? = null,
     onFocus: (Item) -> Unit,
 ) {
@@ -470,37 +513,49 @@ fun CategoryRow(
     val items by produceState<List<Item>?>(null, kind, cat.id) {
         value = runCatching { src.items(kind, cat.id) }.getOrDefault(emptyList())
     }
-    var sort by remember(cat.id) { mutableStateOf(SortMode.DEFAULT) }
     val list = items
-    val shown = remember(list, sort) { list?.sortedFor(sort) }
     LaunchedEffect(list) {
         val first = list?.firstOrNull()
         if (first != null) onLoaded?.invoke(first)
     }
     if (list != null && list.isEmpty()) return
+    val pretty = remember(cat.name, kind) { prettyCategory(cat.name, kind) }
     Column {
-        if (d.tv) {
-            SectionTitle(titlePrefix + cat.name)
-        } else {
-            // Táctil: título (abre la carpeta) + buscar dentro + ordenar
-            Row(Modifier.fillMaxWidth().padding(start = d.edge, end = d.edge - 4.dp, top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    titlePrefix + cat.name,
-                    color = Col.Text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.1).sp,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f).clickable { nav.push(Screen.Category(kind, cat)) },
-                )
-                if (!list.isNullOrEmpty()) {
-                    RoundIconButton(Icons.Filled.Search, "Buscar en ${cat.name}") { nav.push(Screen.Category(kind, cat, search = true)) }
-                    Spacer(Modifier.width(8.dp))
-                    SortButton(sort) { sort = it }
-                }
-            }
-        }
-        if (shown == null) RowPlaceholder()
-        else PosterRow("${kind.name}-${cat.id}", shown, onFocus) { nav.push(Screen.Detail(it)) }
+        SectionTitle(
+            pretty.main,
+            year = pretty.year,
+            tag = tag,
+            onSeeAll = if (!d.tv && !list.isNullOrEmpty()) ({ nav.push(Screen.Category(kind, cat)) }) else null,
+        )
+        if (list == null) RowPlaceholder()
+        else PosterRow("${kind.name}-${cat.id}", list, onFocus) { nav.push(Screen.Detail(it)) }
     }
 }
+
+/** Primera fila de Películas / Series: acceso a "Todas" con buscador y orden. */
+@Composable
+fun AllEntryRow(kind: Kind) {
+    val nav = LocalNav.current
+    val d = LocalDims.current
+    val label = if (kind == Kind.MOVIE) "Todas las películas" else "Todas las series"
+    Row(Modifier.fillMaxWidth().padding(horizontal = d.edge, vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Focusable(Modifier.weight(1f).height(46.dp), key = "all-${kind.name}", shape = RoundedCornerShape(50), focusScale = 1.03f,
+            onClick = { nav.push(Screen.Category(kind, Category(ALL_ID, label), search = false)) }) { focused ->
+            Row(
+                Modifier.fillMaxSize().background(if (focused) Color.White else Col.Surface).padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Filled.Search, null, tint = if (focused) Color.Black else Col.Sub, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(10.dp))
+                Text(label, color = if (focused) Color.Black else Col.Text, fontSize = 14.sp, fontWeight = FontWeight.Medium,
+                    modifier = Modifier.weight(1f))
+                Text("Buscar y ordenar  ›", color = if (focused) Color.Black.copy(alpha = 0.6f) else Col.Sub, fontSize = 12.sp)
+            }
+        }
+    }
+}
+
+const val ALL_ID = "__all"
 
 /**
  * Cabecera grande con la imagen e info del elemento enfocado.
@@ -645,59 +700,70 @@ fun TvRowScroll(content: @Composable () -> Unit) {
     CompositionLocalProvider(LocalBringIntoViewSpec provides spec) { content() }
 }
 
-/** Portada deslizable del móvil (estilo plataformas de streaming). */
+/** Portada del móvil: a todo el ancho, carrusel automático de "Recién llegados". */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun FeaturedPager(items: List<Item>) {
+fun FeaturedPager(items: List<Item>, label: String = "Recién llegados") {
     val nav = LocalNav.current
     if (items.isEmpty()) {
-        Box(Modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 8.dp).aspectRatio(4f / 3.2f).clip(RoundedCornerShape(8.dp)).background(Col.Surface))
+        Box(Modifier.fillMaxWidth().aspectRatio(0.82f).background(Col.Surface))
         return
     }
     val pager = rememberPagerState(pageCount = { items.size })
-    HorizontalPager(
-        state = pager,
-        contentPadding = PaddingValues(horizontal = 28.dp),
-        pageSpacing = 12.dp,
-        modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 6.dp),
-    ) { page ->
-        val item = items[page]
-        val off = ((pager.currentPage - page) + pager.currentPageOffsetFraction).absoluteValue.coerceIn(0f, 1f)
-        FeaturedCard(
-            item,
-            Modifier.graphicsLayer {
-                val sc = 1f - 0.07f * off
-                scaleX = sc
-                scaleY = sc
-                alpha = 1f - 0.4f * off
-            },
-        ) { nav.push(Screen.Detail(item)) }
+    val dragged by pager.interactionSource.collectIsDraggedAsState()
+    LaunchedEffect(pager.currentPage, dragged) {
+        if (dragged) return@LaunchedEffect
+        delay(6000)
+        val next = (pager.currentPage + 1) % items.size
+        pager.animateScrollToPage(next, animationSpec = tween(700, easing = FastOutSlowInEasing))
+    }
+    Box(Modifier.fillMaxWidth()) {
+        HorizontalPager(state = pager, modifier = Modifier.fillMaxWidth()) { page ->
+            FeaturedPage(items[page], label) { nav.push(Screen.Detail(items[page])) }
+        }
+        Row(
+            Modifier.align(Alignment.BottomCenter).padding(bottom = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+        ) {
+            repeat(items.size) { i ->
+                val sel = i == pager.currentPage
+                val w by animateDpAsState(if (sel) 16.dp else 5.dp, tween(250), label = "dot")
+                Box(Modifier.height(5.dp).width(w).clip(RoundedCornerShape(50)).background(if (sel) Color.White else Color.White.copy(alpha = 0.35f)))
+            }
+        }
     }
 }
 
 @Composable
-private fun FeaturedCard(item: Item, modifier: Modifier, onClick: () -> Unit) {
+private fun FeaturedPage(item: Item, label: String, onClick: () -> Unit) {
     val src = Repo.source
     val details by produceState<Details?>(null, item.key) {
         value = runCatching {
             if (item.kind == Kind.MOVIE) src?.movieDetails(item) else src?.seriesDetails(item)?.details
         }.getOrNull()
     }
-    Box(
-        modifier.fillMaxWidth().aspectRatio(4f / 3.2f).clip(RoundedCornerShape(8.dp)).background(Col.Surface)
-            .border(0.5.dp, Col.Hairline, RoundedCornerShape(8.dp)).clickable { onClick() }
-    ) {
-        AsyncImage(model = details?.backdrop ?: item.image, contentDescription = item.name, contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize())
-        Box(Modifier.matchParentSize().background(Brush.verticalGradient(0.4f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.88f))))
-        Column(Modifier.align(Alignment.BottomStart).padding(16.dp)) {
-            Text(item.name, fontFamily = InterDisplay, fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White,
-                maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 27.sp, letterSpacing = (-0.6).sp)
-            Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Box(Modifier.fillMaxWidth().aspectRatio(0.82f).background(Col.Surface).clickable { onClick() }) {
+        Crossfade(targetState = details?.backdrop ?: item.image, animationSpec = tween(400), label = "feat") { url ->
+            AsyncImage(model = url, contentDescription = item.name, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+        }
+        Box(
+            Modifier.matchParentSize().background(
+                Brush.verticalGradient(0f to Color.Black.copy(alpha = 0.35f), 0.25f to Color.Transparent, 0.55f to Color.Transparent, 1f to Col.Bg)
+            )
+        )
+        Column(
+            Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(start = 24.dp, end = 24.dp, bottom = 30.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(label.uppercase(), color = Col.Sub, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.6.sp)
+            Text(item.name, fontFamily = InterDisplay, fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Color.White,
+                textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 31.sp,
+                letterSpacing = (-0.7).sp, modifier = Modifier.padding(top = 6.dp))
+            Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 RatingPill(details?.rating ?: item.rating)
                 (details?.year ?: item.year)?.let { Text(it, color = Col.Sub, fontSize = 12.sp) }
             }
-            GenreChips(details?.genre, Modifier.padding(top = 8.dp), max = 3)
+            GenreChips(details?.genre, Modifier.padding(top = 10.dp), max = 3)
         }
     }
 }

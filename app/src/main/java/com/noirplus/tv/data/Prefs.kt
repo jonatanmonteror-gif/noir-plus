@@ -51,6 +51,76 @@ class Prefs(ctx: Context) {
 
     fun hasAccount() = type.isNotEmpty()
 
+    // ---------- Perfil ----------
+    var name: String
+        get() = s("name")
+        set(v) { sp.edit().putString("name", v.trim()).apply(); bump() }
+
+    // ---------- Subtítulos ----------
+    /** Retardo en ms (−2000…+2000). Positivo = salen más tarde. */
+    var subDelayMs: Int
+        get() = sp.getInt("subDelay", 0)
+        set(v) { sp.edit().putInt("subDelay", v.coerceIn(-2000, 2000)).apply(); bump() }
+
+    /** 0 = abajo, 1 = centro, 2 = arriba */
+    var subPos: Int
+        get() = sp.getInt("subPos", 0)
+        set(v) { sp.edit().putInt("subPos", v.coerceIn(0, 2)).apply(); bump() }
+
+    /** Ajuste fino de altura en dp (−60…+60). Positivo = más arriba. */
+    var subOffset: Int
+        get() = sp.getInt("subOffset", 0)
+        set(v) { sp.edit().putInt("subOffset", v.coerceIn(-60, 60)).apply(); bump() }
+
+    /** 0 = pequeño, 1 = normal, 2 = grande */
+    var subSize: Int
+        get() = sp.getInt("subSize", 1)
+        set(v) { sp.edit().putInt("subSize", v.coerceIn(0, 2)).apply(); bump() }
+
+    /** 0 = sin fondo (con sombra), 1 = caja semitransparente */
+    var subBg: Int
+        get() = sp.getInt("subBg", 0)
+        set(v) { sp.edit().putInt("subBg", v.coerceIn(0, 1)).apply(); bump() }
+
+    // ---------- Reproducción ----------
+    var autoNext: Boolean
+        get() = sp.getBoolean("autoNext", true)
+        set(v) { sp.edit().putBoolean("autoNext", v).apply(); bump() }
+
+    // ---------- Carpetas ocultas y protegidas ----------
+    private fun set(k: String): Set<String> = sp.getStringSet(k, emptySet())?.toSet() ?: emptySet()
+
+    val hidden: Set<String> get() = set("hiddenCats")
+    val locked: Set<String> get() = set("lockedCats")
+
+    fun toggleHidden(key: String) {
+        val cur = hidden.toMutableSet()
+        if (!cur.add(key)) cur.remove(key)
+        sp.edit().putStringSet("hiddenCats", cur).apply(); bump()
+    }
+
+    fun toggleLocked(key: String) {
+        val cur = locked.toMutableSet()
+        if (!cur.add(key)) cur.remove(key)
+        sp.edit().putStringSet("lockedCats", cur).apply(); bump()
+    }
+
+    var pin: String
+        get() = s("pin")
+        set(v) { sp.edit().putString("pin", v).apply(); bump() }
+
+    /** Desbloqueo del contenido protegido solo mientras la app está abierta. */
+    var unlocked: Boolean = false
+        set(v) { field = v; bump() }
+
+    /** ¿Se debe mostrar esta carpeta? (ni oculta ni protegida sin desbloquear) */
+    fun visible(kind: Kind, catId: String): Boolean {
+        val k = "${kind.name}:$catId"
+        if (k in hidden) return false
+        if (k in locked && !(unlocked || pin.isEmpty())) return false
+        return true
+    }
+
     fun saveXtream(server: String, user: String, pass: String) {
         sp.edit().putString("type", "xtream").putString("server", server)
             .putString("user", user).putString("pass", pass).apply()

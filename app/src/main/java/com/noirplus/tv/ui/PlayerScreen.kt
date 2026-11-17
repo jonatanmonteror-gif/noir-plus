@@ -1,40 +1,54 @@
 package com.noirplus.tv.ui
 
-import android.view.KeyEvent
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.ActivityInfo
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.media3.common.AudioAttributes
-import androidx.media3.common.C as MC
-import androidx.media3.exoplayer.DefaultLoadControl
-import androidx.media3.exoplayer.DefaultRenderersFactory
-import androidx.media3.exoplayer.upstream.DefaultBandwidthMeter
+import android.media.AudioManager
+import android.provider.Settings
+import android.view.KeyEvent
+import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
+import android.view.WindowManager
 import androidx.annotation.OptIn
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -43,14 +57,21 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C as MC
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.text.Cue
+import androidx.media3.common.text.CueGroup
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.exoplayer.upstream.DefaultBandwidthMeter
+import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import com.noirplus.tv.MainActivity
@@ -59,13 +80,27 @@ import com.noirplus.tv.data.PlayRequest
 import com.noirplus.tv.data.Progress
 import com.noirplus.tv.data.Repo
 import kotlinx.coroutines.delay
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
+private val ResizeModes = listOf(
+    AspectRatioFrameLayout.RESIZE_MODE_FIT to "Ajustar",
+    AspectRatioFrameLayout.RESIZE_MODE_ZOOM to "Rellenar",
+    AspectRatioFrameLayout.RESIZE_MODE_FILL to "Estirar",
+)
+
+@SuppressLint("ClickableViewAccessibility")
 @OptIn(UnstableApi::class)
 @Composable
 fun PlayerScreen(req: PlayRequest) {
     val ctx = LocalContext.current
     val src = Repo.source
     val prefs = Repo.prefs
+    val dims = LocalDims.current
+    val nav = LocalNav.current
+
+    // Lo que se está reproduciendo ahora (cambia con el siguiente episodio)
+    var cur by remember { mutableStateOf(req) }
     val channels = req.channels
     var index by remember { mutableIntStateOf(req.channelIndex.coerceIn(0, (channels.size - 1).coerceAtLeast(0))) }
     val channel = channels.getOrNull(index)
@@ -74,35 +109,129 @@ fun PlayerScreen(req: PlayRequest) {
     var error by remember { mutableStateOf<String?>(null) }
     var infoVisible by remember { mutableStateOf(true) }
     var controlsVisible by remember { mutableStateOf(false) }
+    var panelOpen by remember { mutableStateOf(false) }
+    var cues by remember { mutableStateOf<List<Cue>>(emptyList()) }
+    var sessionDelay by remember { mutableIntStateOf(prefs.subDelayMs) }
+    var resize by remember { mutableIntStateOf(0) }
+    var nextCountdown by remember { mutableIntStateOf(-1) }
+    // Indicador de gestos: 0 nada, 1 brillo, 2 volumen
+    var gesture by remember { mutableIntStateOf(0) }
+    var gestureLevel by remember { mutableFloatStateOf(0f) }
+    var gestureTick by remember { mutableIntStateOf(0) }
     val startApplied = remember { booleanArrayOf(false) }
     val backConsumed = remember { booleanArrayOf(false) }
     val viewRef = remember { arrayOfNulls<PlayerView>(1) }
+    val panelFr = remember { FocusRequester() }
+    val changes = prefs.changes.intValue
 
-    val dims = LocalDims.current
     val exo = remember { buildPlayer(ctx, req.isLive) }
+    val activity = remember { ctx.findActivity() }
+    val audio = remember { ctx.getSystemService(Context.AUDIO_SERVICE) as AudioManager }
 
-    // En el móvil el reproductor se pone en horizontal y vuelve a como estaba al salir.
+    SubtitleClock.delayUs = sessionDelay * 1000L
+
+    // Móvil: horizontal mientras se reproduce; al salir, se restaura orientación y brillo.
     DisposableEffect(Unit) {
-        val act = ctx.findActivity()
-        val prev = act?.requestedOrientation
-        if (!dims.tv) act?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-        onDispose { if (!dims.tv && prev != null) act?.requestedOrientation = prev }
+        val prev = activity?.requestedOrientation
+        if (!dims.tv) activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        onDispose {
+            if (!dims.tv && prev != null) activity?.requestedOrientation = prev
+            activity?.window?.let { w ->
+                val lp = w.attributes
+                lp.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+                w.attributes = lp
+            }
+            SubtitleClock.delayUs = 0L
+        }
+    }
+
+    fun brightness(): Float {
+        val b = activity?.window?.attributes?.screenBrightness ?: -1f
+        if (b >= 0f) return b
+        return runCatching { Settings.System.getInt(ctx.contentResolver, Settings.System.SCREEN_BRIGHTNESS) / 255f }.getOrDefault(0.5f)
+    }
+
+    fun setBrightness(v: Float) {
+        val w = activity?.window ?: return
+        val lp = w.attributes
+        lp.screenBrightness = v.coerceIn(0.02f, 1f)
+        w.attributes = lp
+    }
+
+    fun volume(): Float {
+        val max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
+        return audio.getStreamVolume(AudioManager.STREAM_MUSIC) / max.toFloat()
+    }
+
+    fun setVolume(v: Float) {
+        val max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+        audio.setStreamVolume(AudioManager.STREAM_MUSIC, (v.coerceIn(0f, 1f) * max).roundToInt(), 0)
+    }
+
+    /** Aplica el gesto: modo 1 = brillo (izquierda), 2 = volumen (derecha). */
+    fun applyGesture(mode: Int, level: Float) {
+        val l = level.coerceIn(0f, 1f)
+        if (mode == 1) setBrightness(l) else setVolume(l)
+        gesture = mode
+        gestureLevel = l
+        gestureTick++
     }
 
     fun save() {
-        if (req.isLive) return
+        val c = cur
+        if (c.isLive) return
         val d = exo.duration
         val p = exo.currentPosition
         if (d <= 0) return
-        if (p > d * 0.95) prefs.removeProgress(req.key)
-        else if (p > 15_000) prefs.saveProgress(
-            Progress(req.key, req.title, req.image, url, p, d, System.currentTimeMillis(), req.parent)
+        if (p > d * 0.95) prefs.removeProgress(c.key)
+        else if (p > 15_000) prefs.saveProgress(Progress(c.key, c.title, c.image, url, p, d, System.currentTimeMillis(), c.parent))
+    }
+
+    fun nextRequest(): PlayRequest? {
+        val c = cur
+        val ni = c.episodeIndex + 1
+        if (c.episodeIndex < 0 || ni >= c.episodes.size || src == null) return null
+        val ep = c.episodes[ni]
+        return c.copy(
+            url = src.episodeUrl(ep),
+            title = "${c.seriesName ?: ""} · T${ep.season} E${ep.number}",
+            key = "EP:${ep.id}",
+            image = ep.image ?: c.image,
+            startMs = 0L,
+            episodeIndex = ni,
         )
+    }
+
+    fun playNext() {
+        val n = nextRequest() ?: return
+        save()
+        nextCountdown = -1
+        startApplied[0] = false
+        cur = n
+        url = n.url
     }
 
     fun handleKey(ev: KeyEvent): Boolean {
         val down = ev.action == KeyEvent.ACTION_DOWN
-        if (req.isLive) {
+        // Con el panel de opciones abierto, el mando lo controla Compose (Atrás lo cierra).
+        if (panelOpen) {
+            if (ev.keyCode == KeyEvent.KEYCODE_BACK) {
+                if (!down) panelOpen = false
+                return true
+            }
+            return false
+        }
+        if (ev.keyCode == KeyEvent.KEYCODE_MENU || ev.keyCode == KeyEvent.KEYCODE_CAPTIONS || ev.keyCode == KeyEvent.KEYCODE_SETTINGS ||
+            ev.keyCode == KeyEvent.KEYCODE_INFO
+        ) {
+            if (down) panelOpen = true
+            return true
+        }
+        if (nextCountdown >= 0 && down && (ev.keyCode == KeyEvent.KEYCODE_DPAD_CENTER || ev.keyCode == KeyEvent.KEYCODE_ENTER)) {
+            playNext()
+            return true
+        }
+        if (cur.isLive) {
             when (ev.keyCode) {
                 KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_CHANNEL_UP -> {
                     if (down && channels.size > 1) index = (index - 1 + channels.size) % channels.size
@@ -151,7 +280,7 @@ fun PlayerScreen(req: PlayRequest) {
 
     // Cambio de canal (zapping)
     LaunchedEffect(index) {
-        if (req.isLive && channel != null && src != null) {
+        if (cur.isLive && channel != null && src != null) {
             val u = src.streamUrl(channel)
             if (u.isNotEmpty() && u != url) {
                 triedAlt = false
@@ -163,11 +292,12 @@ fun PlayerScreen(req: PlayRequest) {
 
     LaunchedEffect(url) {
         error = null
+        cues = emptyList()
         exo.setMediaItem(MediaItem.fromUri(url))
         exo.prepare()
         if (!startApplied[0]) {
             startApplied[0] = true
-            if (!req.isLive && req.startMs > 0) exo.seekTo(req.startMs)
+            if (!cur.isLive && cur.startMs > 0) exo.seekTo(cur.startMs)
         }
         exo.playWhenReady = true
     }
@@ -176,6 +306,23 @@ fun PlayerScreen(req: PlayRequest) {
         if (infoVisible) {
             delay(4000)
             infoVisible = false
+        }
+    }
+
+    LaunchedEffect(gestureTick) {
+        if (gesture != 0) {
+            delay(900)
+            gesture = 0
+        }
+    }
+
+    // Cuenta atrás del siguiente episodio
+    LaunchedEffect(nextCountdown) {
+        if (nextCountdown > 0) {
+            delay(1000)
+            nextCountdown -= 1
+        } else if (nextCountdown == 0) {
+            playNext()
         }
     }
 
@@ -195,11 +342,22 @@ fun PlayerScreen(req: PlayRequest) {
                         exo.prepare()
                     }
                     // Si el canal falla en HLS probamos en TS (y al revés).
-                    req.isLive && !triedAlt && (url.endsWith(".m3u8") || url.endsWith(".ts")) -> {
+                    cur.isLive && !triedAlt && (url.endsWith(".m3u8") || url.endsWith(".ts")) -> {
                         triedAlt = true
                         url = if (url.endsWith(".m3u8")) url.removeSuffix(".m3u8") + ".ts" else url.removeSuffix(".ts") + ".m3u8"
                     }
                     else -> error = "No se ha podido reproducir este contenido.\n(${e.errorCodeName})"
+                }
+            }
+
+            override fun onCues(cueGroup: CueGroup) {
+                cues = cueGroup.cues
+            }
+
+            override fun onPlaybackStateChanged(state: Int) {
+                if (state == Player.STATE_ENDED && !cur.isLive) {
+                    prefs.removeProgress(cur.key)
+                    if (prefs.autoNext && nextRequest() != null) nextCountdown = 8
                 }
             }
         }
@@ -225,41 +383,123 @@ fun PlayerScreen(req: PlayRequest) {
                     controllerShowTimeoutMs = 4000
                     isFocusable = true
                     isFocusableInTouchMode = true
+                    subtitleView?.visibility = View.GONE // los subtítulos los dibuja la app
                     setControllerVisibilityListener(
                         PlayerView.ControllerVisibilityListener { v -> controlsVisible = v == View.VISIBLE }
                     )
+                    if (!dims.tv) {
+                        // Gestos: mitad izquierda = brillo, mitad derecha = volumen (arrastrar arriba/abajo)
+                        val slop = ViewConfiguration.get(c).scaledTouchSlop * 2
+                        var sx = 0f
+                        var sy = 0f
+                        var mode = 0
+                        var start = 0f
+                        setOnTouchListener { v, e ->
+                            when (e.actionMasked) {
+                                MotionEvent.ACTION_DOWN -> {
+                                    sx = e.x; sy = e.y; mode = 0
+                                    false
+                                }
+                                MotionEvent.ACTION_MOVE -> {
+                                    val dy = e.y - sy
+                                    if (mode == 0 && abs(dy) > slop && abs(dy) > abs(e.x - sx) * 1.5f) {
+                                        mode = if (sx < v.width / 2f) 1 else 2
+                                        start = if (mode == 1) brightness() else volume()
+                                    }
+                                    if (mode != 0) {
+                                        applyGesture(mode, start - dy / (v.height * 0.8f))
+                                        true
+                                    } else {
+                                        false
+                                    }
+                                }
+                                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                                    val was = mode != 0
+                                    mode = 0
+                                    was
+                                }
+                                else -> false
+                            }
+                        }
+                    }
                     viewRef[0] = this
                     post { requestFocus() }
                 }
             },
+            update = { v -> v.resizeMode = ResizeModes[resize].first },
             modifier = Modifier.fillMaxSize(),
         )
 
-        // Título arriba cuando se ven los controles (películas y series)
-        if (!req.isLive && controlsVisible) {
-            Text(
-                req.title,
-                Modifier
-                    .align(Alignment.TopStart)
-                    .fillMaxWidth()
-                    .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.8f), Color.Transparent)))
-                    .padding(horizontal = edge, vertical = 28.dp),
-                color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold, maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+        // Subtítulos propios (posición, altura, tamaño y fondo según Ajustes)
+        if (changes >= 0) {
+            SubtitleLayer(
+                cues,
+                pos = prefs.subPos,
+                offsetDp = prefs.subOffset + if (controlsVisible && prefs.subPos == 0) 60 else 0,
+                size = prefs.subSize,
+                box = prefs.subBg == 1,
             )
         }
 
-        // Táctil (móvil): tocar la pantalla muestra/oculta la información del canal
-        if (req.isLive && !dims.tv) {
+        // Directo en móvil: tocar = info; arrastrar = brillo / volumen
+        if (cur.isLive && !dims.tv) {
+            var dMode by remember { mutableIntStateOf(0) }
+            var dStart by remember { mutableFloatStateOf(0f) }
+            var dAcc by remember { mutableFloatStateOf(0f) }
             Box(
-                Modifier.fillMaxSize().clickable(
-                    interactionSource = remember { MutableInteractionSource() }, indication = null,
-                ) { infoVisible = !infoVisible }
+                Modifier.fillMaxSize()
+                    .pointerInput(Unit) { detectTapGestures(onTap = { infoVisible = !infoVisible }) }
+                    .pointerInput(Unit) {
+                        detectVerticalDragGestures(
+                            onDragStart = { o ->
+                                dMode = if (o.x < size.width / 2f) 1 else 2
+                                dStart = if (dMode == 1) brightness() else volume()
+                                dAcc = 0f
+                            },
+                            onVerticalDrag = { _, dy ->
+                                dAcc += dy
+                                applyGesture(dMode, dStart - dAcc / (size.height * 0.8f))
+                            },
+                        )
+                    }
             )
+        }
+
+        // Indicador de brillo / volumen
+        AnimatedVisibility(gesture != 0, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.Center)) {
+            Column(
+                Modifier.clip(RoundedCornerShape(14.dp)).background(Color.Black.copy(alpha = 0.6f)).padding(horizontal = 22.dp, vertical = 14.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(if (gesture == 1) "Brillo" else "Volumen", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                Box(Modifier.padding(top = 10.dp).width(150.dp).height(4.dp).clip(RoundedCornerShape(50)).background(Color.White.copy(alpha = 0.25f))) {
+                    Box(Modifier.fillMaxHeight().fillMaxWidth(gestureLevel).clip(RoundedCornerShape(50)).background(Color.White))
+                }
+                Text("${(gestureLevel * 100).roundToInt()} %", color = Col.Sub, fontSize = 11.sp, modifier = Modifier.padding(top = 6.dp))
+            }
+        }
+
+        // Cabecera con título y botón de opciones cuando se ven los controles
+        val showTop = (!cur.isLive && controlsVisible) || (cur.isLive && infoVisible)
+        if (showTop) {
+            Row(
+                Modifier.align(Alignment.TopStart).fillMaxWidth()
+                    .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.8f), Color.Transparent)))
+                    .padding(horizontal = edge, vertical = 22.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    if (cur.isLive) "" else cur.title,
+                    color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold, maxLines = 1,
+                    overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
+                )
+                if (!dims.tv) ActionButton("Opciones") { panelOpen = true }
+                else Text("Menú: opciones", color = Col.Sub, fontSize = 12.sp)
+            }
         }
 
         // Banda de información del canal en directo
-        if (req.isLive && infoVisible) {
+        if (cur.isLive && infoVisible) {
             Row(
                 Modifier
                     .align(Alignment.BottomStart)
@@ -296,6 +536,61 @@ fun PlayerScreen(req: PlayRequest) {
             }
         }
 
+        // Siguiente episodio
+        if (nextCountdown >= 0) {
+            val n = nextRequest()
+            if (n != null) {
+                Column(
+                    Modifier.align(Alignment.BottomEnd).padding(edge).clip(RoundedCornerShape(12.dp))
+                        .background(Color.Black.copy(alpha = 0.78f)).padding(18.dp),
+                ) {
+                    Text("Siguiente episodio en $nextCountdown s", color = Col.Sub, fontSize = 12.sp)
+                    Text(n.title, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
+                        overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp, bottom = 12.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        ActionButton("Ver ahora", primary = true) { playNext() }
+                        ActionButton("Cancelar") { nextCountdown = -1 }
+                    }
+                }
+            }
+        }
+
+        // Panel rápido: subtítulos e imagen
+        if (panelOpen) {
+            LaunchedEffect(Unit) {
+                delay(120)
+                runCatching { panelFr.requestFocus() }
+            }
+            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f)).pointerInput(Unit) { detectTapGestures { panelOpen = false } })
+            Column(
+                Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(if (dims.compact) 340.dp else 420.dp)
+                    .background(Col.Surface.copy(alpha = 0.97f))
+                    .pointerInput(Unit) { detectTapGestures { } }
+                    .verticalScroll(rememberScrollState())
+                    .padding(22.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Text("Opciones", fontFamily = InterDisplay, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                Text("SUBTÍTULOS", color = Col.Sub, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.2.sp)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Retardo", color = Col.Text, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                    ActionButton("−", focusRequester = panelFr) { sessionDelay = (sessionDelay - 100).coerceAtLeast(-2000) }
+                    Text(fmtDelay(sessionDelay), color = Col.Text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+                        textAlign = TextAlign.Center, modifier = Modifier.width(78.dp))
+                    ActionButton("+") { sessionDelay = (sessionDelay + 100).coerceAtMost(2000) }
+                }
+                Text("Positivo = salen más tarde. Solo para esta reproducción.", color = Col.Sub, fontSize = 11.sp)
+                ChoiceRow("Posición", SubPositions, prefs.subPos, "pp") { prefs.subPos = it }
+                StepperRow("Altura", "${prefs.subOffset}", { prefs.subOffset -= 4 }, { prefs.subOffset += 4 }, "ph")
+                ChoiceRow("Tamaño", SubSizes, prefs.subSize, "ps") { prefs.subSize = it }
+                ChoiceRow("Fondo", SubBgs, prefs.subBg, "pb") { prefs.subBg = it }
+                Text("IMAGEN", color = Col.Sub, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.2.sp,
+                    modifier = Modifier.padding(top = 6.dp))
+                ChoiceRow("Formato", ResizeModes.map { it.second }, resize, "pr") { resize = it }
+                ActionButton("Cerrar", modifier = Modifier.padding(top = 6.dp)) { panelOpen = false }
+            }
+        }
+
         error?.let {
             Column(
                 Modifier.align(Alignment.Center).background(Color.Black.copy(alpha = 0.75f)).padding(28.dp),
@@ -303,9 +598,10 @@ fun PlayerScreen(req: PlayRequest) {
             ) {
                 Text(it, color = Color.White, fontSize = 16.sp, textAlign = TextAlign.Center)
                 Text(
-                    if (req.isLive && channels.size > 1) "Prueba otro canal con ▲ ▼ o pulsa Atrás" else "Pulsa Atrás para volver",
+                    if (cur.isLive && channels.size > 1) "Prueba otro canal con ▲ ▼ o pulsa Atrás" else "Pulsa Atrás para volver",
                     color = Col.Sub, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp),
                 )
+                if (!dims.tv) ActionButton("Volver", modifier = Modifier.padding(top = 12.dp)) { nav.pop() }
             }
         }
     }
@@ -317,6 +613,7 @@ fun PlayerScreen(req: PlayRequest) {
  * - Búfer moderado: arranque rápido y pocos cortes sin gastar memoria de más.
  * - Si un decodificador por hardware falla, prueba otro automáticamente.
  * - Audio y subtítulos en español por defecto si el contenido los tiene.
+ * - Subtítulos con retardo ajustable (NoirRenderersFactory).
  */
 @OptIn(UnstableApi::class)
 private fun buildPlayer(ctx: Context, live: Boolean): ExoPlayer {
@@ -325,7 +622,7 @@ private fun buildPlayer(ctx: Context, live: Boolean): ExoPlayer {
         .setAllowCrossProtocolRedirects(true)
         .setConnectTimeoutMs(15_000)
         .setReadTimeoutMs(20_000)
-    val renderers = DefaultRenderersFactory(ctx).setEnableDecoderFallback(true)
+    val renderers = NoirRenderersFactory(ctx).setEnableDecoderFallback(true)
     val bandwidth = DefaultBandwidthMeter.Builder(ctx).setInitialBitrateEstimate(12_000_000L).build()
     val load = DefaultLoadControl.Builder()
         .setBufferDurationsMs(
@@ -336,7 +633,7 @@ private fun buildPlayer(ctx: Context, live: Boolean): ExoPlayer {
         )
         .setPrioritizeTimeOverSizeThresholds(true)
         .build()
-    val audio = AudioAttributes.Builder()
+    val audioAttrs = AudioAttributes.Builder()
         .setUsage(MC.USAGE_MEDIA)
         .setContentType(MC.AUDIO_CONTENT_TYPE_MOVIE)
         .build()
@@ -344,7 +641,7 @@ private fun buildPlayer(ctx: Context, live: Boolean): ExoPlayer {
         .setMediaSourceFactory(DefaultMediaSourceFactory(DefaultDataSource.Factory(ctx, http)))
         .setBandwidthMeter(bandwidth)
         .setLoadControl(load)
-        .setAudioAttributes(audio, true)
+        .setAudioAttributes(audioAttrs, true)
         .setHandleAudioBecomingNoisy(true)
         .setSeekBackIncrementMs(10_000)
         .setSeekForwardIncrementMs(10_000)

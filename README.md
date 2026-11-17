@@ -32,7 +32,8 @@ https://github.com/USUARIO/REPO/releases/latest/download/NoirPlus.apk
 4. En Downloader escribe ese código → descarga → **Instalar**.
 5. Para actualizar, repite el paso 4 con el mismo código (siempre apunta a la última versión).
 
-## Firma
-El APK se firma con `app/release.jks` (incluido en el repo para que las actualizaciones
-se instalen encima sin desinstalar). Es una app de uso personal; si la distribuyes,
-cambia la clave y guárdala fuera del repositorio.
+## Firma y seguridad
+- La clave nueva está cifrada en `app/noirplus.jks.enc`; GitHub Actions la descifra con el secreto `NOIR_KEY_PASSWORD`.
+  Mientras ese secreto no exista se sigue firmando con la clave antigua (`app/legacy.jks`) para no tener que reinstalar.
+- Cada versión publica `NoirPlus.apk.sha256`; el actualizador de la app comprueba la huella antes de instalar.
+- Las acciones de GitHub están fijadas a un commit concreto.

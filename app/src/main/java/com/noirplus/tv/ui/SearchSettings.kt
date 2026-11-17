@@ -67,7 +67,7 @@ fun SearchContent() {
             loading = true
             index = withContext(Dispatchers.Default) {
                 val all = ArrayList<Item>()
-                for (k in Kind.entries) all.addAll(runCatching { src.all(k) }.getOrDefault(emptyList()))
+                for (k in Kind.entries) all.addAll(runCatching { src.all(k) }.getOrDefault(emptyList()).filter { Repo.prefs.visible(it.kind, it.categoryId) })
                 all.map { norm(it.name) to it }
             }
             loading = false
@@ -133,47 +133,3 @@ fun SearchContent() {
     }
 }
 
-@Composable
-fun SettingsContent() {
-    val prefs = Repo.prefs
-    val nav = LocalNav.current
-    val changes = prefs.changes.intValue
-    val info by produceState<String?>(null) { value = Repo.source?.accountInfo() ?: "No se pudo comprobar la cuenta" }
-    val format = remember(changes) { prefs.liveFormat }
-
-    Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = edge, end = edge, top = 16.dp, bottom = LocalDims.current.bottomPad),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Text("Cuenta", color = Col.Text, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-        Text(
-            if (prefs.type == "xtream") "Xtream Codes  ·  ${prefs.server}  ·  usuario ${prefs.user}" else "Lista M3U  ·  ${prefs.m3u}",
-            color = Col.Sub, fontSize = 14.sp,
-        )
-        Text(info ?: "Comprobando cuenta…", color = Col.Sub, fontSize = 14.sp)
-        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            ActionButton("Recargar contenido") { Repo.rebuild() }
-            ActionButton("Cambiar de lista") {
-                prefs.clearAccount()
-                Repo.rebuild()
-                nav.reset(Screen.Setup)
-            }
-        }
-
-        Spacer(Modifier.height(12.dp))
-        Text("Reproducción", color = Col.Text, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            ActionButton("Formato de canales: " + if (format == "ts") "TS" else "HLS") {
-                prefs.liveFormat = if (prefs.liveFormat == "ts") "m3u8" else "ts"
-            }
-            ActionButton("Borrar «Continuar viendo»") { prefs.clearHistory() }
-        }
-        Text(
-            "Si algún canal no arranca, prueba a cambiar el formato. La app ya intenta el otro automáticamente si falla.",
-            color = Col.Sub, fontSize = 13.sp,
-        )
-
-        Spacer(Modifier.height(12.dp))
-        Text("Noir+  ·  versión ${BuildConfig.VERSION_NAME}", color = Col.Sub, fontSize = 13.sp)
-    }
-}

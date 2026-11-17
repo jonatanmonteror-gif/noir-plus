@@ -8,31 +8,41 @@ val buildNumber = (System.getenv("VERSION_CODE") ?: "1").toInt()
 
 android {
     namespace = "com.noirplus.tv"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.noirplus.tv"
         minSdk = 21
-        targetSdk = 34
+        targetSdk = 35
         versionCode = buildNumber
         versionName = "1.0.$buildNumber"
     }
 
+    // Firma:
+    //  - Clave nueva (recomendada): app/noirplus.jks.enc, descifrada por GitHub Actions con el secreto NOIR_KEY_PASSWORD.
+    //  - Mientras ese secreto no exista, se sigue usando la clave antigua (legacy.jks) para no obligar a reinstalar.
+    val newKey = file("noirplus.jks")
+    val newPass = System.getenv("NOIR_KEY_PASSWORD")
+    val useNewKey = newKey.exists() && !newPass.isNullOrEmpty()
     signingConfigs {
         create("release") {
-            storeFile = file("release.jks")
-            storePassword = "nexotv2026"
-            keyAlias = "nexotv"
-            keyPassword = "nexotv2026"
+            if (useNewKey) {
+                storeFile = newKey
+                storePassword = newPass
+                keyAlias = "noirplus"
+                keyPassword = newPass
+            } else {
+                storeFile = file("legacy.jks")
+                storePassword = "nexotv2026"
+                keyAlias = "nexotv"
+                keyPassword = "nexotv2026"
+            }
         }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("release")
-        }
-        debug {
             signingConfig = signingConfigs.getByName("release")
         }
     }
@@ -71,4 +81,5 @@ dependencies {
     implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+    implementation("com.google.zxing:core:3.5.3")
 }

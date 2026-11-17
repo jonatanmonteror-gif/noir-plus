@@ -1,7 +1,6 @@
 package com.noirplus.tv.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -18,7 +17,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -57,10 +55,12 @@ val SortIcon: ImageVector = materialIcon(name = "Filled.Sort") {
 
 @Composable
 fun RoundIconButton(icon: ImageVector, desc: String, active: Boolean = false, onClick: () -> Unit) {
-    Box(
-        Modifier.size(34.dp).clip(CircleShape).background(if (active) Color.White else Col.Glass.copy(alpha = 0.14f)).clickable { onClick() },
-        contentAlignment = Alignment.Center,
-    ) { Icon(icon, desc, tint = if (active) Color.Black else Col.Text, modifier = Modifier.size(18.dp)) }
+    Focusable(Modifier.size(34.dp), shape = CircleShape, focusScale = 1.12f, onClick = onClick) { focused ->
+        Box(
+            Modifier.matchParentSize().background(if (active || focused) Color.White else Color.White.copy(alpha = 0.14f)),
+            contentAlignment = Alignment.Center,
+        ) { Icon(icon, desc, tint = if (active || focused) Color.Black else Col.Text, modifier = Modifier.size(18.dp)) }
+    }
 }
 
 /** Botón de ordenar con su menú desplegable. */

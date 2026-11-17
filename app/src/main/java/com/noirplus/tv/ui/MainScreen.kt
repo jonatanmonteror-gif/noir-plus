@@ -103,7 +103,10 @@ private fun BigScreenMain() {
             Modifier.fillMaxWidth().padding(start = d.edge, end = d.edge, top = 16.dp, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(Modifier.weight(1f)) { Logo(22) }
+            Column(Modifier.weight(1f)) {
+                Logo(22)
+                Greeting(Modifier.padding(top = 2.dp))
+            }
             Row(
                 Modifier.background(Col.Surface.copy(alpha = 0.85f), RoundedCornerShape(50)).padding(4.dp).focusRestorer(),
                 horizontalArrangement = Arrangement.spacedBy(2.dp),
@@ -182,6 +185,8 @@ private fun PhoneMain() {
             if (section == Section.HOME) {
                 Row(Modifier.fillMaxWidth().padding(start = d.edge, end = d.edge, top = 14.dp), verticalAlignment = Alignment.CenterVertically) {
                     Logo(24)
+                    Spacer(Modifier.weight(1f))
+                    Greeting()
                 }
                 Row(
                     Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(start = d.edge, end = d.edge, top = 12.dp, bottom = 2.dp),
@@ -234,7 +239,7 @@ private fun FilterTab(label: String, selected: Boolean, onClick: () -> Unit) {
 private fun BottomBar(current: Section, modifier: Modifier, onSelect: (Section) -> Unit) {
     Row(
         modifier
-            .padding(horizontal = 48.dp, vertical = 16.dp)
+            .padding(horizontal = 14.dp, vertical = 14.dp)
             .fillMaxWidth()
             .height(56.dp)
             .clip(RoundedCornerShape(50))
@@ -307,21 +312,21 @@ fun HomeContent() {
     val history = remember(changes) { prefs.history() }
     val favs = remember(changes) { prefs.favorites().filter { it.kind != Kind.LIVE } }
     var hero by remember { mutableStateOf<Item?>(null) }
-    val movieCats by produceState(emptyList<Category>()) {
-        value = runCatching { src.categories(Kind.MOVIE).take(4) }.getOrDefault(emptyList())
+    val movieCats by produceState(emptyList<Category>(), changes) {
+        value = runCatching { src.categories(Kind.MOVIE).filter { prefs.visible(Kind.MOVIE, it.id) }.take(4) }.getOrDefault(emptyList())
     }
-    val seriesCats by produceState(emptyList<Category>()) {
-        value = runCatching { src.categories(Kind.SERIES).take(4) }.getOrDefault(emptyList())
+    val seriesCats by produceState(emptyList<Category>(), changes) {
+        value = runCatching { src.categories(Kind.SERIES).filter { prefs.visible(Kind.SERIES, it.id) }.take(4) }.getOrDefault(emptyList())
     }
-    val featured by produceState(emptyList<Item>(), movieCats) {
-        val c = movieCats.firstOrNull() ?: return@produceState
-        value = runCatching { src.items(Kind.MOVIE, c.id).take(8) }.getOrDefault(emptyList())
+    val featured by produceState(emptyList<Item>(), changes) {
+        val m = recentOf(Kind.MOVIE, 6)
+        val sr = recentOf(Kind.SERIES, 4)
+        value = (m.zip(sr).flatMap { listOf(it.first, it.second) } + m.drop(sr.size) + sr.drop(m.size)).take(10)
     }
-    val setFirst: (Item) -> Unit = { if (hero == null) hero = it }
 
     HeroList({
         if (d.compact) FeaturedPager(featured)
-        else HeroArea(hero, "Bienvenido", "Películas, series y canales en directo de tu lista")
+        else HeroArea(hero ?: cycling(featured), "Bienvenido", "Películas, series y canales en directo de tu lista")
     }) {
         if (history.isNotEmpty()) {
             item(key = "history") {
@@ -361,35 +366,61 @@ fun HomeContent() {
                 }
             }
         }
-        itemsIndexed(movieCats, key = { i, c -> "m$i:${c.id}" }) { i, c ->
-            CategoryRow(Kind.MOVIE, c, "Películas · ", onLoaded = if (i == 0) setFirst else null) { hero = it }
+        itemsIndexed(movieCats, key = { i, c -> "m$i:${c.id}" }) { _, c ->
+            CategoryRow(Kind.MOVIE, c, tag = "Película") { hero = it }
         }
         itemsIndexed(seriesCats, key = { i, c -> "s$i:${c.id}" }) { _, c ->
-            CategoryRow(Kind.SERIES, c, "Series · ") { hero = it }
+            CategoryRow(Kind.SERIES, c, tag = "Serie") { hero = it }
         }
     }
+}
+
+/** Lo último añadido de un tipo (para "Recién llegados"). */
+private suspend fun recentOf(kind: Kind, n: Int): List<Item> {
+    val src = Repo.source ?: return emptyList()
+    val prefs = Repo.prefs
+    return runCatching {
+        src.all(kind).filter { prefs.visible(kind, it.categoryId) }.sortedByDescending { it.added }.take(n)
+    }.getOrElse {
+        runCatching {
+            val c = src.categories(kind).firstOrNull { prefs.visible(kind, it.id) } ?: return emptyList()
+            src.items(kind, c.id).take(n)
+        }.getOrDefault(emptyList())
+    }
+}
+
+/** TV: mientras no se elige nada, la cabecera va pasando sola por los destacados. */
+@Composable
+private fun cycling(items: List<Item>): Item? {
+    var i by remember(items) { mutableStateOf(0) }
+    LaunchedEffect(items) {
+        if (items.size < 2) return@LaunchedEffect
+        while (true) {
+            delay(7000)
+            i = (i + 1) % items.size
+        }
+    }
+    return items.getOrNull(i)
 }
 
 @Composable
 fun BrowseContent(kind: Kind) {
     val src = Repo.source ?: return Message("No hay ninguna lista configurada")
     val d = LocalDims.current
+    val prefs = Repo.prefs
+    val changes = prefs.changes.intValue
     var hero by remember(kind) { mutableStateOf<Item?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
-    val cats by produceState<List<Category>?>(null, kind) {
+    val cats by produceState<List<Category>?>(null, kind, changes) {
         value = try {
-            src.categories(kind)
+            src.categories(kind).filter { prefs.visible(kind, it.id) }
         } catch (t: Throwable) {
             error = t.message
             emptyList()
         }
     }
-    val featured by produceState(emptyList<Item>(), cats) {
-        val c = cats?.firstOrNull() ?: return@produceState
-        value = runCatching { src.items(kind, c.id).take(8) }.getOrDefault(emptyList())
-    }
+    val featured by produceState(emptyList<Item>(), kind, changes) { value = recentOf(kind, 10) }
     val title = if (kind == Kind.MOVIE) "Películas" else "Series"
-    val setFirst: (Item) -> Unit = { if (hero == null) hero = it }
 
     val c = cats
     when {
@@ -397,13 +428,27 @@ fun BrowseContent(kind: Kind) {
         c.isEmpty() -> Message(error?.let { "No se pudo cargar: $it" } ?: "No hay contenido en esta sección")
         else -> HeroList({
             if (d.compact) FeaturedPager(featured)
-            else HeroArea(hero, title, "Explora las categorías de tu lista")
+            else HeroArea(hero ?: cycling(featured), title, "Explora las categorías de tu lista")
         }) {
-            itemsIndexed(c, key = { i, cat -> "$i:${cat.id}" }) { i, cat ->
-                CategoryRow(kind, cat, onLoaded = if (i == 0) setFirst else null) { hero = it }
+            item(key = "all") { AllEntryRow(kind) }
+            itemsIndexed(c, key = { i, cat -> "$i:${cat.id}" }) { _, cat ->
+                CategoryRow(kind, cat) { hero = it }
             }
         }
     }
+}
+
+/** "Buenos días, Jonatan" según la hora. */
+@Composable
+fun Greeting(modifier: Modifier = Modifier) {
+    val name = Repo.prefs.name.takeIf { it.isNotBlank() } ?: return
+    val h = remember { java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) }
+    val hello = when (h) {
+        in 6..13 -> "Buenos días"
+        in 14..20 -> "Buenas tardes"
+        else -> "Buenas noches"
+    }
+    Text("$hello, $name", modifier, color = Col.Sub, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1)
 }
 
 /** TV/tablet: cabecera fija y filas debajo. Móvil: la cabecera se desplaza con la lista. */

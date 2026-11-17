@@ -85,6 +85,10 @@ data class PlayRequest(
     val channels: List<Item> = emptyList(),
     val channelIndex: Int = 0,
     val parent: String? = null,
+    /** Cola de episodios (para "siguiente episodio automático"). */
+    val episodes: List<Episode> = emptyList(),
+    val episodeIndex: Int = -1,
+    val seriesName: String? = null,
 )
 
 /** Lee un texto de un JSON ignorando null, "null" y vacíos (los paneles Xtream mezclan tipos). */

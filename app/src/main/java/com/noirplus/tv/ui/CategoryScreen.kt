@@ -43,7 +43,10 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
@@ -62,9 +65,14 @@ fun CategoryScreen(kind: Kind, cat: Category, startSearch: Boolean = false) {
     val nav = LocalNav.current
     val d = LocalDims.current
     val keyboard = LocalSoftwareKeyboardController.current
+    val isAll = cat.id == ALL_ID
+    val prefs = Repo.prefs
     val items by produceState<List<Item>?>(null, kind, cat.id) {
-        value = runCatching { src.items(kind, cat.id) }.getOrDefault(emptyList())
+        value = runCatching {
+            if (isAll) src.all(kind).filter { prefs.visible(kind, it.categoryId) } else src.items(kind, cat.id)
+        }.getOrDefault(emptyList())
     }
+    val pretty = remember(cat.name) { if (isAll) PrettyName(cat.name, null) else prettyCategory(cat.name, kind) }
     var searching by rememberSaveable { mutableStateOf(startSearch) }
     var query by rememberSaveable { mutableStateOf("") }
     var sort by rememberSaveable { mutableStateOf(SortMode.DEFAULT) }
@@ -119,13 +127,19 @@ fun CategoryScreen(kind: Kind, cat: Category, startSearch: Boolean = false) {
                 }
             } else {
                 Text(
-                    cat.name, fontFamily = InterDisplay, fontSize = 19.sp, fontWeight = FontWeight.SemiBold, color = Col.Text,
+                    buildAnnotatedString {
+                        append(pretty.main)
+                        pretty.year?.let { withStyle(SpanStyle(fontSize = 13.sp, color = Col.Sub)) { append("  ($it)") } }
+                    },
+                    fontFamily = InterDisplay, fontSize = 19.sp, fontWeight = FontWeight.SemiBold, color = Col.Text,
                     maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
                 )
-                RoundIconButton(Icons.Filled.Search, "Buscar") { searching = true }
+                if (isAll) RoundIconButton(Icons.Filled.Search, "Buscar") { searching = true }
             }
-            Spacer(Modifier.width(8.dp))
-            SortButton(sort) { sort = it }
+            if (isAll) {
+                Spacer(Modifier.width(8.dp))
+                SortButton(sort) { sort = it }
+            }
         }
         if (sort != SortMode.DEFAULT || query.isNotBlank()) {
             Text(

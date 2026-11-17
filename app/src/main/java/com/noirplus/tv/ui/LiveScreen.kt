@@ -64,7 +64,7 @@ fun LiveContent() {
     var error by remember { mutableStateOf<String?>(null) }
     val cats by produceState<List<Category>?>(null) {
         value = try {
-            src.categories(Kind.LIVE)
+            src.categories(Kind.LIVE).filter { prefs.visible(Kind.LIVE, it.id) }
         } catch (t: Throwable) {
             error = t.message
             emptyList()
@@ -145,7 +145,7 @@ fun LiveContent() {
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 itemsIndexed(allCats, key = { i, c -> "$i:${c.id}" }) { _, c ->
-                    CategoryChip(c.name, selected = c.id == selected) { selected = c.id }
+                    CategoryChip(liveLabel(c.name), selected = c.id == selected) { selected = c.id }
                 }
             }
             Text(hint, color = Col.Sub, fontSize = 12.sp, modifier = Modifier.padding(horizontal = d.edge, vertical = 10.dp))
@@ -162,7 +162,7 @@ fun LiveContent() {
         ) {
             itemsIndexed(allCats, key = { i, c -> "$i:${c.id}" }) { _, c ->
                 CategoryItem(
-                    c.name,
+                    liveLabel(c.name),
                     selected = c.id == selected,
                     memKey = "livecat/${c.id}",
                     modifier = Modifier.focusProperties {
@@ -174,7 +174,7 @@ fun LiveContent() {
         Spacer(Modifier.width(24.dp))
         Column(Modifier.weight(1f).fillMaxHeight()) {
             Text(
-                allCats.firstOrNull { it.id == selected }?.name ?: "",
+                allCats.firstOrNull { it.id == selected }?.let { liveLabel(it.name) } ?: "",
                 color = Col.Text, fontSize = 20.sp, fontWeight = FontWeight.Bold, maxLines = 1,
             )
             Text(hint, color = Col.Sub, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp, bottom = 8.dp))
@@ -277,4 +277,10 @@ private fun ChannelCard(
             modifier = Modifier.padding(top = 5.dp),
         )
     }
+}
+
+private fun liveLabel(name: String): String {
+    if (name.startsWith("★")) return name
+    val p = prettyCategory(name, Kind.LIVE)
+    return p.main + (p.year?.let { " ($it)" } ?: "")
 }

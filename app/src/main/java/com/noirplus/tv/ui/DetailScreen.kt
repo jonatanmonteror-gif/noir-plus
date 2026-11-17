@@ -362,6 +362,8 @@ private fun SeriesDetail(item: Item) {
         if (!hasFocus) runCatching { playFr.requestFocus() }
     }
 
+    val queue = remember(sd) { sd?.seasons?.values?.flatten() ?: emptyList() }
+
     fun playEpisode(ep: Episode, start: Long) {
         nav.push(
             Screen.Player(
@@ -373,6 +375,9 @@ private fun SeriesDetail(item: Item) {
                     isLive = false,
                     startMs = start,
                     parent = item.key,
+                    episodes = queue,
+                    episodeIndex = queue.indexOfFirst { it.id == ep.id },
+                    seriesName = item.name,
                 )
             )
         )
@@ -381,11 +386,15 @@ private fun SeriesDetail(item: Item) {
     fun playMain() {
         val l = last
         when {
-            l != null -> nav.push(
-                Screen.Player(
-                    PlayRequest(url = l.url, title = l.title, key = l.key, image = l.image, isLive = false, startMs = l.position, parent = item.key)
+            l != null -> {
+                val idx = queue.indexOfFirst { "EP:${it.id}" == l.key }
+                nav.push(
+                    Screen.Player(
+                        PlayRequest(url = l.url, title = l.title, key = l.key, image = l.image, isLive = false, startMs = l.position,
+                            parent = item.key, episodes = queue, episodeIndex = idx, seriesName = item.name)
+                    )
                 )
-            )
+            }
             first != null -> playEpisode(first, 0)
         }
     }
