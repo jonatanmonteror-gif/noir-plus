@@ -298,7 +298,9 @@ object Tmdb {
         }
     }
     @Volatile private var preloadStarted = false
-    private val bg = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + Dispatchers.IO)
+    // Tareas de fondo: un fallo se apunta en el registro de errores y nunca cierra la app
+    private val bg = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + Dispatchers.IO +
+        kotlinx.coroutines.CoroutineExceptionHandler { _, e -> ErrorLog.note("Tarea de fondo (TMDB)", e) })
 
     suspend fun catalog(kind: Kind, group: String, slow: Boolean = false, onProgress: (Int, Int) -> Unit = { _, _ -> }): Catalog? = coroutineScope {
         val type = if (kind == Kind.SERIES) "tv" else "movie"

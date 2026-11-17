@@ -11,6 +11,7 @@ import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -62,6 +63,7 @@ fun App() {
     val hasAccount = remember(changes) { Store.hasAccount }
     Box(Modifier.fillMaxSize().background(Col.Bg)) {
         if (!hasAccount) SetupScreen() else Shell()
+        CrashNotice()
     }
 }
 
@@ -203,4 +205,28 @@ private fun NavMini(icon: ImageVector, desc: String, onClick: () -> Unit) {
             .hoverable(src).clickable(interactionSource = src, indication = null) { onClick() }.pointerHoverIcon(PointerIcon.Hand),
         contentAlignment = Alignment.Center,
     ) { Icon(icon, desc, tint = Col.Text, modifier = Modifier.size(18.dp)) }
+}
+
+
+/** Si Noir+ se cerró la última vez, se muestra el informe para copiarlo y enviarlo. */
+@Composable
+private fun CrashNotice() {
+    val crash = remember { com.noirplus.desktop.data.ErrorLog.lastCrash(Store.lastCrashSeen) }
+    var open by remember { mutableStateOf(crash != null) }
+    if (!open || crash == null) return
+    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f)), contentAlignment = Alignment.Center) {
+        Column(Modifier.width(620.dp).clip(RoundedCornerShape(16.dp)).background(Col.Surface2).padding(22.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("Noir+ se cerró la última vez", color = Col.Text, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+            Text("Copia este informe y envíamelo para arreglarlo. No incluye tu usuario, contraseña ni servidor.", color = Col.Sub, fontSize = 13.sp)
+            Text(crash.second.take(1500), color = Col.Sub, fontSize = 11.sp, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                modifier = Modifier.heightIn(max = 260.dp).verticalScroll(androidx.compose.foundation.rememberScrollState()))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                NButton("Copiar", primary = true) {
+                    java.awt.Toolkit.getDefaultToolkit().systemClipboard.setContents(java.awt.datatransfer.StringSelection(crash.second), null)
+                }
+                NButton("Cerrar") { Store.lastCrashSeen = crash.first; open = false }
+            }
+        }
+    }
 }

@@ -152,6 +152,7 @@ fun PlayerScreen(start: PlayRequest) {
     var resumeAt by remember { mutableLongStateOf(start.startMs) }
     var pendingSubTrack by remember { mutableStateOf<Int?>(null) }
     var styleDirty by remember { mutableStateOf(false) }
+    var pendingSeek by remember { mutableLongStateOf(0L) }
     val video = remember(styleKey) { VlcVideo() }
     val scope = rememberCoroutineScope()
 
@@ -241,6 +242,7 @@ fun PlayerScreen(start: PlayRequest) {
             }
         })
         video.mp.audio().setVolume(volume)
+        if (!req.isLive && resumeAt > 5_000) pendingSeek = resumeAt
         load(req.copy(startMs = resumeAt))
         onDispose {
             Thread { video.release() }.start()
@@ -271,14 +273,25 @@ fun PlayerScreen(start: PlayRequest) {
         }
     }
 
-    // Reloj del reproductor
-    LaunchedEffect(Unit) {
+    // Reloj del reproductor. Va ligado al reproductor actual: si se reprepara (estilo de subtítulos),
+    // no sigue leyendo del anterior ya cerrado (eso podía cerrar la app).
+    LaunchedEffect(video) {
         var n = 0
+        var tries = 0
         while (true) {
             delay(250)
             runCatching {
                 time = video.mp.status().time()
-                length = video.mp.status().length()
+                length = video.mp.status().length().takeIf { it > 0 } ?: (video.mp.media().info()?.duration() ?: 0L)
+            }
+            // Volver al punto donde estaba tras preparar de nuevo el reproductor (reintenta hasta que el vídeo lo permite)
+            val target = pendingSeek
+            if (target > 0) {
+                if (time >= target - 3_000) pendingSeek = 0
+                else if (length > 0 && n % 4 == 0 && tries < 20) {
+                    tries++
+                    runCatching { video.mp.controls().setTime(target) }
+                } else if (tries >= 20) pendingSeek = 0
             }
             if (++n % 20 == 0) saveProgress()
         }
@@ -445,6 +458,17 @@ fun PlayerScreen(start: PlayRequest) {
             }
         }
 
+        // Línea de tiempo siempre visible (fina) cuando los controles están ocultos
+        if (!showControls && !req.isLive && length > 0) {
+            Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(3.dp).background(Color.White.copy(alpha = 0.18f))) {
+                Box(Modifier.fillMaxWidth((time.toFloat() / length).coerceIn(0f, 1f)).fillMaxHeight().background(Color.White.copy(alpha = 0.85f)))
+            }
+        }
+        if (pendingSeek > 0) {
+            Text("Volviendo a ${fmtTime(pendingSeek)}…", color = Color.White, fontSize = 14.sp,
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = 90.dp).clip(RoundedCornerShape(50))
+                    .background(Color.Black.copy(alpha = 0.6f)).padding(horizontal = 16.dp, vertical = 7.dp))
+        }
         toast?.let {
             Text(it, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.align(Alignment.TopCenter).padding(top = 90.dp).clip(RoundedCornerShape(50))

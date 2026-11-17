@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
+
 package com.noirplus.desktop
 
 import androidx.compose.runtime.*
@@ -25,6 +27,7 @@ val LocalWindowState = staticCompositionLocalOf<WindowState> { error("sin ventan
 
 fun main() {
     com.noirplus.desktop.data.Startup.mainAt = System.currentTimeMillis()
+    com.noirplus.desktop.data.ErrorLog.install()
     System.setProperty("skiko.renderApi", System.getProperty("skiko.renderApi") ?: "DIRECT3D")
     Repo.rebuild()
     application {
@@ -62,7 +65,18 @@ fun main() {
                         .crossfade(true)
                         .build()
                 }
-                CompositionLocalProvider(LocalWindowState provides state, LocalWindowMode provides mode) {
+                // Si algo falla dentro de la ventana: se guarda el informe y se avisa en lugar de cerrarse sin más
+                val handler = androidx.compose.ui.window.WindowExceptionHandlerFactory { w ->
+                    androidx.compose.ui.window.WindowExceptionHandler { e ->
+                        com.noirplus.desktop.data.ErrorLog.note("Error en pantalla", e)
+                        javax.swing.JOptionPane.showMessageDialog(w,
+                            "Noir+ ha tenido un problema y se va a cerrar.\nAl volver a abrirlo podrás copiar el informe para enviarlo.",
+                            "Noir+", javax.swing.JOptionPane.WARNING_MESSAGE)
+                        kotlin.system.exitProcess(1)
+                    }
+                }
+                CompositionLocalProvider(LocalWindowState provides state, LocalWindowMode provides mode,
+                    androidx.compose.ui.window.LocalWindowExceptionHandlerFactory provides handler) {
                     NoirTheme { App() }
                 }
             }

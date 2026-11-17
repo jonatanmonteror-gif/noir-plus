@@ -137,6 +137,10 @@ object Store {
     fun browseMode(kind: Kind): String = s("browse_${kind.name}").takeIf { it == "genre" || it == "new" } ?: "plat"
     fun setBrowseMode(kind: Kind, v: String) { o.put("browse_${kind.name}", v); save() }
 
+    var lastCrashSeen: Long
+        get() = o.optLong("lastCrashSeen", 0L)
+        set(v) { o.put("lastCrashSeen", v); save() }
+
     var volume: Int
         get() = o.optInt("volume", 100)
         set(v) { o.put("volume", v.coerceIn(0, 150)); o.toString().let { runCatching { file.writeText(it) } } }
