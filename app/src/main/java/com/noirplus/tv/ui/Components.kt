@@ -42,6 +42,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -254,7 +255,7 @@ fun SectionTitle(text: String, onSeeAll: (() -> Unit)? = null) {
         Text(
             text,
             color = Col.Text,
-            fontSize = if (LocalDims.current.compact) 17.sp else 19.sp,
+            fontSize = if (LocalDims.current.compact) 15.sp else 17.sp,
             fontWeight = FontWeight.SemiBold,
             letterSpacing = (-0.2).sp,
             maxLines = 1,
@@ -465,20 +466,39 @@ fun CategoryRow(
 ) {
     val src = Repo.source ?: return
     val nav = LocalNav.current
+    val d = LocalDims.current
     val items by produceState<List<Item>?>(null, kind, cat.id) {
         value = runCatching { src.items(kind, cat.id) }.getOrDefault(emptyList())
     }
+    var sort by remember(cat.id) { mutableStateOf(SortMode.DEFAULT) }
     val list = items
+    val shown = remember(list, sort) { list?.sortedFor(sort) }
     LaunchedEffect(list) {
         val first = list?.firstOrNull()
         if (first != null) onLoaded?.invoke(first)
     }
     if (list != null && list.isEmpty()) return
     Column {
-        val tv = LocalDims.current.tv
-        SectionTitle(titlePrefix + cat.name, onSeeAll = if (!tv && !list.isNullOrEmpty()) ({ nav.push(Screen.Category(kind, cat)) }) else null)
-        if (list == null) RowPlaceholder()
-        else PosterRow("${kind.name}-${cat.id}", list, onFocus) { nav.push(Screen.Detail(it)) }
+        if (d.tv) {
+            SectionTitle(titlePrefix + cat.name)
+        } else {
+            // Táctil: título (abre la carpeta) + buscar dentro + ordenar
+            Row(Modifier.fillMaxWidth().padding(start = d.edge, end = d.edge - 4.dp, top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    titlePrefix + cat.name,
+                    color = Col.Text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.1).sp,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f).clickable { nav.push(Screen.Category(kind, cat)) },
+                )
+                if (!list.isNullOrEmpty()) {
+                    RoundIconButton(Icons.Filled.Search, "Buscar en ${cat.name}") { nav.push(Screen.Category(kind, cat, search = true)) }
+                    Spacer(Modifier.width(8.dp))
+                    SortButton(sort) { sort = it }
+                }
+            }
+        }
+        if (shown == null) RowPlaceholder()
+        else PosterRow("${kind.name}-${cat.id}", shown, onFocus) { nav.push(Screen.Detail(it)) }
     }
 }
 

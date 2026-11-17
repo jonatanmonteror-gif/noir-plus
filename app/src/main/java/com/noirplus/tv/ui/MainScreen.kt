@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -233,9 +234,9 @@ private fun FilterTab(label: String, selected: Boolean, onClick: () -> Unit) {
 private fun BottomBar(current: Section, modifier: Modifier, onSelect: (Section) -> Unit) {
     Row(
         modifier
-            .padding(horizontal = 22.dp, vertical = 14.dp)
+            .padding(horizontal = 48.dp, vertical = 16.dp)
             .fillMaxWidth()
-            .height(62.dp)
+            .height(56.dp)
             .clip(RoundedCornerShape(50))
             .background(Col.Surface.copy(alpha = 0.94f))
             .border(0.5.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(50)),
@@ -244,13 +245,15 @@ private fun BottomBar(current: Section, modifier: Modifier, onSelect: (Section) 
     ) {
         Section.entries.forEach { s ->
             val sel = s == current
+            val dot by animateDpAsState(if (sel) 4.dp else 0.dp, tween(200), label = "dot")
             Column(
-                Modifier.weight(1f).clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onSelect(s) },
+                Modifier.weight(1f).fillMaxHeight()
+                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onSelect(s) },
                 horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
             ) {
-                Icon(s.icon, s.label, tint = if (sel) Color.White else Col.Sub, modifier = Modifier.size(24.dp))
-                Text(s.label, color = if (sel) Color.White else Col.Sub, fontSize = 10.sp, fontWeight = FontWeight.Medium,
-                    modifier = Modifier.padding(top = 2.dp))
+                Icon(s.icon, s.label, tint = if (sel) Color.White else Col.Sub, modifier = Modifier.size(25.dp))
+                Box(Modifier.padding(top = 4.dp).size(dot).clip(RoundedCornerShape(50)).background(Color.White))
             }
         }
     }

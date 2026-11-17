@@ -34,7 +34,7 @@ sealed interface Screen {
     data object Main : Screen
     data class Detail(val item: Item) : Screen
     data class Player(val req: PlayRequest) : Screen
-    data class Category(val kind: Kind, val cat: com.noirplus.tv.data.Category) : Screen
+    data class Category(val kind: Kind, val cat: com.noirplus.tv.data.Category, val search: Boolean = false) : Screen
 }
 
 class Nav(initial: Screen) {
@@ -118,7 +118,7 @@ fun App() {
                             Screen.Main -> MainScreen()
                             is Screen.Detail -> DetailScreen(screen.item)
                             is Screen.Player -> PlayerScreen(screen.req)
-                            is Screen.Category -> CategoryScreen(screen.kind, screen.cat)
+                            is Screen.Category -> CategoryScreen(screen.kind, screen.cat, screen.search)
                         }
                     }
                 }
