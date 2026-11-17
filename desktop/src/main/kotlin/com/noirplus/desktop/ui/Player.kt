@@ -7,6 +7,11 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.ui.graphics.graphicsLayer
+import kotlin.math.roundToInt
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -119,7 +124,9 @@ fun PlayerScreen(start: PlayRequest) {
     var ended by remember { mutableStateOf(false) }
     var volume by remember { mutableIntStateOf(Store.volume) }
     var lastMove by remember { mutableLongStateOf(System.currentTimeMillis()) }
-    var menu by remember { mutableStateOf<String?>(null) } // "audio" | "subs"
+    var menu by remember { mutableStateOf<String?>(null) } // "all" (ruedita) o una opción concreta
+    var speed by remember { mutableFloatStateOf(1f) }
+    var format by remember { mutableIntStateOf(0) } // 0 ajustar, 1 rellenar, 2 estirar
     var toast by remember { mutableStateOf<String?>(null) }
     var countdown by remember { mutableStateOf<Int?>(null) }
 
@@ -230,8 +237,9 @@ fun PlayerScreen(start: PlayRequest) {
             Key.DirectionDown -> { setVol(volume - 5); true }
             Key.F -> { toggleFull(); true }
             Key.M -> { video.mp.audio().setMute(!video.mp.audio().isMute); toast = if (video.mp.audio().isMute) "Silencio" else "Sonido"; true }
-            Key.S -> { menu = if (menu == "subs") null else "subs"; true }
+            Key.S -> { menu = if (menu == "cc") null else "cc"; true }
             Key.A -> { menu = if (menu == "audio") null else "audio"; true }
+            Key.O -> { menu = if (menu == "all") null else "all"; true }
             Key.N -> { if (hasNext()) playNext(); true }
             Key.Escape, Key.Backspace -> {
                 when {
@@ -255,7 +263,7 @@ fun PlayerScreen(start: PlayRequest) {
                 .createCustomCursor(java.awt.image.BufferedImage(1, 1, java.awt.image.BufferedImage.TYPE_INT_ARGB), java.awt.Point(0, 0), "none"))),
     ) {
         video.frame.value?.let { img ->
-            Image(img, null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize()
+            Image(img, null, contentScale = when (format) { 1 -> ContentScale.Crop; 2 -> ContentScale.FillBounds; else -> ContentScale.Fit }, modifier = Modifier.fillMaxSize()
                 .clickable(indication = null, interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }) {
                     if (menu != null) menu = null else togglePause()
                 })
@@ -324,15 +332,34 @@ fun PlayerScreen(start: PlayRequest) {
                         Icon(Icons.AutoMirrored.Filled.VolumeUp, null, tint = Col.Sub, modifier = Modifier.size(20.dp))
                         Slider(volume.toFloat(), { setVol(it.toInt()) }, valueRange = 0f..150f, modifier = Modifier.width(140.dp).padding(horizontal = 8.dp),
                             colors = SliderDefaults.colors(thumbColor = Color.White, activeTrackColor = Color.White, inactiveTrackColor = Color.White.copy(alpha = 0.25f)))
-                        RoundIcon(Icons.Filled.Audiotrack, "Audio (A)") { menu = if (menu == "audio") null else "audio" }
-                        Spacer(Modifier.width(8.dp))
-                        RoundIcon(Icons.Filled.ClosedCaption, "Subtítulos (S)") { menu = if (menu == "subs") null else "subs" }
-                        Spacer(Modifier.width(8.dp))
+                        // Botones elegidos en Ajustes; lo demás va dentro de la ruedita (nunca en los dos sitios)
+                        val changes = Store.changes.intValue
+                        val quick = remember(changes) { QuickOptions.map { it.first }.filter { Store.quick(it) } }
+                        quick.forEach { k ->
+                            when (k) {
+                                "audio" -> RoundIcon(Icons.Filled.Audiotrack, "Audio (A)") { menu = if (menu == "audio") null else "audio" }
+                                "cc" -> RoundIcon(Icons.Filled.ClosedCaption, "Subtítulos (S)") { menu = if (menu == "cc") null else "cc" }
+                                "subopts" -> RoundIcon(Icons.Filled.Subtitles, "Opciones de subtítulos") { menu = if (menu == "subopts") null else "subopts" }
+                                "speed" -> RoundIcon(Icons.Filled.Speed, "Velocidad") { menu = if (menu == "speed") null else "speed" }
+                                "format" -> RoundIcon(Icons.Filled.AspectRatio, "Formato de imagen") {
+                                    format = (format + 1) % 3
+                                    toast = FormatNames[format]
+                                }
+                            }
+                            Spacer(Modifier.width(8.dp))
+                        }
+                        if (quick.size < QuickOptions.size) {
+                            RoundIcon(Icons.Filled.Settings, "Opciones (O)") { menu = if (menu == "all") null else "all" }
+                            Spacer(Modifier.width(8.dp))
+                        }
                         RoundIcon(if (window.placement == WindowPlacement.Fullscreen) Icons.Filled.FullscreenExit else Icons.Filled.Fullscreen,
                             "Pantalla completa (F)") { toggleFull() }
                     }
                 }
-                menu?.let { m -> TrackPanel(m, video, Modifier.align(Alignment.BottomEnd).padding(end = 28.dp, bottom = 110.dp)) { menu = null } }
+                menu?.let { m ->
+                    OptionsPanel(m, video, speed, { speed = it; video.mp.controls().setRate(it) }, format, { format = it },
+                        Modifier.align(Alignment.BottomEnd).padding(end = 28.dp, bottom = 110.dp))
+                }
             }
         }
 
@@ -376,44 +403,118 @@ private fun TooltipArea(text: String, content: @Composable () -> Unit) {
     )
 }
 
-/** Panel para elegir pista de audio o de subtítulos (y el retardo de los subtítulos). */
+/** Opciones que pueden ir como botón en pantalla o dentro de la ruedita. */
+val QuickOptions = listOf(
+    "audio" to "Audio (idioma)",
+    "cc" to "Subtítulos (elegir pista)",
+    "subopts" to "Opciones de subtítulos",
+    "speed" to "Velocidad",
+    "format" to "Formato de imagen",
+)
+
+val FormatNames = listOf("Ajustar", "Rellenar", "Estirar")
+
+/**
+ * Panel de opciones. Desde la ruedita ("all"): solo lo que no es botón, en secciones que se despliegan.
+ * Desde un botón: directamente esa opción.
+ */
 @Composable
-private fun TrackPanel(kind: String, video: VlcVideo, modifier: Modifier, onClose: () -> Unit) {
-    var refresh by remember { mutableIntStateOf(0) }
-    val tracks: List<TrackDescription> = remember(kind, refresh) {
-        runCatching { if (kind == "audio") video.mp.audio().trackDescriptions() else video.mp.subpictures().trackDescriptions() }.getOrDefault(emptyList())
-    }
-    val current = remember(kind, refresh) { runCatching { if (kind == "audio") video.mp.audio().track() else video.mp.subpictures().track() }.getOrDefault(-1) }
-    var delayMs by remember { mutableLongStateOf(runCatching { video.mp.subpictures().delay() / 1000 }.getOrDefault(0L)) }
-    Column(modifier.width(320.dp).clip(RoundedCornerShape(14.dp)).background(Color(0xF0161618)).padding(12.dp)) {
-        Text(if (kind == "audio") "Audio" else "Subtítulos", color = Col.Sub, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(start = 8.dp, bottom = 6.dp))
-        if (tracks.isEmpty()) Text("No hay pistas disponibles", color = Col.Sub, fontSize = 14.sp, modifier = Modifier.padding(8.dp))
-        tracks.forEach { t ->
-            val sel = t.id() == current
-            val label = if (t.id() < 0) "Desactivados" else t.description().ifBlank { "Pista ${t.id()}" }
-            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(if (sel) Color.White else Color.Transparent)
-                .clickable {
-                    if (kind == "audio") video.mp.audio().setTrack(t.id()) else video.mp.subpictures().setTrack(t.id())
-                    refresh++
-                }.pointerHoverIcon(PointerIcon.Hand).padding(horizontal = 10.dp, vertical = 9.dp)) {
-                Text(label, color = if (sel) Color.Black else Col.Text, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-        }
-        if (kind == "subs") {
-            Row(Modifier.fillMaxWidth().padding(top = 10.dp, start = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("Retardo", color = Col.Text, fontSize = 14.sp, modifier = Modifier.weight(1f))
-                listOf(-100L to "−0,1", 100L to "+0,1").forEach { (d, l) ->
-                    Text(l, color = Col.Text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 6.dp)
-                        .clip(RoundedCornerShape(50)).background(Color.White.copy(alpha = 0.12f)).clickable {
-                            delayMs = (delayMs + d).coerceIn(-5000, 5000)
-                            video.mp.subpictures().setDelay(delayMs * 1000)
-                        }.pointerHoverIcon(PointerIcon.Hand).padding(horizontal = 10.dp, vertical = 5.dp))
+private fun OptionsPanel(
+    sec: String, video: VlcVideo, speed: Float, onSpeed: (Float) -> Unit, format: Int, onFormat: (Int) -> Unit, modifier: Modifier,
+) {
+    val all = sec == "all"
+    val changes = Store.changes.intValue
+    val expanded = remember(sec) { mutableStateMapOf<String, Boolean>() }
+    val keys = remember(sec, changes) { if (all) QuickOptions.filter { !Store.quick(it.first) } else QuickOptions.filter { it.first == sec } }
+    Column(
+        modifier.width(340.dp).heightIn(max = 560.dp).clip(RoundedCornerShape(14.dp)).background(Color(0xF0161618))
+            .verticalScroll(rememberScrollState()).padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text(if (all) "Opciones" else keys.firstOrNull()?.second ?: "", color = Col.Text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(start = 8.dp, bottom = 4.dp))
+        if (keys.isEmpty()) Text("Todo está como botón en pantalla. Puedes cambiarlo en Ajustes.", color = Col.Sub, fontSize = 13.sp,
+            modifier = Modifier.padding(8.dp))
+        keys.forEach { (k, label) ->
+            val open = !all || expanded[k] == true
+            if (all) SectionHeader(label, open) { expanded[k] = !open }
+            if (open) Column(Modifier.padding(start = if (all) 6.dp else 0.dp, bottom = 4.dp)) {
+                when (k) {
+                    "audio" -> Tracks(video, audio = true)
+                    "cc" -> Tracks(video, audio = false)
+                    "subopts" -> SubOptions(video)
+                    "speed" -> Stepper(String.format(java.util.Locale("es", "ES"), "%.1f×", speed),
+                        { onSpeed(((speed * 10).roundToInt() - 1).coerceAtLeast(5) / 10f) },
+                        { onSpeed(((speed * 10).roundToInt() + 1).coerceAtMost(20) / 10f) })
+                    "format" -> Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(4.dp)) {
+                        FormatNames.forEachIndexed { i, n -> Chip(n, i == format) { onFormat(i) } }
+                    }
                 }
-                Text("  " + String.format("%+.1f s", delayMs / 1000f), color = Col.Sub, fontSize = 13.sp)
             }
         }
     }
+}
+
+@Composable
+private fun SectionHeader(label: String, open: Boolean, onClick: () -> Unit) {
+    val rot by animateFloatAsState(if (open) 90f else 0f, label = "chev")
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Color.White.copy(alpha = 0.06f))
+            .clickable { onClick() }.pointerHoverIcon(PointerIcon.Hand).padding(horizontal = 12.dp, vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, color = Col.Text, fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+        Text("›", color = Col.Sub, fontSize = 18.sp, modifier = Modifier.graphicsLayer { rotationZ = rot })
+    }
+}
+
+@Composable
+private fun Tracks(video: VlcVideo, audio: Boolean) {
+    var refresh by remember { mutableIntStateOf(0) }
+    val tracks: List<TrackDescription> = remember(refresh) {
+        runCatching { if (audio) video.mp.audio().trackDescriptions() else video.mp.subpictures().trackDescriptions() }.getOrDefault(emptyList())
+    }
+    val current = remember(refresh) { runCatching { if (audio) video.mp.audio().track() else video.mp.subpictures().track() }.getOrDefault(-1) }
+    if (tracks.isEmpty()) Text("No hay pistas disponibles", color = Col.Sub, fontSize = 13.sp, modifier = Modifier.padding(8.dp))
+    tracks.forEach { t ->
+        val sel = t.id() == current
+        val label = if (t.id() < 0) "Desactivados" else t.description().ifBlank { "Pista ${t.id()}" }
+        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(if (sel) Color.White else Color.Transparent)
+            .clickable {
+                if (audio) video.mp.audio().setTrack(t.id()) else video.mp.subpictures().setTrack(t.id())
+                refresh++
+            }.pointerHoverIcon(PointerIcon.Hand).padding(horizontal = 10.dp, vertical = 9.dp)) {
+            Text(label, color = if (sel) Color.Black else Col.Text, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+@Composable
+private fun SubOptions(video: VlcVideo) {
+    var delayMs by remember { mutableLongStateOf(runCatching { video.mp.subpictures().delay() / 1000 }.getOrDefault(0L)) }
+    Row(Modifier.fillMaxWidth().padding(start = 4.dp, top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text("Retardo", color = Col.Text, fontSize = 14.sp, modifier = Modifier.weight(1f))
+        Stepper(String.format("%+.1f s", delayMs / 1000f),
+            { delayMs = (delayMs - 100).coerceIn(-5000, 5000); video.mp.subpictures().setDelay(delayMs * 1000) },
+            { delayMs = (delayMs + 100).coerceIn(-5000, 5000); video.mp.subpictures().setDelay(delayMs * 1000) })
+    }
+    Text("El tamaño de los subtítulos se cambia en Ajustes.", color = Col.Sub, fontSize = 12.sp, modifier = Modifier.padding(start = 4.dp, top = 6.dp))
+}
+
+@Composable
+private fun Stepper(value: String, onMinus: () -> Unit, onPlus: () -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(4.dp)) {
+        Chip("−", false, onMinus)
+        Text(value, color = Col.Text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 12.dp))
+        Chip("+", false, onPlus)
+    }
+}
+
+@Composable
+private fun Chip(text: String, selected: Boolean, onClick: () -> Unit) {
+    Text(text, color = if (selected) Color.Black else Col.Text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+        modifier = Modifier.clip(RoundedCornerShape(50)).background(if (selected) Color.White else Color.White.copy(alpha = 0.12f))
+            .clickable { onClick() }.pointerHoverIcon(PointerIcon.Hand).padding(horizontal = 12.dp, vertical = 6.dp))
 }
 
 @Composable

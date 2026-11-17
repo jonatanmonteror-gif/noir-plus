@@ -57,6 +57,16 @@ fun SettingsScreen() {
             Seg(listOf("Pequeño" to "70", "Normal" to "100", "Grande" to "130", "Muy grande" to "160"), Store.subScale.toString()) {
                 Store.subScale = it.toInt()
             }
+            Spacer(Modifier.height(6.dp))
+            Text("Botones del reproductor", color = Col.Text, fontSize = 14.sp)
+            Text("Cada opción va en un sitio: como botón en pantalla o dentro de la ruedita, nunca en los dos.", color = Col.Sub, fontSize = 12.sp)
+            QuickOptions.forEach { (k, label) ->
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(label, color = Col.Text, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                    Seg(listOf("Botón" to "1", "En la ruedita" to "0"), if (Store.quick(k)) "1" else "0") { Store.setQuick(k, it == "1") }
+                }
+            }
+            Spacer(Modifier.height(6.dp))
             Text("Atajos en el reproductor: Espacio pausa · ←/→ 10 s · ↑/↓ volumen · F pantalla completa · S subtítulos · A audio · Esc salir.",
                 color = Col.Sub, fontSize = 12.sp, lineHeight = 17.sp)
         }

@@ -40,6 +40,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -48,6 +49,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -111,9 +113,12 @@ fun PlayerScreen(req: PlayRequest) {
     var controlsVisible by remember { mutableStateOf(false) }
     var panelOpen by remember { mutableStateOf(false) }
     var panelSection by remember { mutableStateOf("all") }
+    // Secciones desplegadas dentro de la ruedita (todas recogidas al abrir)
+    val expanded = remember { mutableStateMapOf<String, Boolean>() }
     var speed by remember { mutableFloatStateOf(1f) }
     var tracksTick by remember { mutableIntStateOf(0) }
     fun openPanel(sec: String) {
+        if (sec == "all") expanded.clear()
         panelSection = sec
         panelOpen = true
     }
@@ -432,7 +437,8 @@ fun PlayerScreen(req: PlayRequest) {
                             resize = (resize + 1) % ResizeModes.size
                             formatToast++
                         }
-                        add(com.noirplus.tv.R.drawable.ic_gear, "Opciones") { openPanel("all") }
+                        // La ruedita solo aparece si queda algo dentro (lo que es botón no se repite en ella)
+                        if (QuickKeys.any { !prefs.quick(it) }) add(com.noirplus.tv.R.drawable.ic_gear, "Opciones") { openPanel("all") }
                     }
                     setControllerVisibilityListener(
                         PlayerView.ControllerVisibilityListener { v -> controlsVisible = v == View.VISIBLE }
@@ -648,16 +654,26 @@ fun PlayerScreen(req: PlayRequest) {
                 )
                 var first = true
                 fun fr(): FocusRequester? = if (first) { first = false; panelFr } else null
-                if (all || sec == "audio") {
-                    if (all) PanelLabel("Audio")
+                // En la ruedita: solo lo que NO es botón, cada cosa en una sección que se despliega.
+                // Desde un botón: directamente esa sección abierta.
+                @Composable
+                fun section(key: String, label: String): Boolean {
+                    if (!all) return sec == key
+                    if (prefs.quick(key)) return false
+                    val open = expanded[key] == true
+                    PanelHeader(label, open, fr()) { expanded[key] = !open }
+                    return open
+                }
+                if (all && QuickKeys.all { prefs.quick(it) }) {
+                    Text("Todo está como botón en pantalla. Puedes cambiarlo en Ajustes → Reproductor.", color = Col.Sub, fontSize = 12.sp)
+                }
+                if (section("audio", "Audio")) {
                     TrackChoices(exo, MC.TRACK_TYPE_AUDIO, tracksTick, allowOff = false, focus = fr())
                 }
-                if (all || sec == "cc") {
-                    if (all) PanelLabel("Subtítulos")
+                if (section("cc", "Subtítulos")) {
                     TrackChoices(exo, MC.TRACK_TYPE_TEXT, tracksTick, allowOff = true, focus = fr())
                 }
-                if (all || sec == "subopts") {
-                    if (all) PanelLabel("Opciones de subtítulos")
+                if (section("subopts", "Opciones de subtítulos")) {
                     Text("Retardo", color = Col.Sub, fontSize = 12.sp)
                     MiniStepper(fmtDelay(sessionDelay), "pd", { sessionDelay = (sessionDelay - 100).coerceAtLeast(-2000) },
                         { sessionDelay = (sessionDelay + 100).coerceAtMost(2000) }, focus = fr())
@@ -672,14 +688,12 @@ fun PlayerScreen(req: PlayRequest) {
                     Text("Fondo", color = Col.Sub, fontSize = 12.sp)
                     Segmented(listOf("Sombra", "Caja"), prefs.subBg, "pb") { prefs.subBg = it }
                 }
-                if (all || sec == "speed") {
-                    if (all) PanelLabel("Velocidad")
+                if (section("speed", "Velocidad")) {
                     MiniStepper(String.format(java.util.Locale("es", "ES"), "%.1f×", speed), "sp",
                         { speed = ((speed * 10f).roundToInt() - 1).coerceAtLeast(5) / 10f },
                         { speed = ((speed * 10f).roundToInt() + 1).coerceAtMost(20) / 10f }, focus = fr())
                 }
-                if (all || sec == "format") {
-                    if (all) PanelLabel("Formato de imagen")
+                if (section("format", "Formato de imagen")) {
                     Segmented(ResizeModes.map { it.second }, resize, "pr") { resize = it }
                 }
             }
@@ -747,6 +761,24 @@ private fun buildPlayer(ctx: Context, live: Boolean): ExoPlayer {
         .build()
     player.videoScalingMode = MC.VIDEO_SCALING_MODE_SCALE_TO_FIT
     return player
+}
+
+/** Opciones que pueden ir como botón en pantalla o dentro de la ruedita. */
+val QuickKeys = listOf("audio", "cc", "subopts", "speed", "format")
+
+/** Cabecera de sección de la ruedita: se pulsa para desplegar o recoger. */
+@Composable
+private fun PanelHeader(label: String, open: Boolean, focus: FocusRequester?, onClick: () -> Unit) {
+    val rot by androidx.compose.animation.core.animateFloatAsState(if (open) 90f else 0f, label = "chev")
+    Focusable(Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp), focusScale = 1f, focusRequester = focus, onClick = onClick) { f ->
+        Row(
+            Modifier.fillMaxWidth().background(if (f) Color.White else Color.White.copy(alpha = 0.06f)).padding(horizontal = 12.dp, vertical = 11.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(label, color = if (f) Color.Black else Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+            Text("›", color = if (f) Color.Black else Col.Sub, fontSize = 18.sp, modifier = Modifier.graphicsLayer { rotationZ = rot })
+        }
+    }
 }
 
 @Composable

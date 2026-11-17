@@ -90,6 +90,13 @@ object Store {
         get() = o.optInt("subScale", 100)
         set(v) { o.put("subScale", v.coerceIn(50, 200)); save() }
 
+    /** ¿Esta opción del reproductor va como botón en pantalla? (si no, va dentro de la ruedita). Por defecto, todo en la ruedita. */
+    fun quick(k: String): Boolean = o.optJSONObject("quick")?.optBoolean(k, false) ?: false
+    fun setQuick(k: String, v: Boolean) {
+        val q = o.optJSONObject("quick") ?: JSONObject().also { o.put("quick", it) }
+        q.put(k, v); save()
+    }
+
     var volume: Int
         get() = o.optInt("volume", 100)
         set(v) { o.put("volume", v.coerceIn(0, 150)); o.toString().let { runCatching { file.writeText(it) } } }
