@@ -78,7 +78,7 @@ fun CategoryScreen(kind: Kind, cat: Category, startSearch: Boolean = false) {
     val pretty = remember(cat.name) { if (virtual) PrettyName(cat.name, null) else prettyCategory(cat.name, kind) }
     var searching by rememberSaveable { mutableStateOf(startSearch) }
     var query by rememberSaveable { mutableStateOf("") }
-    var sort by rememberSaveable { mutableStateOf(prefs.defaultSort) }
+    val sort = prefs.defaultSort // el orden se elige en Ajustes
     // Filtro por plataforma (TMDB): se descarga el catálogo de la plataforma una vez y se cruza con la lista.
     // No aparece dentro de carpetas que ya son de una plataforma ("Series Netflix", "HBO"…).
     val canFilter = kind != Kind.LIVE && Tmdb.configured() &&
@@ -185,14 +185,12 @@ fun CategoryScreen(kind: Kind, cat: Category, startSearch: Boolean = false) {
                 Spacer(Modifier.width(8.dp))
                 PlatformButton(platform, Platforms.main) { platform = it }
             }
-            Spacer(Modifier.width(8.dp))
-            SortButton(sort, prefs.defaultSort) { sort = it }
             if (d.compact) {
                 Spacer(Modifier.width(8.dp))
                 ColumnsButton(cols) { cols = it; prefs.gridCols = it }
             }
         }
-        if (sort != prefs.defaultSort || query.isNotBlank() || platform != null || genre != null) {
+        if (query.isNotBlank() || platform != null || genre != null) {
             Text(
                 listOfNotNull(
                     shown?.let { "${it.size} resultados" },
@@ -200,7 +198,6 @@ fun CategoryScreen(kind: Kind, cat: Category, startSearch: Boolean = false) {
                     genre?.let { Tmdb.genreNames(kind)[it] },
                     progress,
                     if (genre != null) Tmdb.genreProgress.value?.let { "clasificando ${it.first}/${it.second}" } else null,
-                    sort.takeIf { it != prefs.defaultSort }?.label,
                 ).joinToString("  ·  "),
                 color = Col.Sub, fontSize = 12.sp, modifier = Modifier.padding(start = d.edge, bottom = 6.dp),
             )

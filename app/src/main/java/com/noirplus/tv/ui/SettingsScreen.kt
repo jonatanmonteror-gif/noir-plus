@@ -23,6 +23,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -48,13 +49,31 @@ import kotlinx.coroutines.launch
 
 @Composable
 private fun Section(title: String, content: @Composable () -> Unit) {
-    Column(Modifier.fillMaxWidth()) {
-        Text(title.uppercase(), color = Col.Sub, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.2.sp,
-            modifier = Modifier.padding(start = 4.dp, bottom = 8.dp))
-        Column(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Col.Surface).padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) { content() }
+    // Recogida por defecto: se despliega al pulsar el título.
+    var open by androidx.compose.runtime.saveable.rememberSaveable(title) { mutableStateOf(false) }
+    val rot by androidx.compose.animation.core.animateFloatAsState(if (open) 90f else 0f, label = "chev")
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Col.Surface)) {
+        Focusable(Modifier.fillMaxWidth(), key = "sec-$title", shape = RoundedCornerShape(14.dp), focusScale = 1f, onClick = { open = !open }) { focused ->
+            Row(
+                Modifier.fillMaxWidth().background(if (focused) Color.White else Color.Transparent).padding(horizontal = 16.dp, vertical = 15.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(title, color = if (focused) Color.Black else Col.Text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f))
+                Text("›", color = if (focused) Color.Black else Col.Sub, fontSize = 20.sp,
+                    modifier = Modifier.graphicsLayer { rotationZ = rot })
+            }
+        }
+        androidx.compose.animation.AnimatedVisibility(
+            visible = open,
+            enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
+            exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut(),
+        ) {
+            Column(
+                Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 2.dp, bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) { content() }
+        }
     }
 }
 
@@ -162,7 +181,7 @@ fun SettingsContent() {
             Modifier.fillMaxSize().verticalScroll(rememberScrollState())
                 .padding(start = d.edge, end = d.edge, top = 12.dp, bottom = d.bottomPad)
                 .then(if (d.compact) Modifier else Modifier.widthIn(max = 860.dp)),
-            verticalArrangement = Arrangement.spacedBy(22.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             if (changes < 0) Spacer(Modifier)
 
@@ -224,13 +243,8 @@ fun SettingsContent() {
                 val sortOpts = listOf(SortMode.RECENT, SortMode.RATING, SortMode.AZ, SortMode.DEFAULT)
                 ChoiceRow("Orden de las carpetas", listOf("Recientes", "Valoradas", "A–Z", "Original"),
                     sortOpts.indexOf(prefs.defaultSort).coerceAtLeast(0), "ds",
-                    note = "Cómo se ordena al abrir «Ver todo» o «Todas». Siempre puedes cambiarlo dentro con el botón de ordenar.") {
+                    note = "Cómo se ordenan «Ver todo» y «Todas».") {
                     prefs.defaultSort = sortOpts[it]
-                }
-                val limits = listOf(25, 50, 75, 100)
-                ChoiceRow("Títulos por fila", limits.map { it.toString() }, limits.indexOf(prefs.rowLimit).coerceAtLeast(1), "rl",
-                    note = "Cuántos se muestran en cada fila. El resto, en «Ver todo». Menos = más fluido en la tele.") {
-                    prefs.rowLimit = limits[it]
                 }
                 ChoiceRow("Columnas en las carpetas", listOf("2", "3", "4"), prefs.gridCols - 2, "gc",
                     note = "En el móvil, al abrir «Ver todo» o «Todas». También se cambia dentro de la propia lista.") { prefs.gridCols = it + 2 }
