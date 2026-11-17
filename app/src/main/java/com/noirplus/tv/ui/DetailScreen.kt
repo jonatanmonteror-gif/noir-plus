@@ -108,6 +108,7 @@ private fun TvInfo(item: Item, details: Details?) {
         modifier = Modifier.padding(top = 10.dp),
     )
     GenreChips(details?.genre, Modifier.padding(top = 10.dp))
+    PlatformBadge(item, Modifier.padding(top = 10.dp))
     val plot = details?.plot ?: item.plot
     if (plot != null) {
         Text(plot, color = Col.Text.copy(alpha = 0.88f), fontSize = 14.sp, lineHeight = 20.sp, maxLines = 4,
@@ -180,6 +181,7 @@ private fun PhoneHeader(item: Item, details: Details?, extra: String? = null) {
         }
         StarRow(details?.rating ?: item.rating, size = 20.dp, modifier = Modifier.padding(top = 12.dp))
         GenreChips(details?.genre, Modifier.padding(top = 12.dp), max = 3)
+        PlatformBadge(item, Modifier.padding(top = 10.dp))
     }
 }
 

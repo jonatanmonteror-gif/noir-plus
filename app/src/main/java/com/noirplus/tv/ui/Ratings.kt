@@ -171,13 +171,13 @@ fun RatingDialog(target: RateTarget, onClose: () -> Unit) {
                 label = { Text("Tu opinión (opcional)") }, minLines = 2, maxLines = 4,
                 modifier = Modifier.fillMaxWidth(), colors = fieldColors(),
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                ActionButton("Guardar", primary = true) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                DialogButton("Guardar", primary = true, modifier = Modifier.weight(1f)) {
                     prefs.saveRating(Rating(target.key, target.title, target.image, stars, text.trim(), System.currentTimeMillis(), target.item, target.label))
                     onClose()
                 }
-                if (existing != null) ActionButton("Quitar") { prefs.removeRating(target.key); onClose() }
-                ActionButton("Cancelar") { onClose() }
+                if (existing != null) DialogButton("Quitar", modifier = Modifier.weight(1f)) { prefs.removeRating(target.key); onClose() }
+                DialogButton("Cancelar", modifier = Modifier.weight(1f)) { onClose() }
             }
         }
     }
@@ -249,5 +249,24 @@ fun MyRatingLine(key: String, onRate: () -> Unit, modifier: Modifier = Modifier)
             HalfStars(r.stars, size = 14.dp, gap = 2.dp)
             Text(fmtStars(r.stars), color = Col.Text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 6.dp))
         }
+    }
+}
+
+/** Botón de diálogo que se reparte el ancho con sus vecinos (el texto nunca se corta). */
+@Composable
+fun DialogButton(text: String, primary: Boolean = false, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Focusable(modifier, shape = RoundedCornerShape(50), focusScale = 1.04f, onClick = onClick) { focused ->
+        Text(
+            text,
+            Modifier.fillMaxWidth().background(
+                when {
+                    focused || primary -> Color.White
+                    else -> Color.White.copy(alpha = 0.14f)
+                }
+            ).padding(vertical = 11.dp),
+            color = if (focused || primary) Color.Black else Col.Text,
+            fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        )
     }
 }

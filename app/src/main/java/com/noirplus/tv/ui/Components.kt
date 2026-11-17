@@ -661,7 +661,10 @@ fun HeroArea(item: Item?, emptyTitle: String, emptySubtitle: String) {
                         duration = if (d.compact) null else details?.duration,
                         modifier = Modifier.padding(top = 8.dp),
                     )
-                    GenreChips(details?.genre, Modifier.padding(top = 8.dp))
+                    Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        GenreChips(details?.genre)
+                        PlatformBadge(it0, Modifier.padding(start = 8.dp))
+                    }
                     val plot = details?.plot ?: it0.plot
                     if (plot != null) {
                         Text(plot, color = Col.Text.copy(alpha = 0.85f), fontSize = 13.sp, maxLines = if (d.compact) 2 else 3,
@@ -796,6 +799,25 @@ private fun FeaturedPage(item: Item, label: String, onClick: () -> Unit) {
                 (details?.year ?: item.year)?.let { Text(it, color = Col.Sub, fontSize = 12.sp) }
             }
             GenreChips(details?.genre, Modifier.padding(top = 10.dp), max = 3)
+            PlatformBadge(item, Modifier.padding(top = 10.dp))
+        }
+    }
+}
+
+/** Pastilla "Disponible en Netflix / Disney+ …" (solo si se puede deducir de tus carpetas). */
+@Composable
+fun PlatformBadge(item: Item?, modifier: Modifier = Modifier) {
+    val p by produceState<String?>(null, item?.key, Repo.dataVersion.intValue) {
+        value = item?.let { com.noirplus.tv.data.Platforms.of(it) }
+    }
+    androidx.compose.animation.AnimatedVisibility(p != null, modifier = modifier, enter = androidx.compose.animation.fadeIn(tween(300))) {
+        Row(
+            Modifier.clip(RoundedCornerShape(50)).background(Color.White.copy(alpha = 0.12f))
+                .border(0.8.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(50)).padding(horizontal = 10.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("Disponible en ", color = Col.Sub, fontSize = 11.sp)
+            Text(p ?: "", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
         }
     }
 }

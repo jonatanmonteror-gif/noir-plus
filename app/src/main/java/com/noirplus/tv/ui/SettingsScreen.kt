@@ -316,11 +316,11 @@ fun PinDialog(title: String, onCancel: () -> Unit, onDone: (String) -> String?) 
                 colors = fieldColors(),
             )
             err?.let { Text(it, color = Col.Error, fontSize = 13.sp) }
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                ActionButton("Aceptar", primary = true) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                DialogButton("Aceptar", primary = true, modifier = Modifier.weight(1f)) {
                     err = if (pin.length != 4) "Tienen que ser 4 cifras" else onDone(pin)
                 }
-                ActionButton("Cancelar") { onCancel() }
+                DialogButton("Cancelar", modifier = Modifier.weight(1f)) { onCancel() }
             }
         }
     }

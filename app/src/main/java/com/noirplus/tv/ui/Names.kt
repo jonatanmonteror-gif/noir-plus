@@ -54,3 +54,19 @@ fun prettyCategory(raw: String, kind: Kind? = null): PrettyName {
     }.joinToString(" ").trim()
     return PrettyName(out.ifEmpty { raw.trim() }, year)
 }
+
+/** Orden de carpetas: primero "Estrenos <año actual>", luego lo del año actual, luego otros estrenos; el resto, como venga. */
+fun List<com.noirplus.tv.data.Category>.newestFirst(): List<com.noirplus.tv.data.Category> {
+    val y = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR).toString()
+    fun score(name: String): Int {
+        val n = normText(name)
+        val est = n.contains("estreno") || n.contains("novedad")
+        return when {
+            est && n.contains(y) -> 0
+            n.contains(y) -> 1
+            est -> 2
+            else -> 3
+        }
+    }
+    return sortedBy { score(it.name) }
+}

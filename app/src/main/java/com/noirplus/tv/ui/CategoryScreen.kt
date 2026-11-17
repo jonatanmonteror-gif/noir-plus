@@ -134,12 +134,10 @@ fun CategoryScreen(kind: Kind, cat: Category, startSearch: Boolean = false) {
                     fontFamily = InterDisplay, fontSize = 19.sp, fontWeight = FontWeight.SemiBold, color = Col.Text,
                     maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
                 )
-                if (isAll) RoundIconButton(Icons.Filled.Search, "Buscar") { searching = true }
+                RoundIconButton(Icons.Filled.Search, "Buscar") { searching = true }
             }
-            if (isAll) {
-                Spacer(Modifier.width(8.dp))
-                SortButton(sort) { sort = it }
-            }
+            Spacer(Modifier.width(8.dp))
+            SortButton(sort) { sort = it }
         }
         if (sort != SortMode.DEFAULT || query.isNotBlank()) {
             Text(

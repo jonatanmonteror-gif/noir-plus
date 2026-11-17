@@ -28,6 +28,7 @@ object Repo {
 
     fun invalidate(kind: Kind? = null) {
         source?.clear(kind)
+        Platforms.clear()
         loadedAt = System.currentTimeMillis()
         dataVersion.intValue = dataVersion.intValue + 1
     }
@@ -38,6 +39,7 @@ object Repo {
     suspend fun refresh(kinds: List<Kind>? = null, onStep: (RefreshStep) -> Unit = {}) {
         val src = source ?: return
         val list = kinds ?: Kind.entries.toList()
+        Platforms.clear()
         if (kinds == null) src.clear(null) else list.forEach { src.clear(it) }
         for (k in list) {
             onStep(RefreshStep(k, null))

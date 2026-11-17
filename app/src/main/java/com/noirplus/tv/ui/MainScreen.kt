@@ -327,10 +327,10 @@ fun HomeContent() {
     val favs = remember(changes) { prefs.favorites().filter { it.kind != Kind.LIVE } }
     var hero by remember { mutableStateOf<Item?>(null) }
     val movieCats by produceState(emptyList<Category>(), changes, Repo.dataVersion.intValue) {
-        value = runCatching { src.categories(Kind.MOVIE).filter { prefs.visible(Kind.MOVIE, it.id) }.take(4) }.getOrDefault(emptyList())
+        value = runCatching { src.categories(Kind.MOVIE).filter { prefs.visible(Kind.MOVIE, it.id) }.newestFirst().take(4) }.getOrDefault(emptyList())
     }
     val seriesCats by produceState(emptyList<Category>(), changes, Repo.dataVersion.intValue) {
-        value = runCatching { src.categories(Kind.SERIES).filter { prefs.visible(Kind.SERIES, it.id) }.take(4) }.getOrDefault(emptyList())
+        value = runCatching { src.categories(Kind.SERIES).filter { prefs.visible(Kind.SERIES, it.id) }.newestFirst().take(4) }.getOrDefault(emptyList())
     }
     val featured by produceState(emptyList<Item>(), changes, Repo.dataVersion.intValue) {
         val m = recentOf(Kind.MOVIE, 6)
@@ -427,7 +427,7 @@ fun BrowseContent(kind: Kind) {
     var error by remember { mutableStateOf<String?>(null) }
     val cats by produceState<List<Category>?>(null, kind, changes, Repo.dataVersion.intValue) {
         value = try {
-            src.categories(kind).filter { prefs.visible(kind, it.id) }
+            src.categories(kind).filter { prefs.visible(kind, it.id) }.newestFirst()
         } catch (t: Throwable) {
             error = t.message
             emptyList()
