@@ -515,6 +515,7 @@ fun WideCard(
 @Composable
 fun PosterRow(rowId: String, items: List<Item>, onFocus: (Item) -> Unit, more: Int = 0, onSeeAll: (() -> Unit)? = null, onClick: (Item) -> Unit) {
     val d = LocalDims.current
+    TvHorizontalScroll {
     LazyRow(
         Modifier.focusRestorer(),
         contentPadding = PaddingValues(horizontal = d.edge, vertical = 12.dp),
@@ -524,6 +525,7 @@ fun PosterRow(rowId: String, items: List<Item>, onFocus: (Item) -> Unit, more: I
             PosterCard(item, memKey = "$rowId/${item.key}", onFocus = { onFocus(item) }, onClick = { onClick(item) })
         }
         if (onSeeAll != null && more > 0) item(key = "more") { SeeAllCard(rowId, more, onSeeAll) }
+    }
     }
 }
 
@@ -754,6 +756,41 @@ class PeekSpec(private val leadPx: Float) : BringIntoViewSpec {
         if (size >= containerSize) return offset
         return offset - leadPx
     }
+}
+
+/**
+ * Filas horizontales en la tele: la fila NO se mueve en cada pulsación. El foco recorre las carátulas
+ * visibles y la fila solo se desliza (con suavidad) cuando el foco llega cerca del borde,
+ * dejando ver un trozo de la siguiente. Así no da saltos.
+ */
+class EdgeSpec(private val marginPx: Float) : BringIntoViewSpec {
+    @Suppress("OVERRIDE_DEPRECATION", "DEPRECATION")
+    override val scrollAnimationSpec: AnimationSpec<Float> = spring(dampingRatio = 1f, stiffness = 300f)
+
+    override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float {
+        val start = marginPx
+        val end = containerSize - marginPx
+        return when {
+            size >= end - start -> offset - start
+            offset < start -> offset - start
+            offset + size > end -> offset + size - end
+            else -> 0f
+        }
+    }
+}
+
+/** Envuelve una fila horizontal de la tele con el desplazamiento suave por bordes. */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun TvHorizontalScroll(content: @Composable () -> Unit) {
+    val d = LocalDims.current
+    if (!d.tv) {
+        content()
+        return
+    }
+    val px = with(LocalDensity.current) { (d.poster * 0.9f).toPx() }
+    val spec = remember(px) { EdgeSpec(px) }
+    CompositionLocalProvider(LocalBringIntoViewSpec provides spec) { content() }
 }
 
 @OptIn(ExperimentalFoundationApi::class)

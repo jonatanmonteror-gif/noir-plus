@@ -466,6 +466,7 @@ fun ContinueRow(history: List<com.noirplus.tv.data.Progress>, memPrefix: String,
     val nav = LocalNav.current
     Column {
         SectionTitle("Continuar viendo")
+        TvHorizontalScroll {
         LazyRow(
             Modifier.focusRestorer(),
             contentPadding = PaddingValues(horizontal = d.edge, vertical = 12.dp),
@@ -488,6 +489,7 @@ fun ContinueRow(history: List<com.noirplus.tv.data.Progress>, memPrefix: String,
                     },
                 )
             }
+        }
         }
     }
 }
