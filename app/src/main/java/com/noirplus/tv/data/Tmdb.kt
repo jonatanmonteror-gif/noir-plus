@@ -192,6 +192,8 @@ object Tmdb {
      * empezando unos segundos después de abrir la app. Solo descarga los que tienen más de una semana.
      */
     fun preloadLater() {
+        // En la tele (poca memoria y procesador justo) no se precarga nada: se carga solo cuando se usa.
+        if (runCatching { Repo.prefs.isLowEnd }.getOrDefault(true)) return
         if (preloadStarted) return
         preloadStarted = true
         bg.launch {

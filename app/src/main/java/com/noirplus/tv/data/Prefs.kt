@@ -66,6 +66,23 @@ class Prefs(ctx: Context) {
 
     private fun s(k: String): String = sp.getString(k, "") ?: ""
 
+    /** ¿Es una tele (Android TV / Google TV)? */
+    val isTv: Boolean = runCatching {
+        (ctx.getSystemService(Context.UI_MODE_SERVICE) as android.app.UiModeManager).currentModeType ==
+            android.content.res.Configuration.UI_MODE_TYPE_TELEVISION ||
+            ctx.packageManager.hasSystemFeature("android.software.leanback")
+    }.getOrDefault(false)
+
+    /** Equipo con poca memoria (muchas teles): se evitan tareas pesadas en segundo plano. */
+    val isLowEnd: Boolean = isTv || runCatching {
+        (ctx.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager).isLowRamDevice
+    }.getOrDefault(false)
+
+    /** Valoraciones visibles. Por defecto: sí en el móvil, no en la tele. */
+    var ratingsEnabled: Boolean
+        get() = if (sp.contains("ratings")) sp.getBoolean("ratings", true) else !isTv
+        set(v) { sp.edit().putBoolean("ratings", v).apply(); bump() }
+
     val type: String get() = s("type")
     val server: String get() = s("server")
     val user: String get() = s("user")

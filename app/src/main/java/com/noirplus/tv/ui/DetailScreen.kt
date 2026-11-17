@@ -330,7 +330,7 @@ private fun MovieDetail(item: Item) {
                 onTrailer = trailer,
             )
             Box(Modifier.fillMaxWidth().padding(top = 10.dp), contentAlignment = Alignment.Center) {
-                MyRatingLine(item.key, { rate(item.rateTarget()) })
+                if (prefs.ratingsEnabled) MyRatingLine(item.key, { rate(item.rateTarget()) })
             }
             PhonePlot(details, item, expanded)
             if (progress != null) {
@@ -360,7 +360,7 @@ private fun MovieDetail(item: Item) {
                     ActionButton("▶  Reproducir", primary = true, key = "d-play", focusRequester = playFr) { play(0) }
                 }
                 ActionButton(if (fav) "✓  En mi lista" else "+  Mi lista", key = "d-fav") { prefs.toggleFavorite(item) }
-                ActionButton(mine?.let { "Tu nota ${fmtStars(it.stars)} ★" } ?: "Valorar", key = "d-rate") { rate(item.rateTarget()) }
+                if (prefs.ratingsEnabled) ActionButton(mine?.let { "Tu nota ${fmtStars(it.stars)} ★" } ?: "Valorar", key = "d-rate") { rate(item.rateTarget()) }
                 ActionButton("Tráiler", key = "d-trailer") { trailer() }
             }
         }
@@ -467,7 +467,7 @@ private fun SeriesDetail(item: Item) {
                 onTrailer = trailer,
             )
             Box(Modifier.fillMaxWidth().padding(top = 10.dp), contentAlignment = Alignment.Center) {
-                MyRatingLine(item.key, { rate(item.rateTarget()) })
+                if (prefs.ratingsEnabled) MyRatingLine(item.key, { rate(item.rateTarget()) })
             }
             PhonePlot(sd?.details, item, expanded)
             when {
@@ -520,7 +520,7 @@ private fun SeriesDetail(item: Item) {
                     ActionButton(if (fav) "✓  En mi lista" else "+  Mi lista", key = "s-fav",
                         focusRequester = if (last == null && first == null) playFr else null) { prefs.toggleFavorite(item) }
                     val mineS = remember(changes) { prefs.rating(item.key) }
-                    ActionButton(mineS?.let { "Tu nota ${fmtStars(it.stars)} ★" } ?: "Valorar", key = "s-rate") { rate(item.rateTarget()) }
+                    if (prefs.ratingsEnabled) ActionButton(mineS?.let { "Tu nota ${fmtStars(it.stars)} ★" } ?: "Valorar", key = "s-rate") { rate(item.rateTarget()) }
                     ActionButton("Tráiler", key = "s-trailer") { trailer() }
                 }
             }

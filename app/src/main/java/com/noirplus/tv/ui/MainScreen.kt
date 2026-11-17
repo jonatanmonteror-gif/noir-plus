@@ -116,7 +116,7 @@ private fun BigScreenMain() {
                 Modifier.background(Col.Surface.copy(alpha = 0.85f), RoundedCornerShape(50)).padding(4.dp).focusRestorer(),
                 horizontalArrangement = Arrangement.spacedBy(2.dp),
             ) {
-                Tab.entries.forEach { t ->
+                Tab.entries.filter { it != Tab.RATINGS || Repo.prefs.ratingsEnabled }.forEach { t ->
                     TabItem(t.label, selected = t == tab, requester = requesters.getValue(t), onSelect = { tab = t })
                 }
             }
@@ -255,7 +255,7 @@ private fun BottomBar(current: Section, modifier: Modifier, onSelect: (Section) 
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Section.entries.forEach { s ->
+        Section.entries.filter { it != Section.RATINGS || Repo.prefs.ratingsEnabled }.forEach { s ->
             val sel = s == current
             val dot by animateDpAsState(if (sel) 4.dp else 0.dp, tween(200), label = "dot")
             Column(

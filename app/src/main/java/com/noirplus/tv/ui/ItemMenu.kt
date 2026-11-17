@@ -146,7 +146,7 @@ private fun ItemMenu(t: MenuTarget, onRate: (RateTarget) -> Unit, onClose: () ->
                         }
                         first = false
                     }
-                    t.rate?.let { r ->
+                    t.rate?.takeIf { prefs.ratingsEnabled }?.let { r ->
                         MenuRow(
                             ReviewIcon,
                             if (mine == null) "Valorar" else "Cambiar valoración",

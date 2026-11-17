@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -107,6 +109,7 @@ fun SettingsContent() {
     val info by produceState<String?>(null) { value = Repo.source?.accountInfo() ?: "No se pudo comprobar la cuenta" }
     var nameEdit by remember { mutableStateOf(prefs.name) }
     var pinDialog by remember { mutableStateOf<String?>(null) } // "set", "unlock", "remove"
+    var nameDialog by remember { mutableStateOf(false) }
     var updStatus by remember { mutableStateOf<String?>(null) }
     var updRelease by remember { mutableStateOf<Updater.Release?>(null) }
     var updProgress by remember { mutableStateOf<Float?>(null) }
@@ -186,7 +189,10 @@ fun SettingsContent() {
             if (changes < 0) Spacer(Modifier)
 
             Section("Perfil") {
-                SettingRow("Tu nombre", "Se usa para el saludo de Inicio.") {
+                if (d.tv) {
+                    // En la tele: se abre una ventanita con el teclado ya preparado
+                    LinkRow("Tu nombre", prefs.name.ifBlank { "Sin poner" }, key = "set-name") { nameDialog = true }
+                } else SettingRow("Tu nombre", "Se usa para el saludo de Inicio.") {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         OutlinedTextField(
                             value = nameEdit, onValueChange = { nameEdit = it }, singleLine = true,
@@ -240,6 +246,8 @@ fun SettingsContent() {
             }
 
             Section("Aspecto") {
+                ChoiceRow("Valoraciones", listOf("Mostrar", "Ocultar"), if (prefs.ratingsEnabled) 0 else 1, "rt",
+                    note = "Pestaña de valoraciones y opción «Valorar» en las fichas.") { prefs.ratingsEnabled = it == 0 }
                 val sortOpts = listOf(SortMode.RECENT, SortMode.RATING, SortMode.AZ, SortMode.DEFAULT)
                 ChoiceRow("Orden de las carpetas", listOf("Recientes", "Valoradas", "A–Z", "Original"),
                     sortOpts.indexOf(prefs.defaultSort).coerceAtLeast(0), "ds",
@@ -329,6 +337,7 @@ fun SettingsContent() {
             Text("Noir+  ·  ${BuildConfig.VERSION_NAME}", color = Col.Sub, fontSize = 12.sp, modifier = Modifier.padding(start = 4.dp))
         }
 
+        if (nameDialog) NameDialog(prefs.name, onCancel = { nameDialog = false }) { prefs.name = it; nameEdit = it; nameDialog = false }
         pinDialog?.let { mode ->
             PinDialog(
                 title = when (mode) {
@@ -385,6 +394,39 @@ fun PinDialog(title: String, onCancel: () -> Unit, onDone: (String) -> String?) 
                 DialogButton("Aceptar", primary = true, modifier = Modifier.weight(1f)) {
                     err = if (pin.length != 4) "Tienen que ser 4 cifras" else onDone(pin)
                 }
+                DialogButton("Cancelar", modifier = Modifier.weight(1f)) { onCancel() }
+            }
+        }
+    }
+}
+
+/** Ventanita para escribir el nombre con el mando: el teclado se abre solo y «Hecho» guarda. */
+@Composable
+private fun NameDialog(current: String, onCancel: () -> Unit, onSave: (String) -> Unit) {
+    var name by remember { mutableStateOf(current) }
+    val fr = remember { androidx.compose.ui.focus.FocusRequester() }
+    val kb = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+    androidx.activity.compose.BackHandler { onCancel() }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(250)
+        runCatching { fr.requestFocus() }
+        kb?.show()
+    }
+    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f)), contentAlignment = Alignment.Center) {
+        Column(
+            Modifier.widthIn(max = 420.dp).clip(RoundedCornerShape(16.dp)).background(Col.Surface2).padding(22.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Text("Tu nombre", color = Col.Text, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+            OutlinedTextField(
+                value = name, onValueChange = { name = it.take(30) }, singleLine = true,
+                keyboardOptions = KeyboardOptions(capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Words,
+                    imeAction = androidx.compose.ui.text.input.ImeAction.Done),
+                keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { kb?.hide(); onSave(name.trim()) }),
+                modifier = Modifier.fillMaxWidth().focusRequester(fr), colors = fieldColors(),
+            )
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                DialogButton("Guardar", primary = true, modifier = Modifier.weight(1f)) { onSave(name.trim()) }
                 DialogButton("Cancelar", modifier = Modifier.weight(1f)) { onCancel() }
             }
         }
