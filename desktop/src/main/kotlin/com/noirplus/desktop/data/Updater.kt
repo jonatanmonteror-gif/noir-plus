@@ -20,10 +20,16 @@ object Updater {
     private fun num(v: String) = v.substringAfterLast('.').toIntOrNull() ?: 0
 
     suspend fun check(): Release? = withContext(Dispatchers.IO) {
-        val req = Request.Builder().url("https://api.github.com/repos/$REPO/releases?per_page=30")
-            .header("Accept", "application/vnd.github+json").header("User-Agent", "NoirPlus-Desktop").build()
-        val arr = Http.client.newCall(req).execute().use { r -> if (!r.isSuccessful) return@withContext null; JSONArray(r.body!!.string()) }
-        val best = (0 until arr.length()).mapNotNull { arr.optJSONObject(it) }
+        // GitHub mezcla las versiones de Android y Windows: se leen varias páginas
+        val all = ArrayList<org.json.JSONObject>()
+        for (page in 1..3) {
+            val req = Request.Builder().url("https://api.github.com/repos/$REPO/releases?per_page=100&page=$page")
+                .header("Accept", "application/vnd.github+json").header("User-Agent", "NoirPlus-Desktop").build()
+            val arr = Http.client.newCall(req).execute().use { r -> if (!r.isSuccessful) null else JSONArray(r.body!!.string()) } ?: break
+            for (i in 0 until arr.length()) arr.optJSONObject(i)?.let { all.add(it) }
+            if (arr.length() < 100) break
+        }
+        val best = all
             .filter { it.optString("tag_name").startsWith("windows-v") && !it.optBoolean("draft") }
             .maxByOrNull { num(it.optString("tag_name")) } ?: return@withContext null
         val v = best.optString("tag_name").removePrefix("windows-v")
