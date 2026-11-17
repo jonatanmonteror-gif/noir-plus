@@ -60,6 +60,7 @@ fun LiveContent() {
     val src = Repo.source ?: return Message("No hay ninguna lista configurada")
     val prefs = Repo.prefs
     val nav = LocalNav.current
+    val menu = LocalItemMenu.current
     val changes = prefs.changes.intValue
     var error by remember { mutableStateOf<String?>(null) }
     val cats by produceState<List<Category>?>(null, Repo.dataVersion.intValue) {
@@ -121,7 +122,7 @@ fun LiveContent() {
                             number = i + 1,
                             isFav = ch.key in favKeys,
                             memKey = "live/${selected}/${ch.key}",
-                            onLongClick = { prefs.toggleFavorite(ch) },
+                            onLongClick = { menu(ch.menuTarget()) },
                         ) {
                             nav.push(
                                 Screen.Player(
@@ -135,8 +136,8 @@ fun LiveContent() {
             }
         }
     }
-    val hint = if (d.tv) "OK para ver  ·  Mantén OK pulsado para añadir o quitar de favoritos"
-    else "Toca para ver  ·  Mantén pulsado para añadir o quitar de favoritos"
+    val hint = if (d.tv) "OK para ver  ·  Mantén OK pulsado para más opciones"
+    else "Toca para ver  ·  Mantén pulsado para más opciones"
 
     if (d.compact) {
         Column(Modifier.fillMaxSize().padding(top = 8.dp)) {

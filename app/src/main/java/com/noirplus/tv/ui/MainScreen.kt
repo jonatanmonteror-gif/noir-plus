@@ -55,6 +55,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -260,7 +261,12 @@ private fun BottomBar(current: Section, modifier: Modifier, onSelect: (Section) 
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
-                Icon(s.icon, s.label, tint = if (sel) Color.White else Col.Sub, modifier = Modifier.size(25.dp))
+                val pop by androidx.compose.animation.core.animateFloatAsState(
+                    if (sel) 1.12f else 1f,
+                    androidx.compose.animation.core.spring(dampingRatio = 0.45f, stiffness = 500f), label = "pop",
+                )
+                Icon(s.icon, s.label, tint = if (sel) Color.White else Col.Sub,
+                    modifier = Modifier.size(25.dp).graphicsLayer { scaleX = pop; scaleY = pop })
                 Box(Modifier.padding(top = 4.dp).size(dot).clip(RoundedCornerShape(50)).background(Color.White))
             }
         }

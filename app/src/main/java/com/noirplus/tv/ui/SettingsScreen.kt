@@ -39,6 +39,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.noirplus.tv.BuildConfig
 import com.noirplus.tv.data.Kind
+import com.noirplus.tv.data.SUB_MAX
+import com.noirplus.tv.data.SUB_MIN
 import com.noirplus.tv.data.Repo
 import com.noirplus.tv.data.Updater
 import kotlinx.coroutines.launch
@@ -210,15 +212,17 @@ fun SettingsContent() {
             }
 
             Section("Subtítulos") {
-                SubtitlePreview(prefs.subPos, prefs.subOffset, prefs.subSize, prefs.subBg == 1,
+                SubtitlePreview(prefs.subPos, prefs.subOffset, prefs.subSizeSp, prefs.subBg == 1, prefs.subFont,
                     Modifier.fillMaxWidth().aspectRatio(16f / 6.5f))
                 ChoiceRow("Posición", SubPositions, prefs.subPos, "sp") { prefs.subPos = it }
                 StepperRow("Altura", "${if (prefs.subOffset > 0) "+" else ""}${prefs.subOffset}", { prefs.subOffset -= 4 }, { prefs.subOffset += 4 }, "so",
                     note = "Ajuste fino dentro de la posición elegida.")
                 StepperRow("Retardo", fmtDelay(prefs.subDelayMs), { prefs.subDelayMs -= 100 }, { prefs.subDelayMs += 100 }, "sd",
                     note = "Entre −2 y +2 s. Positivo = salen más tarde.")
-                ChoiceRow("Tamaño", SubSizes, prefs.subSize, "ss") { prefs.subSize = it }
-                ChoiceRow("Fondo", SubBgs, prefs.subBg, "sb") { prefs.subBg = it }
+                StepperRow("Tamaño", "${prefs.subSizeSp}", { prefs.subSizeSp -= 1 }, { prefs.subSizeSp += 1 }, "ss",
+                    note = "Entre $SUB_MIN y $SUB_MAX.")
+                SettingRow("Tipografía") { FontPicker(prefs.subFont, "sf") { prefs.subFont = it } }
+                ChoiceRow("Fondo", listOf("Sombra", "Caja semitransparente"), prefs.subBg, "sb") { prefs.subBg = it }
             }
 
             Section("Reproducción") {

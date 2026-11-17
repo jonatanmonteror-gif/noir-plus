@@ -419,7 +419,7 @@ fun PosterCard(
     onFocus: () -> Unit,
     onClick: () -> Unit,
 ) {
-    val rate = LocalRate.current
+    val menu = LocalItemMenu.current
     val rateable = item.kind != Kind.LIVE
     val prefs = Repo.prefs
     val changes = prefs.changes.intValue
@@ -427,7 +427,7 @@ fun PosterCard(
     Column(if (fill) Modifier.fillMaxWidth() else Modifier.width(width)) {
         Focusable(
             Modifier.fillMaxWidth().aspectRatio(2f / 3f), key = memKey, onFocus = onFocus,
-            onLongClick = if (rateable) ({ rate(item.rateTarget()) }) else null,
+            onLongClick = { menu(item.menuTarget()) },
             onClick = onClick,
         ) { focused ->
             Box(Modifier.fillMaxSize().background(Col.Surface))
@@ -547,8 +547,10 @@ fun CategoryRow(
             tag = tag,
             onSeeAll = if (!d.tv && !list.isNullOrEmpty()) ({ nav.push(Screen.Category(kind, cat)) }) else null,
         )
-        if (list == null) RowPlaceholder()
-        else PosterRow("${kind.name}-${cat.id}", list, onFocus) { nav.push(Screen.Detail(it)) }
+        Crossfade(targetState = list, animationSpec = tween(350), label = "row") { l ->
+            if (l == null) RowPlaceholder()
+            else PosterRow("${kind.name}-${cat.id}", l, onFocus) { nav.push(Screen.Detail(it)) }
+        }
     }
 }
 

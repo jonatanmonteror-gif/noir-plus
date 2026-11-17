@@ -42,7 +42,10 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // App más ligera: R8 elimina código no usado y comprime; shrinkResources quita recursos sobrantes.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = signingConfigs.getByName("release")
         }
     }
@@ -57,6 +60,9 @@ android {
     lint {
         checkReleaseBuilds = false
         abortOnError = false
+    }
+    packaging {
+        resources.excludes += listOf("META-INF/*.version", "META-INF/*.kotlin_module", "kotlin/**", "DebugProbesKt.bin", "META-INF/com.android.tools/**")
     }
     buildFeatures {
         compose = true

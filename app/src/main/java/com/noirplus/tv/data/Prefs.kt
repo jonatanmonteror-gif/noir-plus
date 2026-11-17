@@ -54,6 +54,9 @@ data class Rating(
     }
 }
 
+const val SUB_MIN = 14
+const val SUB_MAX = 26
+
 class Prefs(ctx: Context) {
     private val sp = ctx.getSharedPreferences("noirplus", Context.MODE_PRIVATE)
 
@@ -105,6 +108,16 @@ class Prefs(ctx: Context) {
     var subSize: Int
         get() = sp.getInt("subSize", 1)
         set(v) { sp.edit().putInt("subSize", v.coerceIn(0, 2)).apply(); bump() }
+
+    /** Tamaño del texto en sp (14…26). Por defecto, según el antiguo pequeño/normal/grande. */
+    var subSizeSp: Int
+        get() = sp.getInt("subSizeSp", when (sp.getInt("subSize", 1)) { 0 -> 16; 2 -> 26; else -> 20 })
+        set(v) { sp.edit().putInt("subSizeSp", v.coerceIn(SUB_MIN, SUB_MAX)).apply(); bump() }
+
+    /** Tipografía: 0 Inter, 1 Sistema, 2 Clásica, 3 Playfair, 4 Mono */
+    var subFont: Int
+        get() = sp.getInt("subFont", 0)
+        set(v) { sp.edit().putInt("subFont", v.coerceIn(0, 4)).apply(); bump() }
 
     /** 0 = sin fondo (con sombra), 1 = caja semitransparente */
     var subBg: Int

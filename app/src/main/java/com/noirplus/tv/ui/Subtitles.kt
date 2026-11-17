@@ -5,6 +5,8 @@ import android.os.Looper
 import androidx.annotation.OptIn
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -72,15 +74,21 @@ fun fmtDelay(ms: Int): String =
     (if (ms > 0) "+" else if (ms < 0) "−" else "") + String.format(Locale("es", "ES"), "%.1f s", kotlin.math.abs(ms) / 1000f)
 
 val SubPositions = listOf("Abajo", "Centro", "Arriba")
-val SubSizes = listOf("Pequeño", "Normal", "Grande")
+val SubFontNames = listOf("Inter", "Sistema", "Clásica", "Playfair", "Mono")
+fun subFontFamily(i: Int): androidx.compose.ui.text.font.FontFamily = when (i) {
+    1 -> androidx.compose.ui.text.font.FontFamily.SansSerif
+    2 -> androidx.compose.ui.text.font.FontFamily.Serif
+    3 -> Playfair
+    4 -> androidx.compose.ui.text.font.FontFamily.Monospace
+    else -> Inter
+}
 val SubBgs = listOf("Sombra", "Caja")
 
 /** Subtítulos dibujados por la app: posición, altura, tamaño y fondo configurables. */
 @Composable
-fun BoxScope.SubtitleLayer(cues: List<Cue>, pos: Int, offsetDp: Int, size: Int, box: Boolean, preview: Boolean = false) {
+fun BoxScope.SubtitleLayer(cues: List<Cue>, pos: Int, offsetDp: Int, sizeSp: Int, box: Boolean, font: Int = 0, preview: Boolean = false) {
     if (cues.isEmpty()) return
-    val base = if (preview) 14 else 20
-    val fs = when (size) { 0 -> base - 4; 2 -> base + 6; else -> base }
+    val fs = if (preview) (sizeSp * 0.7f).toInt() else sizeSp
     val margin = if (preview) 10 else 34
     val align = when (pos) {
         2 -> Alignment.TopCenter
@@ -111,8 +119,8 @@ fun BoxScope.SubtitleLayer(cues: List<Cue>, pos: Int, offsetDp: Int, size: Int, 
                         color = Color.White,
                         fontSize = fs.sp,
                         lineHeight = (fs * 1.25f).sp,
-                        fontFamily = Inter,
-                        fontWeight = FontWeight.Medium,
+                        fontFamily = subFontFamily(font),
+                        fontWeight = if (font == 4) FontWeight.Normal else FontWeight.Medium,
                         textAlign = TextAlign.Center,
                         shadow = if (box) null else Shadow(Color.Black.copy(alpha = 0.95f), Offset(0f, 2f), 8f),
                     ),
@@ -124,7 +132,7 @@ fun BoxScope.SubtitleLayer(cues: List<Cue>, pos: Int, offsetDp: Int, size: Int, 
 
 /** Vista previa para Ajustes → Subtítulos. */
 @Composable
-fun SubtitlePreview(pos: Int, offsetDp: Int, size: Int, box: Boolean, modifier: Modifier = Modifier) {
+fun SubtitlePreview(pos: Int, offsetDp: Int, sizeSp: Int, box: Boolean, font: Int, modifier: Modifier = Modifier) {
     Box(
         modifier.clip(RoundedCornerShape(8.dp)).background(
             androidx.compose.ui.graphics.Brush.linearGradient(listOf(Color(0xFF2B3440), Color(0xFF1A1A1F), Color(0xFF3A2E28)))
@@ -132,7 +140,7 @@ fun SubtitlePreview(pos: Int, offsetDp: Int, size: Int, box: Boolean, modifier: 
     ) {
         Text("Vista previa", Modifier.align(Alignment.TopStart).padding(8.dp), color = Color.White.copy(alpha = 0.35f), fontSize = 10.sp)
         val cue = Cue.Builder().setText("Así se verán los subtítulos.").build()
-        SubtitleLayer(listOf(cue), pos, offsetDp, size, box, preview = true)
+        SubtitleLayer(listOf(cue), pos, offsetDp, sizeSp, box, font, preview = true)
     }
 }
 
@@ -220,4 +228,33 @@ fun StepperRow(label: String, value: String, onMinus: () -> Unit, onPlus: () -> 
 @Composable
 fun ChoiceRow(label: String, options: List<String>, selected: Int, keyPrefix: String, note: String? = null, onSelect: (Int) -> Unit) {
     SettingRow(label, note) { Segmented(options, selected, keyPrefix, onSelect) }
+}
+
+/** Tipografías de subtítulos: cada opción se muestra con su propia letra. */
+@Composable
+fun FontPicker(selected: Int, keyPrefix: String, onSelect: (Int) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        SubFontNames.forEachIndexed { i, n ->
+            val sel = i == selected
+            Focusable(key = "$keyPrefix-$i", shape = RoundedCornerShape(8.dp), focusScale = 1.04f, onClick = { onSelect(i) }) { f ->
+                Text(
+                    n,
+                    Modifier.background(
+                        when {
+                            sel -> Color.White
+                            f -> Color.White.copy(alpha = 0.22f)
+                            else -> Color.White.copy(alpha = 0.08f)
+                        }
+                    ).padding(horizontal = 12.dp, vertical = 7.dp),
+                    color = if (sel) Color.Black else Col.Text,
+                    fontFamily = subFontFamily(i),
+                    fontSize = 14.sp,
+                    maxLines = 1,
+                )
+            }
+        }
+    }
 }

@@ -183,18 +183,6 @@ fun RatingDialog(target: RateTarget, onClose: () -> Unit) {
     }
 }
 
-/** Envuelve la app: ofrece LocalRate y muestra el diálogo encima de todo. */
-@Composable
-fun RateHost(content: @Composable () -> Unit) {
-    var target by remember { mutableStateOf<RateTarget?>(null) }
-    CompositionLocalProvider(LocalRate provides { t -> target = t }) {
-        Box(Modifier.fillMaxSize()) {
-            content()
-            target?.let { RatingDialog(it) { target = null } }
-        }
-    }
-}
-
 fun Item.rateTarget(): RateTarget = RateTarget(key, name, image, this, if (kind == com.noirplus.tv.data.Kind.SERIES) "Serie" else "Película")
 
 /** Sección "Valoraciones": todo lo que has puntuado. */

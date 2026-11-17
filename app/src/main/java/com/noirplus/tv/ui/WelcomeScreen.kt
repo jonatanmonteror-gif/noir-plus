@@ -86,7 +86,7 @@ fun kindPlural(k: Kind) = when (k) {
 
 /** Aparición suave (sube y se ilumina) con retraso escalonado. */
 @Composable
-private fun Reveal(delayMs: Int, content: @Composable () -> Unit) {
+fun Reveal(delayMs: Int, content: @Composable () -> Unit) {
     val a = remember { Animatable(0f) }
     LaunchedEffect(Unit) {
         delay(delayMs.toLong())

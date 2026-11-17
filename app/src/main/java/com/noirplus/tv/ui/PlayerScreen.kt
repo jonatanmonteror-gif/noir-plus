@@ -463,8 +463,9 @@ fun PlayerScreen(req: PlayRequest) {
                 cues,
                 pos = prefs.subPos,
                 offsetDp = prefs.subOffset + if (controlsVisible && prefs.subPos == 0) 60 else 0,
-                size = prefs.subSize,
+                sizeSp = prefs.subSizeSp,
                 box = prefs.subBg == 1,
+                font = prefs.subFont,
             )
         }
 
@@ -633,7 +634,11 @@ fun PlayerScreen(req: PlayRequest) {
                 Text("Altura", color = Col.Sub, fontSize = 12.sp)
                 MiniStepper("${if (prefs.subOffset > 0) "+" else ""}${prefs.subOffset}", "ph", { prefs.subOffset -= 4 }, { prefs.subOffset += 4 })
                 Text("Tamaño", color = Col.Sub, fontSize = 12.sp)
-                Segmented(SubSizes, prefs.subSize, "ps") { prefs.subSize = it }
+                MiniStepper("${prefs.subSizeSp}", "ps", { prefs.subSizeSp -= 1 }, { prefs.subSizeSp += 1 })
+                Text("Tipografía", color = Col.Sub, fontSize = 12.sp)
+                FontPicker(prefs.subFont, "pf") { prefs.subFont = it }
+                Text("Fondo", color = Col.Sub, fontSize = 12.sp)
+                Segmented(listOf("Sombra", "Caja"), prefs.subBg, "pb") { prefs.subBg = it }
                 Text("El retardo solo cambia esta reproducción; el resto queda guardado.", color = Col.Sub, fontSize = 10.sp, lineHeight = 13.sp)
             }
         }

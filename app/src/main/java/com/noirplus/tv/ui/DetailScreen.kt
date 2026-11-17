@@ -96,8 +96,10 @@ private fun cleanTitle(title: String, series: String): String {
 
 @Composable
 private fun TvInfo(item: Item, details: Details?) {
-    Text(item.name, color = Col.Text, fontFamily = InterDisplay, fontSize = 38.sp, fontWeight = FontWeight.Bold,
-        maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 42.sp, letterSpacing = (-1).sp)
+    Reveal(60) {
+        Text(item.name, color = Col.Text, fontFamily = InterDisplay, fontSize = 38.sp, fontWeight = FontWeight.Bold,
+            maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 42.sp, letterSpacing = (-1).sp)
+    }
     MetaLine(
         year = details?.year ?: item.year,
         rating = details?.rating ?: item.rating,
@@ -165,10 +167,13 @@ private fun PhoneHeader(item: Item, details: Details?, extra: String? = null) {
         Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(top = 0.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(
-            item.name, color = Col.Text, fontFamily = InterDisplay, fontSize = 30.sp, fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center, lineHeight = 34.sp, letterSpacing = (-0.8).sp, maxLines = 3, overflow = TextOverflow.Ellipsis,
-        )
+        Reveal(80) {
+            Text(
+                item.name, color = Col.Text, fontFamily = InterDisplay, fontSize = 30.sp, fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center, lineHeight = 34.sp, letterSpacing = (-0.8).sp, maxLines = 3, overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
         val parts = listOfNotNull(details?.year ?: item.year, extra, details?.duration)
         if (parts.isNotEmpty()) {
             Text(parts.joinToString("   |   "), color = Col.Sub, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp))
@@ -380,9 +385,14 @@ private fun SeriesDetail(item: Item) {
 
     val queue = remember(sd) { sd?.seasons?.values?.flatten() ?: emptyList() }
     val rate = LocalRate.current
+    val menu = LocalItemMenu.current
     fun epTarget(ep: Episode) = RateTarget(
         "EP:${ep.id}", "${item.name} · T${ep.season} E${ep.number} · ${cleanTitle(ep.title, item.name)}",
         ep.image ?: item.image, item, "Episodio",
+    )
+    // Episodio: valorar el episodio y, de paso, añadir la serie a Mi lista
+    fun epMenu(ep: Episode) = MenuTarget(
+        epTarget(ep).title, ep.image ?: item.image, "Episodio", favItem = item, rate = epTarget(ep),
     )
 
     fun playEpisode(ep: Episode, start: Long) {
@@ -465,7 +475,7 @@ private fun SeriesDetail(item: Item) {
                     Spacer(Modifier.height(10.dp))
                     episodes.forEach { ep ->
                         val p = progressMap["EP:${ep.id}"]
-                        EpisodeRow(ep, item.name, item.image, p, onLongClick = { rate(epTarget(ep)) }) { playEpisode(ep, p?.position ?: 0L) }
+                        EpisodeRow(ep, item.name, item.image, p, onLongClick = { menu(epMenu(ep)) }) { playEpisode(ep, p?.position ?: 0L) }
                     }
                 }
             }
@@ -519,7 +529,7 @@ private fun SeriesDetail(item: Item) {
                                 image = ep.image ?: item.image,
                                 progress = p?.fraction,
                                 memKey = "ep/${ep.id}",
-                                onLongClick = { rate(epTarget(ep)) },
+                                onLongClick = { menu(epMenu(ep)) },
                             ) { playEpisode(ep, p?.position ?: 0L) }
                         }
                     }
