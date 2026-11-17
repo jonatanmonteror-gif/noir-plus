@@ -355,6 +355,7 @@ fun PlayerScreen(req: PlayRequest) {
     DisposableEffect(Unit) {
         val listener = object : Player.Listener {
             override fun onPlayerError(e: PlaybackException) {
+                com.noirplus.tv.data.ErrorLog.note("Reproducción", e, "Código: ${e.errorCodeName}")
                 when {
                     e.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW -> {
                         exo.seekToDefaultPosition()

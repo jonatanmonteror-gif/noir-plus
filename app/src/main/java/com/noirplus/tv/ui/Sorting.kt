@@ -156,3 +156,35 @@ fun ColumnsButton(cols: Int, onChange: (Int) -> Unit) {
         }
     }
 }
+
+/** Icono "géneros" (etiqueta). */
+val GenreIcon: ImageVector = materialIcon(name = "Filled.GenreTag") {
+    materialPath {
+        moveTo(3f, 3f); horizontalLineTo(11f); lineTo(21f, 13f); lineTo(13f, 21f); lineTo(3f, 11f); close()
+        moveTo(7.5f, 6f); arcToRelative(1.5f, 1.5f, 0f, true, false, 0.01f, 0f); close()
+    }
+}
+
+/** Botón de filtrar por género con su menú. null = todos. */
+@Composable
+fun GenreButton(selected: Int?, genres: Map<Int, String>, onChange: (Int?) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        RoundIconButton(GenreIcon, "Género", active = selected != null) { open = true }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }, modifier = Modifier.background(Col.Surface2)) {
+            (listOf<Pair<Int?, String>>(null to "Todos los géneros") + genres.map { it.key to it.value }).forEach { (id, name) ->
+                val sel = id == selected
+                DropdownMenuItem(
+                    text = {
+                        Text(name, color = if (sel) Color.White else Col.Sub, fontSize = 14.sp,
+                            fontWeight = if (sel) FontWeight.SemiBold else FontWeight.Normal)
+                    },
+                    onClick = {
+                        onChange(id)
+                        open = false
+                    },
+                )
+            }
+        }
+    }
+}

@@ -149,7 +149,12 @@ class Prefs(ctx: Context) {
         set(v) { sp.edit().putInt("gridCols", v.coerceIn(2, 4)).apply(); bump() }
 
     /** Cómo se ve Películas/Series: "plat" (por plataforma), "genre" (por género) o "folders" (carpetas del proveedor). */
-    fun browseMode(kind: Kind): String = sp.getString("browse_${kind.name}", "plat") ?: "plat"
+    fun browseMode(kind: Kind): String = sp.getString("browse_${kind.name}", "folders") ?: "folders"
+
+    /** Títulos por fila (el resto, en «Ver todo»): 25, 50, 75 o 100. */
+    var rowLimit: Int
+        get() = sp.getInt("rowLimit", 50)
+        set(v) { sp.edit().putInt("rowLimit", v).apply(); bump() }
     fun setBrowseMode(kind: Kind, v: String) { sp.edit().putString("browse_${kind.name}", v).apply(); bump() }
 
     // ---------- Valoraciones propias ----------

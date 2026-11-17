@@ -29,7 +29,9 @@ object Library {
             catId == com.noirplus.tv.ui.ALL_ID -> visibleAll(kind)
             catId.startsWith(PLAT) -> {
                 val c = Tmdb.catalog(kind, catId.removePrefix(PLAT)) ?: return emptyList()
-                visibleAll(kind).filter { c.has(it) }.distinctBy { Tmdb.titleKey(Tmdb.clean(it.name).first) }.newest()
+                // Lo último estrenado primero (por fecha de estreno, no por cuándo lo añadió el proveedor)
+                visibleAll(kind).filter { c.has(it) }.distinctBy { Tmdb.titleKey(Tmdb.clean(it.name).first) }
+                    .sortedByDescending { c.dateOf(it) }
             }
             catId == NO_PLAT -> {
                 val cats = Tmdb.allCatalogs(kind).values

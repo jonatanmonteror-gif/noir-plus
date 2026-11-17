@@ -346,34 +346,7 @@ fun HomeContent() {
         else HeroArea(hero ?: cycling(featured), "Bienvenido", "Películas, series y canales en directo de tu lista")
     }) {
         if (history.isNotEmpty()) {
-            item(key = "history") {
-                Column {
-                    SectionTitle("Continuar viendo")
-                    LazyRow(
-                        Modifier.focusRestorer(),
-                        contentPadding = PaddingValues(horizontal = d.edge, vertical = 12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(d.gap),
-                    ) {
-                        items(history, key = { it.key }) { p ->
-                            WideCard(
-                                title = p.title,
-                                image = p.image,
-                                progress = p.fraction,
-                                memKey = "home-h/${p.key}",
-                                onFocus = { hero = Item(id = p.key, name = p.title, image = p.image, kind = Kind.LIVE) },
-                                onClick = {
-                                    nav.push(
-                                        Screen.Player(
-                                            PlayRequest(url = p.url, title = p.title, key = p.key, image = p.image,
-                                                isLive = false, startMs = p.position, parent = p.parent)
-                                        )
-                                    )
-                                },
-                            )
-                        }
-                    }
-                }
-            }
+            item(key = "history") { ContinueRow(history, "home-h") { hero = it } }
         }
         if (favs.isNotEmpty()) {
             item(key = "favs") {
@@ -439,6 +412,9 @@ fun BrowseContent(kind: Kind) {
     val featured by produceState(emptyList<Item>(), kind, changes, Repo.dataVersion.intValue) { value = recentOf(kind, 10) }
     val title = if (kind == Kind.MOVIE) "Películas" else "Series"
     var mode by remember(kind) { mutableStateOf(if (Tmdb.configured()) prefs.browseMode(kind) else "folders") }
+    val history = remember(changes, kind) {
+        prefs.history().filter { if (kind == Kind.MOVIE) it.key.startsWith("MOVIE:") else it.key.startsWith("EP:") }
+    }
     LaunchedEffect(mode, kind) { if (mode == "genre") Tmdb.indexGenres(kind) }
 
     val c = cats
@@ -451,6 +427,7 @@ fun BrowseContent(kind: Kind) {
         }) {
             item(key = "modes") { BrowseModes(mode) { mode = it; prefs.setBrowseMode(kind, it) } }
             item(key = "all") { AllEntryRow(kind) }
+            if (history.isNotEmpty()) item(key = "history") { ContinueRow(history, "${kind.name}-h") { hero = it } }
             when (mode) {
                 "plat" -> {
                     itemsIndexed(Platforms.main, key = { _, g -> "p:$g" }) { _, g ->
@@ -476,6 +453,39 @@ fun BrowseContent(kind: Kind) {
                 else -> itemsIndexed(c, key = { i, cat -> "$i:${cat.id}" }) { _, cat ->
                     CategoryRow(kind, cat) { hero = it }
                 }
+            }
+        }
+    }
+}
+
+/** Fila "Continuar viendo" (Inicio, Películas y Series). */
+@Composable
+fun ContinueRow(history: List<com.noirplus.tv.data.Progress>, memPrefix: String, onHero: (Item) -> Unit) {
+    val d = LocalDims.current
+    val nav = LocalNav.current
+    Column {
+        SectionTitle("Continuar viendo")
+        LazyRow(
+            Modifier.focusRestorer(),
+            contentPadding = PaddingValues(horizontal = d.edge, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(d.gap),
+        ) {
+            items(history, key = { it.key }) { p ->
+                WideCard(
+                    title = p.title,
+                    image = p.image,
+                    progress = p.fraction,
+                    memKey = "$memPrefix/${p.key}",
+                    onFocus = { onHero(Item(id = p.key, name = p.title, image = p.image, kind = Kind.LIVE)) },
+                    onClick = {
+                        nav.push(
+                            Screen.Player(
+                                PlayRequest(url = p.url, title = p.title, key = p.key, image = p.image,
+                                    isLive = false, startMs = p.position, parent = p.parent)
+                            )
+                        )
+                    },
+                )
             }
         }
     }

@@ -47,6 +47,7 @@ object Repo {
                 src.categories(k)
                 src.all(k).size
             }
+            r.exceptionOrNull()?.let { ErrorLog.note("Actualizar lista (${k.name})", it) }
             onStep(RefreshStep(k, r.getOrNull(), r.exceptionOrNull()?.let { friendlyError(it) }))
         }
         loadedAt = System.currentTimeMillis()
@@ -55,6 +56,7 @@ object Repo {
 
     fun init(ctx: Context) {
         if (!::prefs.isInitialized) {
+            ErrorLog.init(ctx.applicationContext)
             prefs = Prefs(ctx.applicationContext)
             setupImages(ctx.applicationContext)
             Tmdb.init(ctx.applicationContext)

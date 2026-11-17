@@ -102,6 +102,16 @@ fun CategoryScreen(kind: Kind, cat: Category, startSearch: Boolean = false) {
             progress = null
         }
     }
+    // Filtro por género (TMDB). No sale dentro de una lista que ya es de un género.
+    val canGenre = kind != Kind.LIVE && Tmdb.configured() && !cat.id.startsWith(com.noirplus.tv.data.Library.GENRE)
+    var genre by rememberSaveable { mutableStateOf<Int?>(null) }
+    var genreCats by remember { mutableStateOf<Collection<Tmdb.Catalog>?>(null) }
+    val genreV2 = if (genre != null) Tmdb.genreVersion.intValue else 0
+    LaunchedEffect(genre) {
+        if (genre == null) return@LaunchedEffect
+        Tmdb.indexGenres(kind)
+        genreCats = Tmdb.allCatalogs(kind).values
+    }
     val fieldFr = remember { FocusRequester() }
     LaunchedEffect(searching) {
         if (searching) {
@@ -109,11 +119,12 @@ fun CategoryScreen(kind: Kind, cat: Category, startSearch: Boolean = false) {
             runCatching { fieldFr.requestFocus() }
         }
     }
-    val shown = remember(items, query, sort, platform, catalog) {
+    val shown = remember(items, query, sort, platform, catalog, genre, genreCats, genreV2) {
         val q = normText(query.trim())
         items?.let { all ->
             var l = if (q.isEmpty()) all else all.filter { normText(it.name).contains(q) }
             if (platform != null) l = catalog?.let { c -> l.filter { c.has(it) } } ?: emptyList()
+            genre?.let { g -> l = genreCats?.let { cs -> l.filter { Tmdb.genresOf(it, cs)?.contains(g) == true } } ?: emptyList() }
             l.sortedFor(sort)
         }
     }
@@ -166,6 +177,10 @@ fun CategoryScreen(kind: Kind, cat: Category, startSearch: Boolean = false) {
                 )
                 RoundIconButton(Icons.Filled.Search, "Buscar") { searching = true }
             }
+            if (canGenre) {
+                Spacer(Modifier.width(8.dp))
+                GenreButton(genre, Tmdb.genreNames(kind)) { genre = it }
+            }
             if (canFilter) {
                 Spacer(Modifier.width(8.dp))
                 PlatformButton(platform, Platforms.main) { platform = it }
@@ -177,12 +192,14 @@ fun CategoryScreen(kind: Kind, cat: Category, startSearch: Boolean = false) {
                 ColumnsButton(cols) { cols = it; prefs.gridCols = it }
             }
         }
-        if (sort != prefs.defaultSort || query.isNotBlank() || platform != null) {
+        if (sort != prefs.defaultSort || query.isNotBlank() || platform != null || genre != null) {
             Text(
                 listOfNotNull(
                     shown?.let { "${it.size} resultados" },
                     platform,
+                    genre?.let { Tmdb.genreNames(kind)[it] },
                     progress,
+                    if (genre != null) Tmdb.genreProgress.value?.let { "clasificando ${it.first}/${it.second}" } else null,
                     sort.takeIf { it != prefs.defaultSort }?.label,
                 ).joinToString("  ·  "),
                 color = Col.Sub, fontSize = 12.sp, modifier = Modifier.padding(start = d.edge, bottom = 6.dp),

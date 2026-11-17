@@ -280,11 +280,14 @@ fun ActionButton(
 }
 
 @Composable
-fun SectionTitle(text: String, onSeeAll: (() -> Unit)? = null, year: String? = null, tag: String? = null) {
+fun SectionTitle(text: String, onSeeAll: (() -> Unit)? = null, year: String? = null, tag: String? = null, logo: String? = null) {
     val compact = LocalDims.current.compact
     val size = if (compact) 15 else 17
     Row(Modifier.fillMaxWidth().padding(start = edge, top = 10.dp, end = edge - 8.dp), verticalAlignment = Alignment.CenterVertically) {
         Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+        if (logo != null) {
+            AsyncImage(logo, null, modifier = Modifier.padding(end = 8.dp).size(if (compact) 22.dp else 24.dp).clip(RoundedCornerShape(5.dp)))
+        }
         Text(
             buildAnnotatedString {
                 append(text)
@@ -509,7 +512,7 @@ fun WideCard(
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-fun PosterRow(rowId: String, items: List<Item>, onFocus: (Item) -> Unit, onClick: (Item) -> Unit) {
+fun PosterRow(rowId: String, items: List<Item>, onFocus: (Item) -> Unit, more: Int = 0, onSeeAll: (() -> Unit)? = null, onClick: (Item) -> Unit) {
     val d = LocalDims.current
     LazyRow(
         Modifier.focusRestorer(),
@@ -518,6 +521,24 @@ fun PosterRow(rowId: String, items: List<Item>, onFocus: (Item) -> Unit, onClick
     ) {
         itemsIndexed(items, key = { i, item -> "$i:${item.key}" }) { _, item ->
             PosterCard(item, memKey = "$rowId/${item.key}", onFocus = { onFocus(item) }, onClick = { onClick(item) })
+        }
+        if (onSeeAll != null && more > 0) item(key = "more") { SeeAllCard(rowId, more, onSeeAll) }
+    }
+}
+
+/** Última tarjeta de una fila recortada: lleva a la carpeta completa. */
+@Composable
+private fun SeeAllCard(rowId: String, more: Int, onClick: () -> Unit) {
+    val d = LocalDims.current
+    Focusable(Modifier.width(d.poster).aspectRatio(2f / 3f), key = "$rowId/more", onClick = onClick) { focused ->
+        Column(
+            Modifier.matchParentSize().background(if (focused) Color.White else Col.Surface),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Text("Ver todo", color = if (focused) Color.Black else Col.Text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            Text("+$more", color = if (focused) Color.Black.copy(alpha = 0.6f) else Col.Sub, fontSize = 12.sp,
+                modifier = Modifier.padding(top = 4.dp))
         }
     }
 }
@@ -538,7 +559,12 @@ fun CategoryRow(
     val items by produceState<List<Item>?>(null, kind, cat.id, Repo.dataVersion.intValue, genreV) {
         value = runCatching { com.noirplus.tv.data.Library.items(kind, cat.id) }.getOrDefault(emptyList())
     }
-    val list = items
+    val limit = Repo.prefs.rowLimit
+    val all = items
+    val list = remember(all, limit) { all?.take(limit) }
+    val logo by produceState<String?>(null, cat.id) {
+        if (cat.id.startsWith(com.noirplus.tv.data.Library.PLAT)) value = com.noirplus.tv.data.Tmdb.logo(cat.id.removePrefix(com.noirplus.tv.data.Library.PLAT))
+    }
     LaunchedEffect(list) {
         val first = list?.firstOrNull()
         if (first != null) onLoaded?.invoke(first)
@@ -552,11 +578,13 @@ fun CategoryRow(
             pretty.main,
             year = pretty.year,
             tag = tag,
+            logo = logo,
             onSeeAll = if (!d.tv && !list.isNullOrEmpty()) ({ nav.push(Screen.Category(kind, cat)) }) else null,
         )
         Crossfade(targetState = list, animationSpec = tween(350), label = "row") { l ->
             if (l == null) RowPlaceholder()
-            else PosterRow("${kind.name}-${cat.id}", l, onFocus) { nav.push(Screen.Detail(it)) }
+            else PosterRow("${kind.name}-${cat.id}", l, onFocus, more = (all?.size ?: 0) - l.size,
+                onSeeAll = { nav.push(Screen.Category(kind, cat)) }) { nav.push(Screen.Detail(it)) }
         }
     }
 }

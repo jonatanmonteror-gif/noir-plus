@@ -14,6 +14,7 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.sync.withLock
 
 /**
  * TMDB (The Movie Database): en qué plataformas está cada película o serie en España.
@@ -79,7 +80,7 @@ object Tmdb {
     // la plataforma (unas decenas de páginas en paralelo) y se cruza con tu lista al instante.
 
     /** Una película o serie del catálogo de TMDB: año y géneros. */
-    class Entry(val year: Int, val genres: List<Int>)
+    class Entry(val year: Int, val genres: List<Int>, val date: Int = year * 10000)
 
     /** Lo que hay en una plataforma: fichas por id de TMDB y, por cada título normalizado, sus ids. */
     class Catalog(val entries: Map<String, Entry>, val titles: Map<String, List<String>>) {
@@ -93,6 +94,8 @@ object Tmdb {
         }
         fun has(item: Item): Boolean = match(item) != null
         fun genresOf(item: Item): List<Int>? = match(item)?.let { entries[it]?.genres }
+        /** Fecha de estreno (aaaammdd) de un título de tu lista, o 0. */
+        fun dateOf(item: Item): Int = match(item)?.let { entries[it]?.date } ?: 0
     }
 
     private val catalogs = ConcurrentHashMap<String, Catalog>()
@@ -100,6 +103,70 @@ object Tmdb {
     fun titleKey(s: String): String =
         marks.replace(java.text.Normalizer.normalize(s, java.text.Normalizer.Form.NFD), "").lowercase()
             .replace(Regex("[^a-z0-9]+"), " ").trim()
+
+    // --- Logos de las plataformas (para el título de cada fila) ---
+    private val logos = ConcurrentHashMap<String, String>()
+    @Volatile private var logosLoaded = false
+    private val logoLock = kotlinx.coroutines.sync.Mutex()
+
+    /** Logo de una plataforma (Netflix, Disney+…) en España. Se pide una vez y se guarda. */
+    suspend fun logo(group: String): String? {
+        if (!configured()) return null
+        logos[group]?.let { return it }
+        if (logosLoaded) return null
+        logoLock.withLock {
+            if (logosLoaded) return logos[group]
+            val f = file?.parentFile?.let { File(it, "tmdb_logos.json") }
+            runCatching {
+                if (f != null && f.exists() && System.currentTimeMillis() - f.lastModified() < 30 * WEEK / 7) {
+                    val o = JSONObject(f.readText()); for (k in o.keys()) logos[k] = o.optString(k)
+                }
+            }
+            if (logos.isEmpty()) {
+                for (type in listOf("movie", "tv")) {
+                    val arr = get("/watch/providers/$type", "watch_region=ES")?.optJSONArray("results") ?: continue
+                    // Por prioridad de TMDB: el logo principal de cada plataforma va primero
+                    val list = (0 until arr.length()).mapNotNull { arr.optJSONObject(it) }
+                        .sortedBy { it.optJSONObject("display_priorities")?.optInt("ES", 999) ?: it.optInt("display_priority", 999) }
+                    for (o in list) {
+                        val g = Platforms.group(o.optString("provider_name"))
+                        val path = o.optString("logo_path").takeIf { it.isNotBlank() } ?: continue
+                        logos.putIfAbsent(g, "https://image.tmdb.org/t/p/w92$path")
+                    }
+                }
+                if (logos.isNotEmpty()) runCatching { f?.writeText(JSONObject(logos.toMap()).toString()) }
+            }
+            logosLoaded = true
+        }
+        return logos[group]
+    }
+
+    // --- Tráiler en español (YouTube) ---
+    /**
+     * Enlace al tráiler en español: primero de España, luego cualquier español; si TMDB no tiene ninguno,
+     * null (y se buscará en YouTube por título).
+     */
+    suspend fun trailer(item: Item, tmdbId: String?): String? {
+        if (!configured() || item.kind == Kind.LIVE) return null
+        val type = if (item.kind == Kind.SERIES) "tv" else "movie"
+        var id = item.tmdb?.takeIf { it.isNotBlank() && it != "0" } ?: tmdbId?.takeIf { it.isNotBlank() && it != "0" }
+        if (id == null) {
+            val (q, year) = clean(item.name)
+            if (q.isBlank()) return null
+            val yp = year?.let { if (type == "tv") "&first_air_date_year=$it" else "&year=$it" } ?: ""
+            id = get("/search/$type", "query=${enc(q)}&include_adult=false$yp")?.optJSONArray("results")
+                ?.optJSONObject(0)?.optString("id")?.takeIf { it.isNotBlank() } ?: return null
+        }
+        val arr = get("/$type/$id/videos", "include_video_language=es")?.optJSONArray("results") ?: return null
+        val vids = (0 until arr.length()).mapNotNull { arr.optJSONObject(it) }
+            .filter { it.optString("site") == "YouTube" && it.optString("iso_639_1") == "es" && it.optString("key").isNotBlank() }
+        fun score(o: JSONObject): Int =
+            (if (o.optString("iso_3166_1") == "ES") 0 else 10) +
+                when (o.optString("type")) { "Trailer" -> 0; "Teaser" -> 3; else -> 6 } +
+                (if (o.optBoolean("official")) 0 else 1)
+        val best = vids.minByOrNull { score(it) } ?: return null
+        return "https://www.youtube.com/watch?v=" + best.optString("key")
+    }
 
     /** Ids de TMDB de todas las variantes de una plataforma en España (p. ej. Netflix y Netflix con anuncios). */
     private suspend fun providerIds(type: String, group: String): String? {
@@ -114,7 +181,7 @@ object Tmdb {
     /** Catálogo de una plataforma (se guarda una semana). onProgress(hechas, total) en páginas. */
     private fun catFile(kind: Kind, group: String): File? {
         val type = if (kind == Kind.SERIES) "tv" else "movie"
-        return file?.parentFile?.let { File(it, "tmdb_cat2_" + titleKey("$type:$group").replace(' ', '_') + ".json") }
+        return file?.parentFile?.let { File(it, "tmdb_cat3_" + titleKey("$type:$group").replace(' ', '_') + ".json") }
     }
 
     private fun isFresh(kind: Kind, group: String): Boolean =
@@ -158,7 +225,7 @@ object Tmdb {
                 for (k in eO.keys()) {
                     val a = eO.getJSONArray(k)
                     val g = a.optJSONArray(1)
-                    entries[k] = Entry(a.optInt(0), (0 until (g?.length() ?: 0)).map { g!!.optInt(it) })
+                    entries[k] = Entry(a.optInt(0), (0 until (g?.length() ?: 0)).map { g!!.optInt(it) }, a.optInt(2))
                 }
                 val titles = HashMap<String, List<String>>()
                 for (k in tO.keys()) { val a = tO.getJSONArray(k); titles[k] = (0 until a.length()).map { a.optString(it) } }
@@ -190,9 +257,11 @@ object Tmdb {
         for (arr in results.values) for (i in 0 until arr.length()) {
             val o = arr.optJSONObject(i) ?: continue
             val tid = o.optString("id").takeIf { it.isNotBlank() } ?: continue
-            val year = (o.optString(if (type == "tv") "first_air_date" else "release_date")).take(4).toIntOrNull() ?: 0
+            val rd = o.optString(if (type == "tv") "first_air_date" else "release_date")
+            val year = rd.take(4).toIntOrNull() ?: 0
+            val date = rd.replace("-", "").take(8).toIntOrNull() ?: (year * 10000)
             val g = o.optJSONArray("genre_ids")
-            entries[tid] = Entry(year, (0 until (g?.length() ?: 0)).map { g!!.optInt(it) })
+            entries[tid] = Entry(year, (0 until (g?.length() ?: 0)).map { g!!.optInt(it) }, date)
             for (k in listOf("title", "original_title", "name", "original_name")) {
                 val t = o.optString(k).takeIf { it.isNotBlank() } ?: continue
                 val key = titleKey(t)
@@ -204,7 +273,7 @@ object Tmdb {
         // Solo se guarda si llegaron casi todas las páginas
         if (f != null && results.size >= pages * 9 / 10) runCatching {
             val eO = JSONObject()
-            for ((k, v) in entries) eO.put(k, org.json.JSONArray().put(v.year).put(org.json.JSONArray(v.genres)))
+            for ((k, v) in entries) eO.put(k, org.json.JSONArray().put(v.year).put(org.json.JSONArray(v.genres)).put(v.date))
             val tO = JSONObject()
             for ((k, v) in titles) tO.put(k, org.json.JSONArray(v))
             f.writeText(JSONObject().put("e", eO).put("t", tO).toString())

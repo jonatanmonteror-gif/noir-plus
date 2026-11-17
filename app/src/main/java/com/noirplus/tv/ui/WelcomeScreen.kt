@@ -200,7 +200,7 @@ fun WelcomeScreen() {
         Crossfade(targetState = backdrops.getOrNull(bgIndex)?.image, animationSpec = tween(1400), label = "bg") { url ->
             if (url != null) {
                 AsyncImage(
-                    model = url, contentDescription = null, contentScale = ContentScale.Crop, alpha = if (d.compact) 1f else 0.5f,
+                    model = url, contentDescription = null, contentScale = ContentScale.Crop, alpha = if (d.compact) 0.88f else 0.44f,
                     modifier = Modifier.fillMaxSize().graphicsLayer { scaleX = zoom; scaleY = zoom },
                 )
             }

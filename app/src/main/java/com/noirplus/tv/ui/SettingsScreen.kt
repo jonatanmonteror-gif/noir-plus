@@ -227,6 +227,11 @@ fun SettingsContent() {
                     note = "Cómo se ordena al abrir «Ver todo» o «Todas». Siempre puedes cambiarlo dentro con el botón de ordenar.") {
                     prefs.defaultSort = sortOpts[it]
                 }
+                val limits = listOf(25, 50, 75, 100)
+                ChoiceRow("Títulos por fila", limits.map { it.toString() }, limits.indexOf(prefs.rowLimit).coerceAtLeast(1), "rl",
+                    note = "Cuántos se muestran en cada fila. El resto, en «Ver todo». Menos = más fluido en la tele.") {
+                    prefs.rowLimit = limits[it]
+                }
                 ChoiceRow("Columnas en las carpetas", listOf("2", "3", "4"), prefs.gridCols - 2, "gc",
                     note = "En el móvil, al abrir «Ver todo» o «Todas». También se cambia dentro de la propia lista.") { prefs.gridCols = it + 2 }
             }
@@ -263,6 +268,32 @@ fun SettingsContent() {
                         LinkRow("Cambiar PIN", key = "set-pinch") { pinDialog = "set" }
                         LinkRow("Quitar PIN", key = "set-pinrm", danger = true) { pinDialog = "remove" }
                     }
+                }
+            }
+
+            Section("Registro de errores") {
+                val ev = com.noirplus.tv.data.ErrorLog.version.intValue
+                val n = remember(ev) { com.noirplus.tv.data.ErrorLog.count() }
+                val ctx = androidx.compose.ui.platform.LocalContext.current
+                Note(if (n == 0) "No hay errores registrados." else "$n errores registrados. Cópialos o compártelos para revisarlos. No incluyen tu usuario, contraseña ni servidor.")
+                if (n > 0) {
+                    LinkRow("Copiar al portapapeles", key = "err-copy") {
+                        val cm = ctx.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                        cm.setPrimaryClip(android.content.ClipData.newPlainText("Noir+ errores", com.noirplus.tv.data.ErrorLog.read()))
+                        android.widget.Toast.makeText(ctx, "Copiado", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                    LinkRow("Compartir", key = "err-share") {
+                        val i = android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/plain")
+                            .putExtra(android.content.Intent.EXTRA_SUBJECT, "Noir+ · registro de errores")
+                            .putExtra(android.content.Intent.EXTRA_TEXT, com.noirplus.tv.data.ErrorLog.read())
+                        runCatching { ctx.startActivity(android.content.Intent.createChooser(i, "Compartir registro").addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                    }
+                    if (!LocalDims.current.compact) {
+                        // En la tele: verlo en pantalla (últimos errores)
+                        Text(com.noirplus.tv.data.ErrorLog.read().takeLast(1500), color = Col.Sub, fontSize = 10.sp, lineHeight = 13.sp,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
+                    }
+                    LinkRow("Borrar registro", key = "err-clear", danger = true) { com.noirplus.tv.data.ErrorLog.clear() }
                 }
             }
 

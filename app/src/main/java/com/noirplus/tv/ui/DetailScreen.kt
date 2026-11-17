@@ -1,5 +1,6 @@
 package com.noirplus.tv.ui
 
+import kotlinx.coroutines.launch
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -210,7 +211,7 @@ private fun IconLabel(icon: ImageVector, label: String, onClick: () -> Unit) {
 
 /** Mi lista · botón grande de reproducir · Info */
 @Composable
-private fun PhoneActions(fav: Boolean, onFav: () -> Unit, onPlay: () -> Unit, onInfo: () -> Unit, playHint: String?) {
+private fun PhoneActions(fav: Boolean, onFav: () -> Unit, onPlay: () -> Unit, onInfo: () -> Unit, playHint: String?, onTrailer: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().padding(top = 22.dp, start = 20.dp, end = 20.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
@@ -221,6 +222,7 @@ private fun PhoneActions(fav: Boolean, onFav: () -> Unit, onPlay: () -> Unit, on
             Modifier.size(68.dp).clip(CircleShape).background(Color.White).clickable { onPlay() },
             contentAlignment = Alignment.Center,
         ) { Icon(Icons.Filled.PlayArrow, "Reproducir", tint = Color.Black, modifier = Modifier.size(40.dp)) }
+        IconLabel(TrailerIcon, "Tráiler", onTrailer)
         IconLabel(Icons.Filled.Info, "Info", onInfo)
     }
     if (playHint != null) {
@@ -293,6 +295,7 @@ private fun MovieDetail(item: Item) {
     val d = LocalDims.current
     val changes = prefs.changes.intValue
     val details by produceState<Details?>(null) { value = runCatching { src.movieDetails(item) }.getOrNull() }
+    val trailer = rememberTrailer(item) { details?.tmdbId }
     val progress = remember(changes) { prefs.progress(item.key) }
     val fav = remember(changes) { prefs.isFavorite(item.key) }
     val playFr = remember { FocusRequester() }
@@ -324,6 +327,7 @@ private fun MovieDetail(item: Item) {
                 onPlay = { play(progress?.position ?: 0L) },
                 onInfo = { expanded = !expanded },
                 playHint = progress?.let { "Continuar desde ${fmt(it.position)}" },
+                onTrailer = trailer,
             )
             Box(Modifier.fillMaxWidth().padding(top = 10.dp), contentAlignment = Alignment.Center) {
                 MyRatingLine(item.key, { rate(item.rateTarget()) })
@@ -357,6 +361,7 @@ private fun MovieDetail(item: Item) {
                 }
                 ActionButton(if (fav) "✓  En mi lista" else "+  Mi lista", key = "d-fav") { prefs.toggleFavorite(item) }
                 ActionButton(mine?.let { "Tu nota ${fmtStars(it.stars)} ★" } ?: "Valorar", key = "d-rate") { rate(item.rateTarget()) }
+                ActionButton("Tráiler", key = "d-trailer") { trailer() }
             }
         }
     }
@@ -379,6 +384,7 @@ private fun SeriesDetail(item: Item) {
         if (r == null) failed = true
         value = r
     }
+    val trailer = rememberTrailer(item) { sd?.details?.tmdbId }
     val seasons = sd?.seasons?.keys?.toList() ?: emptyList()
     var season by rememberSaveable { mutableIntStateOf(-1) }
     LaunchedEffect(seasons) {
@@ -458,6 +464,7 @@ private fun SeriesDetail(item: Item) {
                     first != null -> "Empezar · T${first.season} E${first.number}"
                     else -> null
                 },
+                onTrailer = trailer,
             )
             Box(Modifier.fillMaxWidth().padding(top = 10.dp), contentAlignment = Alignment.Center) {
                 MyRatingLine(item.key, { rate(item.rateTarget()) })
@@ -514,6 +521,7 @@ private fun SeriesDetail(item: Item) {
                         focusRequester = if (last == null && first == null) playFr else null) { prefs.toggleFavorite(item) }
                     val mineS = remember(changes) { prefs.rating(item.key) }
                     ActionButton(mineS?.let { "Tu nota ${fmtStars(it.stars)} ★" } ?: "Valorar", key = "s-rate") { rate(item.rateTarget()) }
+                    ActionButton("Tráiler", key = "s-trailer") { trailer() }
                 }
             }
             Spacer(Modifier.height(14.dp))
@@ -551,4 +559,49 @@ private fun SeriesDetail(item: Item) {
             }
         }
     }
+}
+
+
+/** Icono "tráiler" (pantalla con play). */
+private val TrailerIcon: androidx.compose.ui.graphics.vector.ImageVector =
+    androidx.compose.material.icons.materialIcon(name = "Filled.Trailer") {
+        androidx.compose.material.icons.materialPath {
+            moveTo(2f, 5f); horizontalLineTo(22f); verticalLineTo(19f); horizontalLineTo(2f); close()
+            moveTo(10f, 8.5f); verticalLineTo(15.5f); lineTo(16f, 12f); close()
+        }
+    }
+
+/**
+ * Abre el tráiler en español en YouTube. Si TMDB no tiene uno en español, busca en YouTube
+ * "<título> tráiler español".
+ */
+@Composable
+private fun rememberTrailer(item: Item, tmdbId: () -> String?): () -> Unit {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var busy by remember { mutableStateOf(false) }
+    return {
+        if (!busy) {
+            busy = true
+            scope.launch {
+                val url = runCatching { com.noirplus.tv.data.Tmdb.trailer(item, tmdbId()) }.getOrNull()
+                openTrailer(ctx, url, com.noirplus.tv.data.Tmdb.clean(item.name).first)
+                busy = false
+            }
+        }
+    }
+}
+
+private fun openTrailer(ctx: android.content.Context, url: String?, title: String) {
+    fun start(i: android.content.Intent): Boolean = runCatching {
+        ctx.startActivity(i.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)); true
+    }.getOrDefault(false)
+    if (url != null && start(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url)))) return
+    val q = "$title tráiler español"
+    for (pkg in listOf("com.google.android.youtube.tv", "com.google.android.youtube")) {
+        if (start(android.content.Intent(android.content.Intent.ACTION_SEARCH).setPackage(pkg).putExtra("query", q))) return
+    }
+    if (start(android.content.Intent(android.content.Intent.ACTION_VIEW,
+            android.net.Uri.parse("https://www.youtube.com/results?search_query=" + java.net.URLEncoder.encode(q, "UTF-8"))))) return
+    android.widget.Toast.makeText(ctx, "No hay ninguna app de YouTube instalada", android.widget.Toast.LENGTH_SHORT).show()
 }
