@@ -118,7 +118,8 @@ object Col {
     val Hairline = Color(0x14FFFFFF)
 }
 
-private val focusSpring = spring<Float>(dampingRatio = 0.78f, stiffness = Spring.StiffnessMediumLow)
+private val focusSpring = spring<Float>(dampingRatio = 0.82f, stiffness = 420f)
+private val elevationSpring = spring<androidx.compose.ui.unit.Dp>(dampingRatio = 1f, stiffness = 420f)
 
 /** Recuerda qué tarjeta tenía el foco para devolverlo al volver atrás. */
 class FocusMemory {
@@ -158,7 +159,7 @@ fun Focusable(
         else -> 1f
     }
     val scale by animateFloatAsState(target, focusSpring, label = "scale")
-    val elevation by animateDpAsState(if (focused && tv && focusScale > 1f) 22.dp else 0.dp, tween(220), label = "elev")
+    val elevation by animateDpAsState(if (focused && tv && focusScale > 1f) 22.dp else 0.dp, elevationSpring, label = "elev")
     val mem = LocalFocusMemory.current
     val ownRequester = remember { FocusRequester() }
     val fr = focusRequester ?: ownRequester
@@ -619,8 +620,15 @@ const val ALL_ID = "__all"
  * TV/tablet: imagen a la derecha con degradado lateral. Móvil: imagen a lo ancho con el texto encima.
  */
 @Composable
-fun HeroArea(item: Item?, emptyTitle: String, emptySubtitle: String) {
+fun HeroArea(item0: Item?, emptyTitle: String, emptySubtitle: String) {
     val d = LocalDims.current
+    // En la tele la cabecera espera a que te detengas un instante en una carátula:
+    // así, al recorrer una fila, no se recarga en cada paso (más fluido y sin tirones).
+    var item by remember { mutableStateOf(item0) }
+    LaunchedEffect(item0?.key) {
+        if (d.tv && item != null) delay(320)
+        item = item0
+    }
     val src = Repo.source
     val nav = LocalNav.current
     val details by produceState<Details?>(null, item?.key) {
@@ -739,7 +747,8 @@ fun Backdrop(url: String?) {
 @OptIn(ExperimentalFoundationApi::class)
 class PeekSpec(private val leadPx: Float) : BringIntoViewSpec {
     @Suppress("OVERRIDE_DEPRECATION", "DEPRECATION")
-    override val scrollAnimationSpec: AnimationSpec<Float> = tween(190, easing = FastOutSlowInEasing)
+    // Muelle sin rebote: al pulsar seguido, el movimiento se encadena con suavidad en vez de ir a golpes
+    override val scrollAnimationSpec: AnimationSpec<Float> = spring(dampingRatio = 1f, stiffness = 340f)
 
     override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float {
         if (size >= containerSize) return offset

@@ -56,7 +56,7 @@ class MainActivity : ComponentActivity() {
         // "moviéndose solas" después de soltar. Se deja pasar como mucho un paso cada 130 ms.
         if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount > 0 && event.keyCode in arrowKeys) {
             val now = android.os.SystemClock.uptimeMillis()
-            if (now - lastRepeatAt < 130) return true
+            if (now - lastRepeatAt < 110) return true
             lastRepeatAt = now
         }
         return super.dispatchKeyEvent(event)
