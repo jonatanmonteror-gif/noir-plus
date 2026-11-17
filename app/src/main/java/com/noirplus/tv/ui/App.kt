@@ -37,6 +37,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -163,10 +164,11 @@ fun App() {
     }
 }
 
-/** Aviso discreto cuando hay una versión nueva (se comprueba una vez por sesión). */
+/** Actualización: se comprueba al abrir, se descarga sola en segundo plano y queda lista para instalar. */
 private object UpdateCheck {
     var checked = false
     var release: Updater.Release? = null
+    var file: java.io.File? = null
 }
 
 @Composable
@@ -174,25 +176,33 @@ private fun UpdateNotice() {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     var rel by remember { mutableStateOf(UpdateCheck.release) }
+    var ready by remember { mutableStateOf(UpdateCheck.file) }
     var visible by remember { mutableStateOf(true) }
     var status by remember { mutableStateOf<String?>(null) }
+    val installFr = remember { FocusRequester() }
     LaunchedEffect(Unit) {
         if (!UpdateCheck.checked) {
             UpdateCheck.checked = true
-            delay(4000)
+            delay(1500)
             val r = Updater.latest()
             if (r != null && r.versionCode > Updater.currentCode) {
                 UpdateCheck.release = r
                 rel = r
+                // Descarga en segundo plano (comprobada con su huella SHA-256)
+                val f = runCatching { Updater.download(ctx, r) { } }.getOrNull()
+                UpdateCheck.file = f
+                ready = f
             }
         }
     }
     val r = rel ?: return
-    LaunchedEffect(r) {
-        delay(20_000)
-        if (status == null) visible = false
+    val f = ready
+    if (!visible || f == null) return
+    // En la tele, el botón «Instalar» queda seleccionado: basta con pulsar OK
+    LaunchedEffect(f) {
+        delay(300)
+        runCatching { installFr.requestFocus() }
     }
-    if (!visible) return
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomEnd) {
         Row(
             Modifier.padding(horizontal = 20.dp, vertical = if (LocalDims.current.compact) 88.dp else 24.dp)
@@ -200,23 +210,14 @@ private fun UpdateNotice() {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.padding(end = 14.dp)) {
-                Text("Nueva versión disponible", color = Col.Text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                Text(status ?: r.name, color = Col.Sub, fontSize = 12.sp)
+                Text("Nueva versión lista", color = Col.Text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                Text(status ?: "${r.name} · ya descargada", color = Col.Sub, fontSize = 12.sp)
             }
-            ActionButton("Actualizar", primary = true) {
-                if (status?.startsWith("Descargando") == true) return@ActionButton
-                status = "Descargando…"
-                scope.launch {
-                    status = try {
-                        val f = Updater.download(ctx, r) { p -> status = "Descargando… ${(p * 100).toInt()} %" }
-                        if (Updater.install(ctx, f)) "Abriendo el instalador…" else "Permite «Instalar apps desconocidas» y vuelve a pulsar"
-                    } catch (t: Throwable) {
-                        t.message ?: "Error al descargar"
-                    }
-                }
+            ActionButton("Instalar", primary = true, key = "upd-install", focusRequester = installFr) {
+                status = if (Updater.install(ctx, f)) "Abriendo el instalador…" else "Permite «Instalar apps desconocidas» y vuelve a pulsar"
             }
             Spacer(Modifier.width(8.dp))
-            ActionButton("Luego") { visible = false }
+            ActionButton("Luego", key = "upd-later") { visible = false }
         }
     }
 }
