@@ -41,10 +41,16 @@ private fun Header(item: Item, d: Details?, extra: String?) {
         maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 14.dp))
     val meta = listOfNotNull(d?.year ?: item.year, extra, d?.duration, d?.genre).filter { it.isNotBlank() }.joinToString("   ·   ")
     if (meta.isNotBlank()) Text(meta, color = Col.Sub, fontSize = 14.sp, modifier = Modifier.padding(top = 10.dp))
-    (d?.rating ?: item.rating)?.toFloatOrNull()?.takeIf { it > 0 }?.let { r ->
-        val stars = if (r > 5) r / 2 else r
-        Text("★".repeat(stars.toInt().coerceIn(0, 5)) + "☆".repeat(5 - stars.toInt().coerceIn(0, 5)) + "  " + String.format("%.1f", stars),
-            color = Color.White, fontSize = 16.sp, modifier = Modifier.padding(top = 10.dp))
+    // Nota de IMDb (en lugar de la valoración del proveedor)
+    val imdb by produceState(Imdb.cached(item), item.key, d?.tmdbId) { value = Imdb.score(item, d?.tmdbId) ?: value }
+    imdb?.let { s ->
+        Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("IMDb", color = Color.Black, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold,
+                modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(Color(0xFFF5C518)).padding(horizontal = 6.dp, vertical = 1.dp))
+            Text(String.format("%.1f", s.rating), color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(start = 10.dp))
+            Text("/10  ·  " + s.votesText, color = Col.Sub, fontSize = 13.sp, modifier = Modifier.padding(start = 4.dp))
+        }
     }
     (d?.plot ?: item.plot)?.let {
         Text(it, color = Col.Text.copy(alpha = 0.88f), fontSize = 16.sp, lineHeight = 23.sp, maxLines = 6, overflow = TextOverflow.Ellipsis,

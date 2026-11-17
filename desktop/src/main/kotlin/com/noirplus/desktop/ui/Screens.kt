@@ -276,7 +276,7 @@ fun CategoryScreen(kind: Kind, cat: Category) {
             when (sort) {
                 0 -> if (kind == Kind.LIVE) l else Tmdb.byRelease(l)
                 1 -> l.sortedBy { normText(it.name) }
-                2 -> l.sortedByDescending { it.rating?.toFloatOrNull() ?: 0f }
+                2 -> l.sortedByDescending { Imdb.cached(it)?.rating ?: 0f }
                 else -> l
             }
         }

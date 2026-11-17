@@ -161,6 +161,13 @@ object Tmdb {
             .sortedBy { platforms.indexOf(it) }
     }
 
+    /** Número de TMDB del título, si está en algún catálogo ya cargado. */
+    fun tmdbIdOf(item: Item): String? {
+        val p = prep(item)
+        for ((_, c) in loaded(item.kind)) c.match(p)?.let { return it }
+        return null
+    }
+
     fun genresOf(item: Item): List<Int>? {
         val p = prep(item)
         for ((_, c) in loaded(item.kind)) c.match(p)?.let { id -> c.entries[id]?.genres?.let { return it } }
