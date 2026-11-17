@@ -488,12 +488,6 @@ fun PlayerScreen(start: PlayRequest, mini: Boolean = false) {
             }
         }
 
-        // Línea de tiempo siempre visible (fina) cuando los controles están ocultos
-        if (!showControls && !req.isLive && length > 0) {
-            Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(3.dp).background(Color.White.copy(alpha = 0.18f))) {
-                Box(Modifier.fillMaxWidth((time.toFloat() / length).coerceIn(0f, 1f)).fillMaxHeight().background(Color.White.copy(alpha = 0.85f)))
-            }
-        }
         toast?.let {
             Text(it, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.align(Alignment.TopCenter).padding(top = 90.dp).clip(RoundedCornerShape(50))
@@ -612,7 +606,7 @@ private fun Tracks(video: VlcVideo, audio: Boolean) {
     if (tracks.isEmpty()) Text("No hay pistas disponibles", color = Col.Sub, fontSize = 13.sp, modifier = Modifier.padding(8.dp))
     tracks.forEach { t ->
         val sel = t.id() == current
-        val label = if (t.id() < 0) "Desactivados" else t.description().ifBlank { "Pista ${t.id()}" }
+        val label = if (t.id() < 0) "Desactivados" else trackLabel(t.description(), t.id())
         Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(if (sel) Color.White else Color.Transparent)
             .clickable {
                 if (audio) video.mp.audio().setTrack(t.id()) else video.mp.subpictures().setTrack(t.id())
@@ -741,4 +735,71 @@ private fun NoVlc(onBack: () -> Unit) {
             }
         }
     }
+}
+
+
+/** Arregla textos que llegan con la codificación cambiada (EspaÃ±ol → Español). */
+internal fun fixMojibake(s: String): String {
+    if (!s.contains('Ã') && !s.contains('Â')) return s
+    for (cs in listOf("windows-1252", "ISO-8859-1")) {
+        val r = runCatching { String(s.toByteArray(charset(cs)), Charsets.UTF_8) }.getOrNull() ?: continue
+        if (!r.contains('\uFFFD')) return r
+    }
+    return s
+}
+
+private val regionNames = mapOf(
+    "ES" to "España", "419" to "Latinoamérica", "MX" to "México", "AR" to "Argentina", "US" to "EE. UU.",
+    "GB" to "Reino Unido", "BR" to "Brasil", "PT" to "Portugal", "FR" to "Francia", "CA" to "Canadá",
+)
+
+private val langNames = mapOf(
+    "es" to "Español", "spa" to "Español", "spanish" to "Español", "castellano" to "Español", "español" to "Español",
+    "en" to "Inglés", "eng" to "Inglés", "english" to "Inglés", "inglés" to "Inglés",
+    "fr" to "Francés", "fre" to "Francés", "fra" to "Francés", "french" to "Francés",
+    "de" to "Alemán", "ger" to "Alemán", "deu" to "Alemán", "german" to "Alemán",
+    "it" to "Italiano", "ita" to "Italiano", "italian" to "Italiano",
+    "pt" to "Portugués", "por" to "Portugués", "portuguese" to "Portugués",
+    "ca" to "Catalán", "cat" to "Catalán", "catalan" to "Catalán",
+    "ja" to "Japonés", "jpn" to "Japonés", "japanese" to "Japonés",
+)
+
+/**
+ * Nombre limpio de una pista de VLC. Ej.: «Spanish - [EspaÃ±ol]» → «Español»,
+ * «es-419--forced-- - [Español]» → «Español (Latinoamérica) · Forzados».
+ */
+internal fun trackLabel(raw: String, id: Int): String {
+    val d = fixMojibake(raw).trim()
+    if (d.isEmpty()) return "Pista $id"
+    val m = Regex("""^(.*?)\s*-\s*\[(.+)]$""").find(d)
+    var title = (m?.groupValues?.get(1) ?: d).trim()
+    val bracket = m?.groupValues?.get(2)?.trim().orEmpty()
+
+    val lower = title.lowercase()
+    val forced = lower.contains("forced") || lower.contains("forzad")
+    val sdh = Regex("""\b(sdh|cc)\b""").containsMatchIn(lower)
+    // Código tipo es-ES, es-419, en-US al principio del título
+    val code = Regex("""^([a-z]{2,3})[-_]([A-Za-z]{2}|\d{3})""").find(title)
+    val region = code?.groupValues?.get(2)?.uppercase()?.let { regionNames[it] }
+    val codeLang = code?.groupValues?.get(1)?.let { langNames[it.lowercase()] }
+
+    val lang = langNames[bracket.lowercase()] ?: bracket.replaceFirstChar { it.uppercase() }.ifEmpty { null }
+        ?: codeLang ?: langNames[lower]
+
+    // Restos del título que aportan algo (p. ej. «Castellano AC3 5.1», «Comentarios»)
+    title = title.replace(Regex("""^[a-z]{2,3}[-_]([A-Za-z]{2}|\d{3})""", RegexOption.IGNORE_CASE), "")
+        .replace(Regex("""-*forced-*|forzados?|\b(sdh|cc)\b""", RegexOption.IGNORE_CASE), "")
+        .replace(Regex("""^(track|pista)\s*\d+$""", RegexOption.IGNORE_CASE), "")
+        .trim(' ', '-', '_', '·')
+    if (title.isNotEmpty() && (langNames[title.lowercase()] != null || title.equals(lang, true))) title = ""
+
+    val parts = mutableListOf<String>()
+    parts += buildString {
+        append(lang ?: title.ifEmpty { "Pista $id" })
+        region?.let { append(" ($it)") }
+    }
+    if (lang != null && title.isNotEmpty()) parts += title
+    if (forced) parts += "Forzados"
+    if (sdh) parts += "Para sordos"
+    return parts.joinToString(" · ")
 }
