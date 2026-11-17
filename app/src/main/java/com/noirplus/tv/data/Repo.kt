@@ -15,6 +15,8 @@ object Repo {
 
     /** Se incrementa cuando hay que volver a mostrar la bienvenida (app abierta tras varias horas). */
     val welcomeRequest = mutableIntStateOf(0)
+    /** Sube cada vez que la app vuelve a primer plano (para volver a mirar si hay actualización). */
+    val resumeCount = mutableIntStateOf(0)
 
     /** Cambia cada vez que se actualizan las listas: las pantallas lo usan para recargar. */
     val dataVersion = mutableIntStateOf(0)
@@ -86,7 +88,7 @@ object Repo {
             ImageLoader.Builder(ctx)
                 .okHttpClient(ImageTuning.client)
                 .components { add(ImageTuning.interceptor) }
-                .crossfade(150)
+                .crossfade(if (prefs.isTv) 0 else 150)
                 .allowRgb565(true)
                 .respectCacheHeaders(false)
                 .memoryCache { MemoryCache.Builder(ctx).maxSizePercent(0.20).build() }

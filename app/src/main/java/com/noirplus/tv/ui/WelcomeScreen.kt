@@ -87,8 +87,11 @@ fun kindPlural(k: Kind) = when (k) {
 /** Aparición suave (sube y se ilumina) con retraso escalonado. */
 @Composable
 fun Reveal(delayMs: Int, content: @Composable () -> Unit) {
-    val a = remember { Animatable(0f) }
+    // En la tele las fichas aparecen directamente (la pantalla de bienvenida usa sus propias animaciones)
+    val instant = LocalDims.current.tv && delayMs < 300
+    val a = remember { Animatable(if (instant) 1f else 0f) }
     LaunchedEffect(Unit) {
+        if (instant) return@LaunchedEffect
         delay(delayMs.toLong())
         a.animateTo(1f, tween(700, easing = FastOutSlowInEasing))
     }

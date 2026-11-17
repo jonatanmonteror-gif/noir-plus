@@ -94,7 +94,7 @@ private fun BigScreenMain() {
 
     // En TV, al pasar por las pestañas esperamos a que el usuario se quede quieto antes de cargar.
     LaunchedEffect(tab) {
-        if (d.tv) delay(250)
+        if (d.tv) delay(180)
         shown = tab
     }
     LaunchedEffect(Unit) {
@@ -122,7 +122,7 @@ private fun BigScreenMain() {
             }
             Spacer(Modifier.weight(1f))
         }
-        Crossfade(targetState = shown, animationSpec = tween(220), modifier = Modifier.weight(1f).fillMaxWidth(), label = "tabs") { t ->
+        Crossfade(targetState = shown, animationSpec = tween(if (d.tv) 0 else 220), modifier = Modifier.weight(1f).fillMaxWidth(), label = "tabs") { t ->
             when (t) {
                 Tab.HOME -> HomeContent()
                 Tab.LIVE -> LiveContent()
@@ -411,7 +411,14 @@ fun BrowseContent(kind: Kind) {
     }
     val featured by produceState(emptyList<Item>(), kind, changes, Repo.dataVersion.intValue) { value = recentOf(kind, 10) }
     val title = if (kind == Kind.MOVIE) "Películas" else "Series"
-    var mode by remember(kind) { mutableStateOf(if (Tmdb.configured()) prefs.browseMode(kind) else "folders") }
+    // Móvil: siempre por plataforma o por género (por defecto, plataforma). Tele: también carpetas (por defecto).
+    var mode by remember(kind) {
+        mutableStateOf(when {
+            !Tmdb.configured() -> "folders"
+            d.compact -> prefs.browseMode(kind).takeIf { it != "folders" } ?: "plat"
+            else -> prefs.browseMode(kind)
+        })
+    }
     val history = remember(changes, kind) {
         prefs.history().filter { if (kind == Kind.MOVIE) it.key.startsWith("MOVIE:") else it.key.startsWith("EP:") }
     }
@@ -498,7 +505,7 @@ fun ContinueRow(history: List<com.noirplus.tv.data.Progress>, memPrefix: String,
 @Composable
 private fun BrowseModes(mode: String, onChange: (String) -> Unit) {
     val d = LocalDims.current
-    val opts = listOf("plat" to "Plataformas", "genre" to "Géneros", "folders" to "Carpetas")
+    val opts = listOf("plat" to "Plataformas", "genre" to "Géneros") + if (d.compact) emptyList() else listOf("folders" to "Carpetas")
     Row(
         Modifier.fillMaxWidth().padding(start = d.edge, end = d.edge, top = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),

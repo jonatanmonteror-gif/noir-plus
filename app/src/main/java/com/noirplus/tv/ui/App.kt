@@ -136,7 +136,11 @@ fun App() {
             AnimatedContent(
                 targetState = top,
                 contentKey = { keyOf(it) },
-                transitionSpec = { fadeIn(tween(220, delayMillis = 60)) togetherWith fadeOut(tween(140)) },
+                // En la tele: cambio de pantalla directo, sin fundidos
+                transitionSpec = {
+                    if (dims.tv) fadeIn(tween(0)) togetherWith fadeOut(tween(0))
+                    else fadeIn(tween(220, delayMillis = 60)) togetherWith fadeOut(tween(140))
+                },
                 modifier = Modifier.fillMaxSize().background(Col.Bg),
                 label = "screens",
             ) { screen ->
@@ -172,7 +176,7 @@ fun App() {
 
 /** Actualización: se comprueba al abrir, se descarga sola en segundo plano y queda lista para instalar. */
 private object UpdateCheck {
-    var checked = false
+    var checkedAt = 0L
     var release: Updater.Release? = null
     var file: java.io.File? = null
 }
@@ -186,9 +190,11 @@ private fun UpdateNotice() {
     var visible by remember { mutableStateOf(true) }
     var status by remember { mutableStateOf<String?>(null) }
     val installFr = remember { FocusRequester() }
-    LaunchedEffect(Unit) {
-        if (!UpdateCheck.checked) {
-            UpdateCheck.checked = true
+    // Se mira al abrir y cada vez que la app vuelve a primer plano (la tele casi nunca cierra la app del todo)
+    val resume = Repo.resumeCount.intValue
+    LaunchedEffect(resume) {
+        if (System.currentTimeMillis() - UpdateCheck.checkedAt > 20 * 60_000L) {
+            UpdateCheck.checkedAt = System.currentTimeMillis()
             delay(1500)
             val r = Updater.latest()
             if (r != null && r.versionCode > Updater.currentCode) {

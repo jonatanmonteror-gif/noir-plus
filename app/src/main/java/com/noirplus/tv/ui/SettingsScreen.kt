@@ -66,10 +66,11 @@ private fun Section(title: String, content: @Composable () -> Unit) {
                     modifier = Modifier.graphicsLayer { rotationZ = rot })
             }
         }
+        val tv = LocalDims.current.tv
         androidx.compose.animation.AnimatedVisibility(
             visible = open,
-            enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
-            exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut(),
+            enter = if (tv) androidx.compose.animation.EnterTransition.None else androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
+            exit = if (tv) androidx.compose.animation.ExitTransition.None else androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut(),
         ) {
             Column(
                 Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 2.dp, bottom = 16.dp),
@@ -322,8 +323,9 @@ fun SettingsContent() {
             Section("Actualizaciones") {
                 val rel = updRelease
                 Column {
-                    if (rel == null) LinkRow("Buscar actualizaciones", BuildConfig.VERSION_NAME, key = "set-upd") { checkUpdates() }
-                    else LinkRow("Descargar e instalar", rel.name, key = "set-updi") { installUpdate(rel) }
+                    // Una sola fila que cambia de texto: así el foco de la tele no salta a otra parte
+                    LinkRow(if (rel == null) "Buscar actualizaciones" else "Descargar e instalar", rel?.name ?: BuildConfig.VERSION_NAME,
+                        key = "set-upd") { if (rel == null) checkUpdates() else installUpdate(rel) }
                 }
                 updStatus?.let { Note(it) }
                 updProgress?.let {

@@ -583,7 +583,7 @@ fun CategoryRow(
             logo = logo,
             onSeeAll = if (!d.tv && !list.isNullOrEmpty()) ({ nav.push(Screen.Category(kind, cat)) }) else null,
         )
-        Crossfade(targetState = list, animationSpec = tween(350), label = "row") { l ->
+        Crossfade(targetState = list, animationSpec = tween(if (d.tv) 0 else 350), label = "row") { l ->
             if (l == null) RowPlaceholder()
             else PosterRow("${kind.name}-${cat.id}", l, onFocus, more = (all?.size ?: 0) - l.size,
                 onSeeAll = { nav.push(Screen.Category(kind, cat)) }) { nav.push(Screen.Detail(it)) }
@@ -651,7 +651,7 @@ fun HeroArea(item0: Item?, emptyTitle: String, emptySubtitle: String) {
     ) {
         Crossfade(
             targetState = img,
-            animationSpec = tween(450),
+            animationSpec = tween(if (d.tv) 180 else 450),
             modifier = if (d.compact) Modifier.fillMaxSize() else Modifier.align(Alignment.TopEnd).fillMaxHeight().fillMaxWidth(0.62f),
             label = "heroImg",
         ) { url ->
@@ -681,7 +681,10 @@ fun HeroArea(item0: Item?, emptyTitle: String, emptySubtitle: String) {
         AnimatedContent(
             targetState = item,
             contentKey = { it?.key },
-            transitionSpec = { fadeIn(tween(260, delayMillis = 80)) togetherWith fadeOut(tween(140)) },
+            transitionSpec = {
+                if (d.tv) fadeIn(tween(0)) togetherWith fadeOut(tween(0))
+                else fadeIn(tween(260, delayMillis = 80)) togetherWith fadeOut(tween(140))
+            },
             modifier = if (d.compact) {
                 Modifier.align(Alignment.BottomStart).padding(horizontal = d.edge, vertical = 14.dp)
             } else {
@@ -725,7 +728,7 @@ fun HeroArea(item0: Item?, emptyTitle: String, emptySubtitle: String) {
 fun Backdrop(url: String?) {
     val compact = LocalDims.current.compact
     Box(Modifier.fillMaxSize()) {
-        Crossfade(targetState = url, animationSpec = tween(500), label = "backdrop") { u ->
+        Crossfade(targetState = url, animationSpec = tween(if (LocalDims.current.tv) 150 else 500), label = "backdrop") { u ->
             if (u != null) {
                 AsyncImage(model = u, contentDescription = null, contentScale = ContentScale.Crop, alpha = 0.6f,
                     modifier = Modifier.fillMaxSize())
