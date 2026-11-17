@@ -189,8 +189,6 @@ private fun PhoneMain() {
             if (section == Section.HOME) {
                 Row(Modifier.fillMaxWidth().padding(start = d.edge, end = d.edge, top = 14.dp), verticalAlignment = Alignment.CenterVertically) {
                     Logo(24)
-                    Spacer(Modifier.weight(1f))
-                    Greeting()
                 }
                 Row(
                     Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(start = d.edge, end = d.edge, top = 12.dp, bottom = 2.dp),

@@ -112,7 +112,7 @@ fun SettingsContent() {
                     st.error != null -> "Error en ${kindPlural(st.kind)}: ${st.error}"
                     st.count == null -> (done + "actualizando ${kindPlural(st.kind)}…").joinToString("  ·  ")
                     else -> {
-                        done += "${nf.format(st.count)} ${kindPlural(st.kind)}"
+                        done += "${kindPlural(st.kind)} ✓"
                         done.joinToString("  ·  ")
                     }
                 }

@@ -158,7 +158,7 @@ fun WelcomeScreen() {
             val movies = src.all(Kind.MOVIE)
             val series = src.all(Kind.SERIES)
             if (last <= 0) {
-                "Tu catálogo: ${nf.format(movies.size)} películas · ${nf.format(series.size)} series"
+                null
             } else {
                 val n = movies.count { it.added > last } + series.count { it.added > last }
                 when (n) {
@@ -200,7 +200,7 @@ fun WelcomeScreen() {
         Crossfade(targetState = backdrops.getOrNull(bgIndex)?.image, animationSpec = tween(1400), label = "bg") { url ->
             if (url != null) {
                 AsyncImage(
-                    model = url, contentDescription = null, contentScale = ContentScale.Crop, alpha = 0.5f,
+                    model = url, contentDescription = null, contentScale = ContentScale.Crop, alpha = if (d.compact) 1f else 0.5f,
                     modifier = Modifier.fillMaxSize().graphicsLayer { scaleX = zoom; scaleY = zoom },
                 )
             }
@@ -208,11 +208,11 @@ fun WelcomeScreen() {
         // Velo: lateral en TV, de abajo arriba en móvil
         Box(
             Modifier.fillMaxSize().background(
-                if (d.compact) Brush.verticalGradient(0f to Col.Bg.copy(alpha = 0.3f), 0.45f to Col.Bg.copy(alpha = 0.55f), 1f to Col.Bg)
+                if (d.compact) Brush.verticalGradient(0f to Col.Bg.copy(alpha = 0.1f), 0.4f to Col.Bg.copy(alpha = 0.2f), 0.68f to Col.Bg.copy(alpha = 0.7f), 1f to Col.Bg)
                 else Brush.horizontalGradient(0f to Col.Bg, 0.45f to Col.Bg.copy(alpha = 0.85f), 1f to Col.Bg.copy(alpha = 0.25f))
             )
         )
-        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0.6f to Color.Transparent, 1f to Col.Bg.copy(alpha = 0.9f))))
+        if (!d.compact) Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0.6f to Color.Transparent, 1f to Col.Bg.copy(alpha = 0.9f))))
 
         val text: @Composable () -> Unit = {
             val align = if (d.compact) TextAlign.Center else TextAlign.Start
@@ -258,7 +258,6 @@ fun WelcomeScreen() {
             } else {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Actualizando tus listas…", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                    val nf = NumberFormat.getIntegerInstance(ES)
                     Kind.entries.forEach { k ->
                         val st = steps.firstOrNull { it.kind == k }
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -271,11 +270,7 @@ fun WelcomeScreen() {
                                 }
                             }
                             Text(
-                                kindPlural(k).replaceFirstChar { it.titlecase(ES) } + when {
-                                    st?.count != null -> "  ·  ${nf.format(st.count)}"
-                                    st?.error != null -> "  ·  ${st.error}"
-                                    else -> ""
-                                },
+                                kindPlural(k).replaceFirstChar { it.titlecase(ES) } + (st?.error?.let { "  ·  $it" } ?: ""),
                                 color = if (st == null) Col.Sub else Color.White, fontSize = 13.sp, modifier = Modifier.padding(start = 10.dp),
                             )
                         }
@@ -286,7 +281,7 @@ fun WelcomeScreen() {
 
         if (d.compact) {
             Column(
-                Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = 28.dp, vertical = 40.dp),
+                Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(start = 28.dp, end = 28.dp, top = 40.dp, bottom = 70.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 text()
