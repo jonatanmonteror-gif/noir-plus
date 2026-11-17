@@ -124,6 +124,7 @@ fun App() {
                 mem.restore = true
                 nav.pop()
             }
+            RateHost {
             AnimatedContent(
                 targetState = top,
                 contentKey = { keyOf(it) },
@@ -143,6 +144,7 @@ fun App() {
                         }
                     }
                 }
+            }
             }
             LaunchedEffect(top) {
                 delay(1500)

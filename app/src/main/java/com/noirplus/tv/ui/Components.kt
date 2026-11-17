@@ -419,8 +419,17 @@ fun PosterCard(
     onFocus: () -> Unit,
     onClick: () -> Unit,
 ) {
+    val rate = LocalRate.current
+    val rateable = item.kind != Kind.LIVE
+    val prefs = Repo.prefs
+    val changes = prefs.changes.intValue
+    val mine = remember(changes, item.key) { if (rateable) prefs.rating(item.key)?.stars else null }
     Column(if (fill) Modifier.fillMaxWidth() else Modifier.width(width)) {
-        Focusable(Modifier.fillMaxWidth().aspectRatio(2f / 3f), key = memKey, onFocus = onFocus, onClick = onClick) { focused ->
+        Focusable(
+            Modifier.fillMaxWidth().aspectRatio(2f / 3f), key = memKey, onFocus = onFocus,
+            onLongClick = if (rateable) ({ rate(item.rateTarget()) }) else null,
+            onClick = onClick,
+        ) { focused ->
             Box(Modifier.fillMaxSize().background(Col.Surface))
             Text(
                 item.name,
@@ -437,6 +446,16 @@ fun PosterCard(
             }
             Box(Modifier.matchParentSize().border(1.dp, if (focused) Color.Transparent else Col.Hairline, CardShape))
             RatingPill(item.rating, Modifier.align(Alignment.TopEnd).padding(6.dp))
+            if (mine != null) {
+                Row(
+                    Modifier.align(Alignment.BottomStart).padding(6.dp).clip(RoundedCornerShape(50)).background(Color.White)
+                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(ReviewIcon, null, tint = Color.Black, modifier = Modifier.size(10.dp))
+                    Text(fmtStars(mine), color = Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 3.dp))
+                }
+            }
         }
         Text(
             item.name,
@@ -456,11 +475,12 @@ fun WideCard(
     width: Dp = LocalDims.current.wide,
     focusRequester: FocusRequester? = null,
     onFocus: () -> Unit = {},
+    onLongClick: (() -> Unit)? = null,
     onClick: () -> Unit,
 ) {
     Column(Modifier.width(width)) {
         Focusable(Modifier.fillMaxWidth().aspectRatio(16f / 9f), key = memKey, focusRequester = focusRequester,
-            onFocus = onFocus, onClick = onClick) { focused ->
+            onFocus = onFocus, onLongClick = onLongClick, onClick = onClick) { focused ->
             Box(Modifier.fillMaxSize().background(Col.Surface))
             if (image != null) {
                 AsyncImage(model = image, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())

@@ -30,6 +30,30 @@ data class Progress(
     }
 }
 
+/** Valoración propia: 0,5 a 5 estrellas y comentario opcional. */
+data class Rating(
+    val key: String,
+    val title: String,
+    val image: String?,
+    val stars: Float,
+    val text: String,
+    val time: Long,
+    val item: Item?,
+    val label: String,
+) {
+    fun toJson(): JSONObject = JSONObject()
+        .put("key", key).put("title", title).put("image", image ?: "").put("stars", stars.toDouble())
+        .put("text", text).put("time", time).put("label", label).apply { item?.let { put("item", it.toJson()) } }
+
+    companion object {
+        fun fromJson(o: JSONObject) = Rating(
+            key = o.optString("key"), title = o.optString("title"), image = o.str("image"),
+            stars = o.optDouble("stars", 0.0).toFloat(), text = o.optString("text"), time = o.optLong("time"),
+            item = o.optJSONObject("item")?.let { Item.fromJson(it) }, label = o.optString("label"),
+        )
+    }
+}
+
 class Prefs(ctx: Context) {
     private val sp = ctx.getSharedPreferences("noirplus", Context.MODE_PRIVATE)
 
@@ -86,6 +110,33 @@ class Prefs(ctx: Context) {
     var autoNext: Boolean
         get() = sp.getBoolean("autoNext", true)
         set(v) { sp.edit().putBoolean("autoNext", v).apply(); bump() }
+
+    /** Columnas en las cuadrículas del móvil (2 o 3). */
+    var gridCols: Int
+        get() = sp.getInt("gridCols", 3)
+        set(v) { sp.edit().putInt("gridCols", v.coerceIn(2, 3)).apply(); bump() }
+
+    // ---------- Valoraciones propias ----------
+    fun ratings(): List<Rating> {
+        val a = readArr("ratings")
+        return (0 until a.length()).mapNotNull { i -> a.optJSONObject(i)?.let { Rating.fromJson(it) } }.sortedByDescending { it.time }
+    }
+
+    fun rating(key: String): Rating? = ratings().firstOrNull { it.key == key }
+
+    fun saveRating(r: Rating) {
+        val list = ratings().filter { it.key != r.key }.toMutableList()
+        list.add(0, r)
+        val arr = JSONArray()
+        list.take(500).forEach { arr.put(it.toJson()) }
+        sp.edit().putString("ratings", arr.toString()).apply(); bump()
+    }
+
+    fun removeRating(key: String) {
+        val arr = JSONArray()
+        ratings().filter { it.key != key }.forEach { arr.put(it.toJson()) }
+        sp.edit().putString("ratings", arr.toString()).apply(); bump()
+    }
 
     // ---------- Carpetas ocultas y protegidas ----------
     private fun set(k: String): Set<String> = sp.getStringSet(k, emptySet())?.toSet() ?: emptySet()

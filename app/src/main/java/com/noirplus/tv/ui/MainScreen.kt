@@ -67,7 +67,8 @@ import com.noirplus.tv.data.Repo
 import kotlinx.coroutines.delay
 
 enum class Tab(val label: String) {
-    HOME("Inicio"), LIVE("Directo"), MOVIES("Películas"), SERIES("Series"), SEARCH("Buscar"), SETTINGS("Ajustes")
+    HOME("Inicio"), LIVE("Directo"), MOVIES("Películas"), SERIES("Series"), MYLIST("Mi lista"), RATINGS("Valoraciones"),
+    SEARCH("Buscar"), SETTINGS("Ajustes")
 }
 
 @Composable
@@ -123,6 +124,8 @@ private fun BigScreenMain() {
                 Tab.LIVE -> LiveContent()
                 Tab.MOVIES -> BrowseContent(Kind.MOVIE)
                 Tab.SERIES -> BrowseContent(Kind.SERIES)
+                Tab.MYLIST -> MyListContent()
+                Tab.RATINGS -> RatingsContent()
                 Tab.SEARCH -> SearchContent()
                 Tab.SETTINGS -> SettingsContent()
             }
@@ -169,6 +172,7 @@ private enum class Section(val label: String, val icon: ImageVector) {
     HOME("Inicio", Icons.Filled.Home),
     SEARCH("Buscar", Icons.Filled.Search),
     MYLIST("Mi lista", Icons.Filled.Favorite),
+    RATINGS("Valoraciones", ReviewIcon),
     SETTINGS("Ajustes", Icons.Filled.Settings),
 }
 
@@ -214,6 +218,7 @@ private fun PhoneMain() {
                     "h-LIVE" -> LiveContent()
                     "SEARCH" -> SearchContent()
                     "MYLIST" -> MyListContent()
+                    "RATINGS" -> RatingsContent()
                     else -> SettingsContent()
                 }
             }
@@ -264,9 +269,9 @@ private fun BottomBar(current: Section, modifier: Modifier, onSelect: (Section) 
     }
 }
 
-/** Favoritos (películas, series y canales). */
+/** Mi lista: acceso directo a tus películas, series y canales favoritos, agrupados. */
 @Composable
-private fun MyListContent() {
+fun MyListContent() {
     val d = LocalDims.current
     val prefs = Repo.prefs
     val src = Repo.source ?: return Message("No hay ninguna lista configurada")
@@ -274,25 +279,30 @@ private fun MyListContent() {
     val changes = prefs.changes.intValue
     val favs = remember(changes) { prefs.favorites() }
     if (favs.isEmpty()) return Message("Aún no has añadido nada.\nPulsa «Mi lista» en una película o serie, o mantén pulsado un canal.")
-    val lives = favs.filter { it.kind == Kind.LIVE }
-    LazyVerticalGrid(
-        columns = GridCells.Adaptive(d.poster),
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = d.edge, end = d.edge, top = 8.dp, bottom = d.bottomPad),
-        horizontalArrangement = Arrangement.spacedBy(d.gap),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        itemsIndexed(favs, key = { i, it2 -> "$i:${it2.key}" }) { _, item ->
-            PosterCard(item, memKey = "fav/${item.key}", fill = true, onFocus = {}) {
-                if (item.kind == Kind.LIVE) {
-                    nav.push(
-                        Screen.Player(
-                            PlayRequest(url = src.streamUrl(item), title = item.name, key = item.key, image = item.image, isLive = true,
-                                channels = lives, channelIndex = lives.indexOf(item).coerceAtLeast(0))
-                        )
-                    )
-                } else {
-                    nav.push(Screen.Detail(item))
+    val groups = listOf(
+        "Películas" to favs.filter { it.kind == Kind.MOVIE },
+        "Series" to favs.filter { it.kind == Kind.SERIES },
+        "Canales" to favs.filter { it.kind == Kind.LIVE },
+    ).filter { it.second.isNotEmpty() }
+    TvRowScroll {
+        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(top = 4.dp, bottom = d.bottomPad)) {
+            groups.forEach { (title, list) ->
+                item(key = "g-$title") {
+                    Column {
+                        SectionTitle(title, year = list.size.toString())
+                        PosterRow("fav-$title", list, {}) { item ->
+                            if (item.kind == Kind.LIVE) {
+                                nav.push(
+                                    Screen.Player(
+                                        PlayRequest(url = src.streamUrl(item), title = item.name, key = item.key, image = item.image, isLive = true,
+                                            channels = list, channelIndex = list.indexOf(item).coerceAtLeast(0))
+                                    )
+                                )
+                            } else {
+                                nav.push(Screen.Detail(item))
+                            }
+                        }
+                    }
                 }
             }
         }

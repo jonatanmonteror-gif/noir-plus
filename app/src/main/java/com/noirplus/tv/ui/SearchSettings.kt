@@ -107,14 +107,14 @@ fun SearchContent() {
             loading -> Message("Preparando el buscador… (la primera vez tarda un poco)")
             results.isEmpty() -> Message("Sin resultados para «${query.trim()}»")
             else -> LazyVerticalGrid(
-                columns = GridCells.Adaptive(LocalDims.current.poster),
+                columns = if (LocalDims.current.compact) GridCells.Fixed(Repo.prefs.gridCols) else GridCells.Adaptive(LocalDims.current.poster),
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(start = edge, end = edge, top = 16.dp, bottom = LocalDims.current.bottomPad),
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 itemsIndexed(results, key = { i, r -> "$i:${r.key}" }) { _, item ->
-                    PosterCard(item, memKey = "search/${item.key}", width = LocalDims.current.poster, onFocus = {}) {
+                    PosterCard(item, memKey = "search/${item.key}", fill = true, onFocus = {}) {
                         if (item.kind == Kind.LIVE) {
                             val lives = results.filter { it.kind == Kind.LIVE }
                             nav.push(

@@ -155,7 +155,7 @@ fun CategoryScreen(kind: Kind, cat: Category, startSearch: Boolean = false) {
             list == null -> Loading()
             list.isEmpty() -> Message(if (query.isBlank()) "No hay contenido en esta categoría" else "Sin resultados para «${query.trim()}»")
             else -> LazyVerticalGrid(
-                columns = GridCells.Adaptive(d.poster),
+                columns = if (LocalDims.current.compact) GridCells.Fixed(Repo.prefs.gridCols) else GridCells.Adaptive(LocalDims.current.poster),
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(start = d.edge, end = d.edge, top = 4.dp, bottom = 32.dp),
                 horizontalArrangement = Arrangement.spacedBy(d.gap),

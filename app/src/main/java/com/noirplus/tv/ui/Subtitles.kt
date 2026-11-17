@@ -136,27 +136,88 @@ fun SubtitlePreview(pos: Int, offsetDp: Int, size: Int, box: Boolean, modifier: 
     }
 }
 
-/** Fila de ajuste con − valor + (para mando y táctil). */
+/** Fila de ajuste: en móvil el control va debajo del título; en TV/tablet, a la derecha. */
 @Composable
-fun StepperRow(label: String, value: String, onMinus: () -> Unit, onPlus: () -> Unit, keyPrefix: String) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(label, color = Col.Text, fontSize = 14.sp, modifier = Modifier.weight(1f))
-        ActionButton("−", key = "$keyPrefix-minus") { onMinus() }
-        Text(value, color = Col.Text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center,
-            modifier = Modifier.widthIn(min = 78.dp).padding(horizontal = 8.dp))
-        ActionButton("+", key = "$keyPrefix-plus") { onPlus() }
+fun SettingRow(label: String, note: String? = null, control: @Composable () -> Unit) {
+    val compact = LocalDims.current.compact
+    if (compact) {
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(label, color = Col.Text, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            control()
+            note?.let { Text(it, color = Col.Sub, fontSize = 11.sp, lineHeight = 15.sp) }
+        }
+    } else {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f).padding(end = 16.dp)) {
+                Text(label, color = Col.Text, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                note?.let { Text(it, color = Col.Sub, fontSize = 11.sp, lineHeight = 15.sp, modifier = Modifier.padding(top = 2.dp)) }
+            }
+            Box(Modifier.widthIn(max = 340.dp)) { control() }
+        }
     }
 }
 
-/** Fila de opciones excluyentes (Abajo / Centro / Arriba…). */
+/** Control segmentado (tipo iOS): opciones excluyentes en una cápsula. */
 @Composable
-fun ChoiceRow(label: String, options: List<String>, selected: Int, keyPrefix: String, onSelect: (Int) -> Unit) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(label, color = Col.Text, fontSize = 14.sp, modifier = Modifier.weight(1f))
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            options.forEachIndexed { i, o ->
-                ActionButton(o, primary = i == selected, key = "$keyPrefix-$i") { onSelect(i) }
+fun Segmented(options: List<String>, selected: Int, keyPrefix: String, onSelect: (Int) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Col.Bg.copy(alpha = 0.55f)).padding(3.dp),
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        options.forEachIndexed { i, o ->
+            val sel = i == selected
+            Focusable(Modifier.weight(1f), key = "$keyPrefix-$i", shape = RoundedCornerShape(8.dp), focusScale = 1f,
+                onClick = { onSelect(i) }) { focused ->
+                Text(
+                    o,
+                    Modifier.fillMaxWidth()
+                        .background(
+                            when {
+                                sel -> Color.White
+                                focused -> Color.White.copy(alpha = 0.22f)
+                                else -> Color.Transparent
+                            }
+                        )
+                        .padding(vertical = 7.dp),
+                    color = if (sel) Color.Black else Col.Text,
+                    fontSize = 13.sp,
+                    fontWeight = if (sel) FontWeight.SemiBold else FontWeight.Medium,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                )
             }
         }
     }
+}
+
+/** − valor + compacto. */
+@Composable
+fun MiniStepper(value: String, keyPrefix: String, onMinus: () -> Unit, onPlus: () -> Unit) {
+    Row(
+        Modifier.clip(RoundedCornerShape(10.dp)).background(Col.Bg.copy(alpha = 0.55f)).padding(3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        StepBtn("−", "$keyPrefix-minus", onMinus)
+        Text(value, color = Col.Text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center,
+            modifier = Modifier.widthIn(min = 70.dp).padding(horizontal = 6.dp))
+        StepBtn("+", "$keyPrefix-plus", onPlus)
+    }
+}
+
+@Composable
+private fun StepBtn(t: String, key: String, onClick: () -> Unit) {
+    Focusable(key = key, shape = RoundedCornerShape(8.dp), focusScale = 1f, onClick = onClick) { focused ->
+        Text(t, Modifier.background(if (focused) Color.White else Color.White.copy(alpha = 0.1f)).padding(horizontal = 14.dp, vertical = 5.dp),
+            color = if (focused) Color.Black else Col.Text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
+fun StepperRow(label: String, value: String, onMinus: () -> Unit, onPlus: () -> Unit, keyPrefix: String, note: String? = null) {
+    SettingRow(label, note) { MiniStepper(value, keyPrefix, onMinus, onPlus) }
+}
+
+@Composable
+fun ChoiceRow(label: String, options: List<String>, selected: Int, keyPrefix: String, note: String? = null, onSelect: (Int) -> Unit) {
+    SettingRow(label, note) { Segmented(options, selected, keyPrefix, onSelect) }
 }

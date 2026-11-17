@@ -44,17 +44,34 @@ import kotlinx.coroutines.launch
 
 @Composable
 private fun Section(title: String, content: @Composable () -> Unit) {
-    Column(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Col.Surface).padding(18.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Text(title.uppercase(), color = Col.Sub, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.2.sp)
-        content()
+    Column(Modifier.fillMaxWidth()) {
+        Text(title.uppercase(), color = Col.Sub, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.2.sp,
+            modifier = Modifier.padding(start = 4.dp, bottom = 8.dp))
+        Column(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Col.Surface).padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) { content() }
     }
 }
 
 @Composable
 private fun Note(text: String) = Text(text, color = Col.Sub, fontSize = 12.sp, lineHeight = 16.sp)
+
+/** Fila que abre algo o ejecuta una acción, con valor a la derecha y flecha. */
+@Composable
+private fun LinkRow(label: String, value: String? = null, key: String, danger: Boolean = false, onClick: () -> Unit) {
+    Focusable(Modifier.fillMaxWidth(), key = key, shape = RoundedCornerShape(10.dp), focusScale = 1f, onClick = onClick) { focused ->
+        Row(
+            Modifier.fillMaxWidth().background(if (focused) Color.White else Color.Transparent).padding(horizontal = 8.dp, vertical = 9.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(label, color = if (focused) Color.Black else if (danger) Col.Error else Col.Text, fontSize = 14.sp,
+                fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+            value?.let { Text(it, color = if (focused) Color.Black.copy(alpha = 0.6f) else Col.Sub, fontSize = 13.sp, maxLines = 1) }
+            Text("  ›", color = if (focused) Color.Black else Col.Sub, fontSize = 16.sp)
+        }
+    }
+}
 
 @Composable
 fun SettingsContent() {
@@ -71,36 +88,71 @@ fun SettingsContent() {
     var updRelease by remember { mutableStateOf<Updater.Release?>(null) }
     var updProgress by remember { mutableStateOf<Float?>(null) }
 
+    fun checkUpdates() {
+        updStatus = "Buscando…"
+        scope.launch {
+            val r = Updater.latest()
+            when {
+                r == null -> updStatus = "No se pudo comprobar. Revisa la conexión."
+                r.versionCode <= Updater.currentCode -> updStatus = "Tienes la última versión."
+                else -> {
+                    updRelease = r
+                    updStatus = "Disponible: ${r.name}"
+                }
+            }
+        }
+    }
+
+    fun installUpdate(rel: Updater.Release) {
+        if (updProgress != null) return
+        updProgress = 0f
+        updStatus = "Descargando…"
+        scope.launch {
+            try {
+                val f = Updater.download(ctx, rel) { p -> updProgress = p }
+                updStatus = "Verificado. Abriendo el instalador…"
+                if (!Updater.install(ctx, f)) updStatus = "Permite «Instalar apps desconocidas» para Noir+ y vuelve a pulsar."
+            } catch (t: Throwable) {
+                updStatus = t.message ?: "Error al descargar"
+            } finally {
+                updProgress = null
+            }
+        }
+    }
+
     Box(Modifier.fillMaxSize()) {
         Column(
             Modifier.fillMaxSize().verticalScroll(rememberScrollState())
-                .padding(start = d.edge, end = d.edge, top = 12.dp, bottom = d.bottomPad),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+                .padding(start = d.edge, end = d.edge, top = 12.dp, bottom = d.bottomPad)
+                .then(if (d.compact) Modifier else Modifier.widthIn(max = 860.dp)),
+            verticalArrangement = Arrangement.spacedBy(22.dp),
         ) {
             if (changes < 0) Spacer(Modifier)
 
             Section("Perfil") {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(
-                        value = nameEdit, onValueChange = { nameEdit = it }, singleLine = true,
-                        label = { Text("Tu nombre") },
-                        modifier = Modifier.weight(1f),
-                        colors = fieldColors(),
-                    )
-                    Spacer(Modifier.padding(start = 10.dp))
-                    ActionButton("Guardar", primary = true) { prefs.name = nameEdit }
+                SettingRow("Tu nombre", "Se usa para el saludo de Inicio.") {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedTextField(
+                            value = nameEdit, onValueChange = { nameEdit = it }, singleLine = true,
+                            modifier = Modifier.weight(1f), colors = fieldColors(),
+                        )
+                        if (nameEdit.trim() != prefs.name) {
+                            ActionButton("Guardar", primary = true, modifier = Modifier.padding(start = 8.dp)) { prefs.name = nameEdit }
+                        }
+                    }
                 }
             }
 
             Section("Cuenta") {
-                Text(
-                    if (prefs.type == "xtream") "Xtream Codes  ·  ${prefs.server}  ·  usuario ${prefs.user}" else "Lista M3U",
-                    color = Col.Text, fontSize = 14.sp,
-                )
-                Note(info ?: "Comprobando cuenta…")
-                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    ActionButton("Recargar contenido") { Repo.rebuild() }
-                    ActionButton("Cambiar de lista") {
+                Column {
+                    Text(if (prefs.type == "xtream") "Xtream Codes · ${prefs.user}" else "Lista M3U", color = Col.Text, fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium)
+                    if (prefs.type == "xtream") Note(prefs.server)
+                    Note(info ?: "Comprobando cuenta…")
+                }
+                Column {
+                    LinkRow("Recargar contenido", key = "set-reload") { Repo.rebuild() }
+                    LinkRow("Cambiar de lista", key = "set-logout", danger = true) {
                         prefs.clearAccount()
                         Repo.rebuild()
                         nav.reset(Screen.Setup)
@@ -108,90 +160,60 @@ fun SettingsContent() {
                 }
             }
 
+            Section("Aspecto") {
+                ChoiceRow("Columnas en las carpetas", listOf("2", "3"), if (prefs.gridCols == 2) 0 else 1, "gc",
+                    note = "En el móvil, al abrir «Ver todo» o «Todas».") { prefs.gridCols = if (it == 0) 2 else 3 }
+            }
+
             Section("Subtítulos") {
                 SubtitlePreview(prefs.subPos, prefs.subOffset, prefs.subSize, prefs.subBg == 1,
-                    Modifier.fillMaxWidth().widthIn(max = 520.dp).aspectRatio(16f / 7f))
+                    Modifier.fillMaxWidth().aspectRatio(16f / 6.5f))
                 ChoiceRow("Posición", SubPositions, prefs.subPos, "sp") { prefs.subPos = it }
-                StepperRow("Altura (ajuste fino)", "${prefs.subOffset}", { prefs.subOffset -= 4 }, { prefs.subOffset += 4 }, "so")
-                StepperRow("Retardo", fmtDelay(prefs.subDelayMs), { prefs.subDelayMs -= 100 }, { prefs.subDelayMs += 100 }, "sd")
+                StepperRow("Altura", "${if (prefs.subOffset > 0) "+" else ""}${prefs.subOffset}", { prefs.subOffset -= 4 }, { prefs.subOffset += 4 }, "so",
+                    note = "Ajuste fino dentro de la posición elegida.")
+                StepperRow("Retardo", fmtDelay(prefs.subDelayMs), { prefs.subDelayMs -= 100 }, { prefs.subDelayMs += 100 }, "sd",
+                    note = "Entre −2 y +2 s. Positivo = salen más tarde.")
                 ChoiceRow("Tamaño", SubSizes, prefs.subSize, "ss") { prefs.subSize = it }
                 ChoiceRow("Fondo", SubBgs, prefs.subBg, "sb") { prefs.subBg = it }
-                Note("Retardo entre −2 y +2 segundos (positivo = salen más tarde). Desde el reproductor se puede ajustar solo para una película con «Opciones».")
             }
 
             Section("Reproducción") {
                 ChoiceRow("Siguiente episodio automático", listOf("Sí", "No"), if (prefs.autoNext) 0 else 1, "an") { prefs.autoNext = it == 0 }
-                ChoiceRow("Formato de canales", listOf("HLS", "TS"), if (prefs.liveFormat == "ts") 1 else 0, "lf") {
-                    prefs.liveFormat = if (it == 1) "ts" else "m3u8"
-                }
-                Note("Si algún canal no arranca, prueba el otro formato (la app ya lo intenta sola si falla).")
-                ActionButton("Borrar «Continuar viendo»") { prefs.clearHistory() }
+                ChoiceRow("Formato de canales", listOf("HLS", "TS"), if (prefs.liveFormat == "ts") 1 else 0, "lf",
+                    note = "Si un canal no arranca, prueba el otro.") { prefs.liveFormat = if (it == 1) "ts" else "m3u8" }
+                LinkRow("Borrar «Continuar viendo»", key = "set-clearh") { prefs.clearHistory() }
             }
 
             Section("Contenido y control parental") {
-                ActionButton("Ocultar y proteger carpetas  ›") { nav.push(Screen.Folders) }
-                when {
-                    prefs.pin.isEmpty() -> {
-                        Note("Pon un PIN para proteger carpetas (por ejemplo, contenido adulto).")
-                        ActionButton("Crear PIN") { pinDialog = "set" }
-                    }
-                    else -> Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        if (prefs.unlocked) ActionButton("Volver a bloquear", primary = true) { prefs.unlocked = false }
-                        else ActionButton("Desbloquear contenido protegido", primary = true) { pinDialog = "unlock" }
-                        ActionButton("Cambiar PIN") { pinDialog = "set" }
-                        ActionButton("Quitar PIN") { pinDialog = "remove" }
+                Column {
+                    LinkRow("Ocultar y proteger carpetas", key = "set-folders") { nav.push(Screen.Folders) }
+                    if (prefs.pin.isEmpty()) {
+                        LinkRow("Crear PIN", "Sin PIN", key = "set-pin") { pinDialog = "set" }
+                    } else {
+                        if (prefs.unlocked) LinkRow("Volver a bloquear", "Desbloqueado", key = "set-lock") { prefs.unlocked = false }
+                        else LinkRow("Desbloquear contenido protegido", "Bloqueado", key = "set-unlock") { pinDialog = "unlock" }
+                        LinkRow("Cambiar PIN", key = "set-pinch") { pinDialog = "set" }
+                        LinkRow("Quitar PIN", key = "set-pinrm", danger = true) { pinDialog = "remove" }
                     }
                 }
             }
 
             Section("Actualizaciones") {
-                Text("Versión instalada: ${BuildConfig.VERSION_NAME}", color = Col.Text, fontSize = 14.sp)
+                val rel = updRelease
+                Column {
+                    if (rel == null) LinkRow("Buscar actualizaciones", BuildConfig.VERSION_NAME, key = "set-upd") { checkUpdates() }
+                    else LinkRow("Descargar e instalar", rel.name, key = "set-updi") { installUpdate(rel) }
+                }
                 updStatus?.let { Note(it) }
                 updProgress?.let {
                     Box(Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(50)).background(Color.White.copy(alpha = 0.2f))) {
                         Box(Modifier.fillMaxWidth(it).height(4.dp).clip(RoundedCornerShape(50)).background(Color.White))
                     }
                 }
-                val rel = updRelease
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    if (rel == null) {
-                        ActionButton("Buscar actualizaciones") {
-                            updStatus = "Buscando…"
-                            scope.launch {
-                                val r = Updater.latest()
-                                when {
-                                    r == null -> updStatus = "No se pudo comprobar. Revisa la conexión."
-                                    r.versionCode <= Updater.currentCode -> updStatus = "Tienes la última versión."
-                                    else -> {
-                                        updRelease = r
-                                        updStatus = "Disponible: ${r.name}"
-                                    }
-                                }
-                            }
-                        }
-                    } else {
-                        ActionButton("Descargar e instalar", primary = true) {
-                            if (updProgress != null) return@ActionButton
-                            updProgress = 0f
-                            updStatus = "Descargando…"
-                            scope.launch {
-                                try {
-                                    val f = Updater.download(ctx, rel) { p -> updProgress = p }
-                                    updStatus = "Verificado. Abriendo el instalador…"
-                                    if (!Updater.install(ctx, f)) updStatus = "Permite «Instalar apps desconocidas» para Noir+ y vuelve a pulsar."
-                                } catch (t: Throwable) {
-                                    updStatus = t.message ?: "Error al descargar"
-                                } finally {
-                                    updProgress = null
-                                }
-                            }
-                        }
-                    }
-                }
                 Note("Cada versión se comprueba con su huella SHA-256 antes de instalarse.")
             }
 
-            Text("Noir+  ·  ${BuildConfig.VERSION_NAME}", color = Col.Sub, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+            Text("Noir+  ·  ${BuildConfig.VERSION_NAME}", color = Col.Sub, fontSize = 12.sp, modifier = Modifier.padding(start = 4.dp))
         }
 
         pinDialog?.let { mode ->
@@ -229,6 +251,7 @@ fun fieldColors() = OutlinedTextFieldDefaults.colors(
 fun PinDialog(title: String, onCancel: () -> Unit, onDone: (String) -> String?) {
     var pin by remember { mutableStateOf("") }
     var err by remember { mutableStateOf<String?>(null) }
+    androidx.activity.compose.BackHandler { onCancel() }
     Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f)), contentAlignment = Alignment.Center) {
         Column(
             Modifier.widthIn(max = 360.dp).clip(RoundedCornerShape(16.dp)).background(Col.Surface2).padding(22.dp),

@@ -114,6 +114,8 @@ fun PlayerScreen(req: PlayRequest) {
     var sessionDelay by remember { mutableIntStateOf(prefs.subDelayMs) }
     var resize by remember { mutableIntStateOf(0) }
     var nextCountdown by remember { mutableIntStateOf(-1) }
+    var formatToast by remember { mutableIntStateOf(0) }
+    var showFormat by remember { mutableStateOf(false) }
     // Indicador de gestos: 0 nada, 1 brillo, 2 volumen
     var gesture by remember { mutableIntStateOf(0) }
     var gestureLevel by remember { mutableFloatStateOf(0f) }
@@ -309,6 +311,14 @@ fun PlayerScreen(req: PlayRequest) {
         }
     }
 
+    LaunchedEffect(formatToast) {
+        if (formatToast > 0) {
+            showFormat = true
+            delay(1300)
+            showFormat = false
+        }
+    }
+
     LaunchedEffect(gestureTick) {
         if (gesture != 0) {
             delay(900)
@@ -384,6 +394,23 @@ fun PlayerScreen(req: PlayRequest) {
                     isFocusable = true
                     isFocusableInTouchMode = true
                     subtitleView?.visibility = View.GONE // los subtítulos los dibuja la app
+                    setShowSubtitleButton(true)
+                    // Botones propios junto a la ruedita: ajustes de subtítulos y formato de imagen
+                    val gear = findViewById<View>(androidx.media3.ui.R.id.exo_settings)
+                    (gear?.parent as? android.view.ViewGroup)?.let { bar ->
+                        fun add(icon: Int, desc: String, onTap: () -> Unit) {
+                            val b = android.widget.ImageButton(c, null, 0, androidx.media3.ui.R.style.ExoStyledControls_Button_Bottom)
+                            b.setImageResource(icon)
+                            b.contentDescription = desc
+                            b.setOnClickListener { onTap() }
+                            bar.addView(b, bar.indexOfChild(gear))
+                        }
+                        add(com.noirplus.tv.R.drawable.ic_subtitle_tune, "Ajustes de subtítulos") { panelOpen = true }
+                        add(com.noirplus.tv.R.drawable.ic_aspect, "Formato de imagen") {
+                            resize = (resize + 1) % ResizeModes.size
+                            formatToast++
+                        }
+                    }
                     setControllerVisibilityListener(
                         PlayerView.ControllerVisibilityListener { v -> controlsVisible = v == View.VISIBLE }
                     )
@@ -479,7 +506,15 @@ fun PlayerScreen(req: PlayRequest) {
             }
         }
 
-        // Cabecera con título y botón de opciones cuando se ven los controles
+        AnimatedVisibility(showFormat, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.Center)) {
+            Text(
+                ResizeModes[resize].second,
+                Modifier.clip(RoundedCornerShape(50)).background(Color.Black.copy(alpha = 0.65f)).padding(horizontal = 18.dp, vertical = 8.dp),
+                color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+            )
+        }
+
+        // Cabecera con título cuando se ven los controles
         val showTop = (!cur.isLive && controlsVisible) || (cur.isLive && infoVisible)
         if (showTop) {
             Row(
@@ -493,8 +528,12 @@ fun PlayerScreen(req: PlayRequest) {
                     color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold, maxLines = 1,
                     overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
                 )
-                if (!dims.tv) ActionButton("Opciones") { panelOpen = true }
-                else Text("Menú: opciones", color = Col.Sub, fontSize = 12.sp)
+                if (cur.isLive && !dims.tv) {
+                    ActionButton("Formato") {
+                        resize = (resize + 1) % ResizeModes.size
+                        formatToast++
+                    }
+                }
             }
         }
 
@@ -555,39 +594,47 @@ fun PlayerScreen(req: PlayRequest) {
             }
         }
 
-        // Panel rápido: subtítulos e imagen
+        // Panel rápido de subtítulos (compacto)
         if (panelOpen) {
             LaunchedEffect(Unit) {
                 delay(120)
                 runCatching { panelFr.requestFocus() }
             }
-            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f)).pointerInput(Unit) { detectTapGestures { panelOpen = false } })
+            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.25f)).pointerInput(Unit) { detectTapGestures { panelOpen = false } })
             Column(
-                Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(if (dims.compact) 340.dp else 420.dp)
-                    .background(Col.Surface.copy(alpha = 0.97f))
+                Modifier.align(Alignment.CenterEnd).padding(14.dp).width(if (dims.tv) 330.dp else 290.dp)
+                    .clip(RoundedCornerShape(16.dp)).background(Col.Surface.copy(alpha = 0.96f))
                     .pointerInput(Unit) { detectTapGestures { } }
                     .verticalScroll(rememberScrollState())
-                    .padding(22.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text("Opciones", fontFamily = InterDisplay, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                Text("SUBTÍTULOS", color = Col.Sub, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.2.sp)
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Retardo", color = Col.Text, fontSize = 14.sp, modifier = Modifier.weight(1f))
-                    ActionButton("−", focusRequester = panelFr) { sessionDelay = (sessionDelay - 100).coerceAtLeast(-2000) }
-                    Text(fmtDelay(sessionDelay), color = Col.Text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
-                        textAlign = TextAlign.Center, modifier = Modifier.width(78.dp))
-                    ActionButton("+") { sessionDelay = (sessionDelay + 100).coerceAtMost(2000) }
+                    Text("Subtítulos", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                    Text("Pista: botón CC", color = Col.Sub, fontSize = 11.sp)
                 }
-                Text("Positivo = salen más tarde. Solo para esta reproducción.", color = Col.Sub, fontSize = 11.sp)
-                ChoiceRow("Posición", SubPositions, prefs.subPos, "pp") { prefs.subPos = it }
-                StepperRow("Altura", "${prefs.subOffset}", { prefs.subOffset -= 4 }, { prefs.subOffset += 4 }, "ph")
-                ChoiceRow("Tamaño", SubSizes, prefs.subSize, "ps") { prefs.subSize = it }
-                ChoiceRow("Fondo", SubBgs, prefs.subBg, "pb") { prefs.subBg = it }
-                Text("IMAGEN", color = Col.Sub, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.2.sp,
-                    modifier = Modifier.padding(top = 6.dp))
-                ChoiceRow("Formato", ResizeModes.map { it.second }, resize, "pr") { resize = it }
-                ActionButton("Cerrar", modifier = Modifier.padding(top = 6.dp)) { panelOpen = false }
+                Text("Retardo", color = Col.Sub, fontSize = 12.sp)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Focusable(key = "pd-minus", shape = RoundedCornerShape(8.dp), focusScale = 1f, focusRequester = panelFr,
+                        onClick = { sessionDelay = (sessionDelay - 100).coerceAtLeast(-2000) }) { f ->
+                        Text("−", Modifier.background(if (f) Color.White else Color.White.copy(alpha = 0.1f)).padding(horizontal = 16.dp, vertical = 5.dp),
+                            color = if (f) Color.Black else Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                    Text(fmtDelay(sessionDelay), color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+                        textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
+                    Focusable(key = "pd-plus", shape = RoundedCornerShape(8.dp), focusScale = 1f,
+                        onClick = { sessionDelay = (sessionDelay + 100).coerceAtMost(2000) }) { f ->
+                        Text("+", Modifier.background(if (f) Color.White else Color.White.copy(alpha = 0.1f)).padding(horizontal = 16.dp, vertical = 5.dp),
+                            color = if (f) Color.Black else Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                }
+                Text("Posición", color = Col.Sub, fontSize = 12.sp)
+                Segmented(SubPositions, prefs.subPos, "pp") { prefs.subPos = it }
+                Text("Altura", color = Col.Sub, fontSize = 12.sp)
+                MiniStepper("${if (prefs.subOffset > 0) "+" else ""}${prefs.subOffset}", "ph", { prefs.subOffset -= 4 }, { prefs.subOffset += 4 })
+                Text("Tamaño", color = Col.Sub, fontSize = 12.sp)
+                Segmented(SubSizes, prefs.subSize, "ps") { prefs.subSize = it }
+                Text("El retardo solo cambia esta reproducción; el resto queda guardado.", color = Col.Sub, fontSize = 10.sp, lineHeight = 13.sp)
             }
         }
 
@@ -649,6 +696,7 @@ private fun buildPlayer(ctx: Context, live: Boolean): ExoPlayer {
     player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
         .setPreferredAudioLanguages("es", "spa", "cat")
         .setPreferredTextLanguages("es", "spa")
+        .setSelectUndeterminedTextLanguage(true)
         .build()
     player.videoScalingMode = MC.VIDEO_SCALING_MODE_SCALE_TO_FIT
     return player

@@ -2,7 +2,9 @@ package com.noirplus.tv.ui
 
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -222,10 +224,12 @@ private fun PhonePlot(details: Details?, item: Item, expanded: Boolean) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun EpisodeRow(ep: Episode, seriesName: String, fallbackImage: String?, progress: Progress?, onClick: () -> Unit) {
+private fun EpisodeRow(ep: Episode, seriesName: String, fallbackImage: String?, progress: Progress?, onLongClick: () -> Unit, onClick: () -> Unit) {
+    val mine = Repo.prefs.let { p -> remember(p.changes.intValue) { p.rating("EP:${ep.id}")?.stars } }
     Row(
-        Modifier.fillMaxWidth().clickable { onClick() }.padding(horizontal = 20.dp, vertical = 8.dp),
+        Modifier.fillMaxWidth().combinedClickable(onLongClick = onLongClick, onClick = onClick).padding(horizontal = 20.dp, vertical = 8.dp),
         verticalAlignment = Alignment.Top,
     ) {
         Box(Modifier.width(136.dp).aspectRatio(16f / 9f).clip(CardShape).background(Col.Surface)) {
@@ -248,7 +252,13 @@ private fun EpisodeRow(ep: Episode, seriesName: String, fallbackImage: String?, 
                 Text(it, color = Col.Sub, fontSize = 12.sp, lineHeight = 16.sp, maxLines = 3, overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(top = 4.dp))
             }
-            ep.duration?.let { Text(it, color = Col.Sub, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp)) }
+            Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                ep.duration?.let { Text(it, color = Col.Sub, fontSize = 11.sp, modifier = Modifier.padding(end = 8.dp)) }
+                if (mine != null) {
+                    HalfStars(mine, size = 11.dp, gap = 1.dp)
+                    Text(fmtStars(mine), color = Col.Text, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 4.dp))
+                }
+            }
         }
     }
 }
@@ -267,6 +277,8 @@ private fun MovieDetail(item: Item) {
     val progress = remember(changes) { prefs.progress(item.key) }
     val fav = remember(changes) { prefs.isFavorite(item.key) }
     val playFr = remember { FocusRequester() }
+    val rate = LocalRate.current
+    val mine = remember(changes) { prefs.rating(item.key) }
     var hasFocus by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         if (!d.tv) return@LaunchedEffect
@@ -294,6 +306,9 @@ private fun MovieDetail(item: Item) {
                 onInfo = { expanded = !expanded },
                 playHint = progress?.let { "Continuar desde ${fmt(it.position)}" },
             )
+            Box(Modifier.fillMaxWidth().padding(top = 10.dp), contentAlignment = Alignment.Center) {
+                MyRatingLine(item.key, { rate(item.rateTarget()) })
+            }
             PhonePlot(details, item, expanded)
             if (progress != null) {
                 Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -322,6 +337,7 @@ private fun MovieDetail(item: Item) {
                     ActionButton("▶  Reproducir", primary = true, key = "d-play", focusRequester = playFr) { play(0) }
                 }
                 ActionButton(if (fav) "✓  En mi lista" else "+  Mi lista", key = "d-fav") { prefs.toggleFavorite(item) }
+                ActionButton(mine?.let { "Tu nota ${fmtStars(it.stars)} ★" } ?: "Valorar", key = "d-rate") { rate(item.rateTarget()) }
             }
         }
     }
@@ -363,6 +379,11 @@ private fun SeriesDetail(item: Item) {
     }
 
     val queue = remember(sd) { sd?.seasons?.values?.flatten() ?: emptyList() }
+    val rate = LocalRate.current
+    fun epTarget(ep: Episode) = RateTarget(
+        "EP:${ep.id}", "${item.name} · T${ep.season} E${ep.number} · ${cleanTitle(ep.title, item.name)}",
+        ep.image ?: item.image, item, "Episodio",
+    )
 
     fun playEpisode(ep: Episode, start: Long) {
         nav.push(
@@ -414,6 +435,9 @@ private fun SeriesDetail(item: Item) {
                     else -> null
                 },
             )
+            Box(Modifier.fillMaxWidth().padding(top = 10.dp), contentAlignment = Alignment.Center) {
+                MyRatingLine(item.key, { rate(item.rateTarget()) })
+            }
             PhonePlot(sd?.details, item, expanded)
             when {
                 sd == null && !failed -> Text("Cargando episodios…", color = Col.Sub, modifier = Modifier.padding(horizontal = 20.dp))
@@ -441,7 +465,7 @@ private fun SeriesDetail(item: Item) {
                     Spacer(Modifier.height(10.dp))
                     episodes.forEach { ep ->
                         val p = progressMap["EP:${ep.id}"]
-                        EpisodeRow(ep, item.name, item.image, p) { playEpisode(ep, p?.position ?: 0L) }
+                        EpisodeRow(ep, item.name, item.image, p, onLongClick = { rate(epTarget(ep)) }) { playEpisode(ep, p?.position ?: 0L) }
                     }
                 }
             }
@@ -464,6 +488,8 @@ private fun SeriesDetail(item: Item) {
                     }
                     ActionButton(if (fav) "✓  En mi lista" else "+  Mi lista", key = "s-fav",
                         focusRequester = if (last == null && first == null) playFr else null) { prefs.toggleFavorite(item) }
+                    val mineS = remember(changes) { prefs.rating(item.key) }
+                    ActionButton(mineS?.let { "Tu nota ${fmtStars(it.stars)} ★" } ?: "Valorar", key = "s-rate") { rate(item.rateTarget()) }
                 }
             }
             Spacer(Modifier.height(14.dp))
@@ -493,6 +519,7 @@ private fun SeriesDetail(item: Item) {
                                 image = ep.image ?: item.image,
                                 progress = p?.fraction,
                                 memKey = "ep/${ep.id}",
+                                onLongClick = { rate(epTarget(ep)) },
                             ) { playEpisode(ep, p?.position ?: 0L) }
                         }
                     }
