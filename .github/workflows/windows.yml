@@ -59,3 +59,14 @@ jobs:
             NoirPlus-Setup.exe
             NoirPlus-Setup.exe.sha256
           make_latest: false
+
+      - name: Publicar también en la versión fija "windows" (la usa el actualizador, sin límite de consultas)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          printf '1.0.%s' "${{ github.run_number }}" > windows-version.txt
+          gh release view windows --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create windows --repo "$GITHUB_REPOSITORY" --title "Noir+ para Windows (última)" \
+              --notes "Siempre la última versión para Windows. La usa el actualizador del programa." --prerelease --latest=false
+          gh release upload windows NoirPlus-Setup.exe NoirPlus-Setup.exe.sha256 windows-version.txt --repo "$GITHUB_REPOSITORY" --clobber

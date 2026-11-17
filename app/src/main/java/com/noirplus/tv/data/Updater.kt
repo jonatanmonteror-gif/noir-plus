@@ -23,7 +23,27 @@ object Updater {
 
     val currentCode: Int get() = BuildConfig.VERSION_CODE
 
-    suspend fun latest(): Release? = runCatching {
+    /**
+     * Última versión publicada. Primero por la web de GitHub (sin límite de consultas: se lee a dónde
+     * redirige «releases/latest»); si falla, por la API (máx. 60 consultas por hora y casa).
+     */
+    suspend fun latest(): Release? = latestByRedirect() ?: latestByApi()
+
+    private suspend fun latestByRedirect(): Release? = runCatching {
+        withContext(Dispatchers.IO) {
+            val req = Request.Builder().url("https://github.com/$REPO/releases/latest").head()
+                .header("User-Agent", Http.UA).build()
+            Http.client.newCall(req).execute().use { r ->
+                val tag = r.request.url.pathSegments.lastOrNull().orEmpty()
+                if (!tag.startsWith("v")) return@withContext null
+                val code = tag.substringAfterLast('.').toIntOrNull() ?: return@withContext null
+                val base = "https://github.com/$REPO/releases/download/$tag"
+                Release(code, "Noir+ ${tag.removePrefix("v")}", "$base/NoirPlus.apk", "$base/NoirPlus.apk.sha256")
+            }
+        }
+    }.getOrNull()
+
+    private suspend fun latestByApi(): Release? = runCatching {
         val o = JSONObject(Http.get("https://api.github.com/repos/$REPO/releases/latest"))
         val code = o.optString("tag_name").substringAfterLast('.').toIntOrNull() ?: return null
         val assets = o.optJSONArray("assets") ?: return null

@@ -19,7 +19,23 @@ object Updater {
 
     private fun num(v: String) = v.substringAfterLast('.').toIntOrNull() ?: 0
 
-    suspend fun check(): Release? = withContext(Dispatchers.IO) {
+    /** Primero la versión fija "windows" (descarga directa, sin límite de consultas); si no existe, la API. */
+    suspend fun check(): Release? {
+        val fixed = runCatching { checkFixed() }
+        return if (fixed.isSuccess) fixed.getOrNull() else checkApi()
+    }
+
+    /** null = ya tienes la última. Lanza error si la versión fija no está disponible. */
+    private suspend fun checkFixed(): Release? = withContext(Dispatchers.IO) {
+        val base = "https://github.com/$REPO/releases/download/windows"
+        val req = Request.Builder().url("$base/windows-version.txt").header("User-Agent", "NoirPlus-Desktop").build()
+        val v = Http.client.newCall(req).execute().use { r -> if (!r.isSuccessful) null else r.body?.string()?.trim() }
+            ?.takeIf { it.matches(Regex("""\d+\.\d+\.\d+""")) } ?: throw IllegalStateException("sin versión fija")
+        if (num(v) <= num(BuildInfo.VERSION)) null
+        else Release(v, "$base/NoirPlus-Setup.exe", "$base/NoirPlus-Setup.exe.sha256")
+    }
+
+    private suspend fun checkApi(): Release? = withContext(Dispatchers.IO) {
         // GitHub mezcla las versiones de Android y Windows: se leen varias páginas
         val all = ArrayList<org.json.JSONObject>()
         for (page in 1..3) {
