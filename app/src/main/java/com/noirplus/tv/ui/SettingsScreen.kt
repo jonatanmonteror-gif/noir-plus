@@ -230,8 +230,8 @@ fun SettingsContent() {
                 Note("Cada película y serie muestra en qué plataforma está en España. Datos de TMDB (themoviedb.org) y JustWatch. Este producto usa la API de TMDB pero no está respaldado ni certificado por TMDB.")
             }
 
+            Section("Reproductor") {
                 Note("Cada opción va en un sitio: como botón en pantalla o dentro de la ruedita, nunca en los dos. Dentro de la ruedita cada opción se despliega al pulsarla.")
-                Note("Botones de acceso rápido junto a la ruedita del reproductor. Lo que no actives queda dentro de la ruedita.")
                 QuickToggle("Audio (idioma)", "audio")
                 QuickToggle("Subtítulos (elegir pista)", "cc")
                 QuickToggle("Opciones de subtítulos", "subopts")
