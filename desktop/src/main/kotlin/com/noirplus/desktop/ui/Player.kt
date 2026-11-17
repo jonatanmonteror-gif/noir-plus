@@ -5,6 +5,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -144,6 +145,7 @@ fun PlayerScreen(start: PlayRequest) {
     var styleKey by remember { mutableStateOf(Store.subStyleKey) }
     var resumeAt by remember { mutableLongStateOf(start.startMs) }
     var pendingSubTrack by remember { mutableStateOf<Int?>(null) }
+    var styleDirty by remember { mutableStateOf(false) }
     val video = remember(styleKey) { VlcVideo() }
     val scope = rememberCoroutineScope()
 
@@ -249,6 +251,18 @@ fun PlayerScreen(start: PlayRequest) {
             pendingSubTrack = runCatching { video.mp.subpictures().track() }.getOrNull()
             styleKey = Store.subStyleKey + "|h$vh"
         } else if (vh > 0) Vlc.lastHeight = vh
+    }
+
+    // Al cerrar el panel con cambios de estilo: se aplica una vez, en el mismo punto y con la misma pista
+    LaunchedEffect(menu) {
+        if (menu == null && styleDirty) {
+            styleDirty = false
+            if (Store.subStyleKey != styleKey.substringBefore("|h").let { it }) {
+                resumeAt = if (req.isLive) 0 else time
+                pendingSubTrack = runCatching { video.mp.subpictures().track() }.getOrNull()
+                styleKey = Store.subStyleKey
+            }
+        }
     }
 
     // Reloj del reproductor
@@ -418,12 +432,8 @@ fun PlayerScreen(start: PlayRequest) {
                 }
                 menu?.let { m ->
                     OptionsPanel(m, video, speed, { speed = it; video.mp.controls().setRate(it) }, format, { format = it },
-                        onStyle = {
-                            // Reaplicar el estilo: mismo punto, misma pista de subtítulos
-                            resumeAt = if (req.isLive) 0 else time
-                            pendingSubTrack = runCatching { video.mp.subpictures().track() }.getOrNull()
-                            styleKey = Store.subStyleKey
-                        },
+                        // Los cambios de estilo se aplican al cerrar el panel (una sola vez, no con cada toque)
+                        onStyle = { styleDirty = true },
                         Modifier.align(Alignment.BottomEnd).padding(end = 28.dp, bottom = 110.dp))
                 }
             }
@@ -494,7 +504,9 @@ private fun OptionsPanel(
     val expanded = remember(sec) { mutableStateMapOf<String, Boolean>() }
     val keys = remember(sec, changes) { if (all) QuickOptions.filter { !Store.quick(it.first) } else QuickOptions.filter { it.first == sec } }
     Column(
-        modifier.width(340.dp).heightIn(max = 560.dp).clip(RoundedCornerShape(14.dp)).background(Color(0xF0161618))
+        modifier.width(if (sec == "subopts" || sec == "all") 440.dp else 340.dp).heightIn(max = 600.dp)
+            .clip(RoundedCornerShape(16.dp)).background(Color(0x99161618))
+            .border(1.dp, Color.White.copy(alpha = 0.10f), RoundedCornerShape(16.dp))
             .verticalScroll(rememberScrollState()).padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
@@ -567,18 +579,53 @@ private fun SubOptions(video: VlcVideo, onStyle: () -> Unit) {
                 { delayMs = (delayMs - 100).coerceIn(-5000, 5000); video.mp.subpictures().setDelay(delayMs * 1000) },
                 { delayMs = (delayMs + 100).coerceIn(-5000, 5000); video.mp.subpictures().setDelay(delayMs * 1000) })
         }
+        SubPreview(ch)
         SubStyleControls(ch, compact = true, onStyle)
+        Text("Los cambios se aplican al cerrar este panel.", color = Col.Sub, fontSize = 11.sp)
+    }
+}
+
+/** Vista previa del estilo elegido (aproximada), para no tener que aplicar cada cambio. */
+@Composable
+fun SubPreview(ch: Int) {
+    if (ch < 0) return
+    val family = remember(Store.subFont) {
+        runCatching { androidx.compose.ui.text.font.FontFamily(androidx.compose.ui.text.platform.SystemFont(Store.subFont)) }
+            .getOrDefault(androidx.compose.ui.text.font.FontFamily.SansSerif)
+    }
+    val color = Color(0xFF000000 or Store.subColor.toLong())
+    val size = (18f * Store.subScale / 100f).sp
+    val shadow = when {
+        Store.subBg == 1 || Store.subOutline > 0 -> androidx.compose.ui.graphics.Shadow(Color.Black, blurRadius = (2 + Store.subOutline * 2).toFloat())
+        else -> null
+    }
+    Box(
+        Modifier.fillMaxWidth().height(86.dp).clip(RoundedCornerShape(10.dp))
+            .background(androidx.compose.ui.graphics.Brush.linearGradient(listOf(Color(0xFF5A6470), Color(0xFF2A2F36)))),
+        contentAlignment = when (Store.subPos) { 1 -> Alignment.Center; 2 -> Alignment.TopCenter; else -> Alignment.BottomCenter },
+    ) {
+        Text(
+            "Así se verán los subtítulos",
+            color = color, fontSize = size, fontFamily = family, fontWeight = FontWeight.Medium,
+            style = androidx.compose.ui.text.TextStyle(shadow = shadow),
+            modifier = Modifier.padding(10.dp)
+                .then(if (Store.subBg == 2) Modifier.background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(4.dp)).padding(horizontal = 6.dp, vertical = 2.dp) else Modifier),
+        )
     }
 }
 
 /** Controles del estilo de subtítulos (en Ajustes y en el reproductor). */
 @Composable
 fun SubStyleControls(ch: Int, compact: Boolean, onChange: () -> Unit) {
+    @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
     @Composable
-    fun line(label: String, content: @Composable RowScope.() -> Unit) {
+    fun line(label: String, content: @Composable androidx.compose.foundation.layout.FlowRowScope.() -> Unit) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(label, color = Col.Text, fontSize = 13.sp, modifier = Modifier.width(if (compact) 90.dp else 160.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), content = content)
+            Text(label, color = Col.Text, fontSize = 13.sp, modifier = Modifier.width(if (compact) 96.dp else 160.dp))
+            androidx.compose.foundation.layout.FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.weight(1f), content = content,
+            )
         }
     }
     // key(ch): se vuelve a dibujar todo al cambiar algo, para que se vea marcado al momento
@@ -604,13 +651,7 @@ fun SubStyleControls(ch: Int, compact: Boolean, onChange: () -> Unit) {
         listOf("No", "Fino", "Normal", "Grueso").forEachIndexed { i, l -> Chip(l, Store.subOutline == i) { Store.subOutline = i; onChange() } }
     }
     line("Letra") {
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            listOf("Segoe UI", "Arial", "Verdana", "Tahoma", "Georgia").chunked(3).forEach { rowFonts ->
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    rowFonts.forEach { f -> Chip(f, Store.subFont == f) { Store.subFont = f; onChange() } }
-                }
-            }
-        }
+        listOf("Segoe UI", "Arial", "Verdana", "Tahoma", "Georgia").forEach { f -> Chip(f, Store.subFont == f) { Store.subFont = f; onChange() } }
     }}
 }
 
@@ -626,6 +667,7 @@ fun Stepper(value: String, onMinus: () -> Unit, onPlus: () -> Unit) {
 @Composable
 fun Chip(text: String, selected: Boolean, onClick: () -> Unit) {
     Text(text, color = if (selected) Color.Black else Col.Text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+        maxLines = 1, softWrap = false,
         modifier = Modifier.clip(RoundedCornerShape(50)).background(if (selected) Color.White else Color.White.copy(alpha = 0.12f))
             .clickable { onClick() }.pointerHoverIcon(PointerIcon.Hand).padding(horizontal = 12.dp, vertical = 6.dp))
 }

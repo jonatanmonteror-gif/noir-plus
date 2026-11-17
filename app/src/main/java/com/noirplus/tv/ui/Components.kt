@@ -153,11 +153,13 @@ fun Focusable(
     var longFired by remember { mutableStateOf(false) }
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
+    // En la tele la carátula NO crece al seleccionarla (el cambio de tamaño hacía que la fila diera saltitos):
+    // se marca con un borde blanco. Los botones mantienen su cambio de color.
     val target = when {
-        focused && tv -> focusScale
         pressed && !tv -> 0.96f
         else -> 1f
     }
+    val tvRing = tv && focused && focusScale > 1.07f
     // Foco ágil: crecimiento corto y sin resplandor/sombra (la sombra animada se cortaba y frenaba la tele)
     val scale by animateFloatAsState(target, if (tv) tween(120, easing = FastOutSlowInEasing) else focusSpring, label = "scale")
     val mem = LocalFocusMemory.current
@@ -214,7 +216,7 @@ fun Focusable(
                 }
             }
 
-            .then(if (focused && border) Modifier.border(2.dp, Color.White, shape) else Modifier)
+            .then(if ((focused && border) || tvRing) Modifier.border(if (tvRing) 3.dp else 2.dp, Color.White, shape) else Modifier)
             .clip(shape)
             .then(clickMod),
     ) {

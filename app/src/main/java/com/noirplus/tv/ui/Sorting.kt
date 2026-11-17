@@ -1,6 +1,9 @@
 package com.noirplus.tv.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.border
+import androidx.compose.ui.draw.shadow
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.padding
@@ -144,43 +147,44 @@ val TrailerIcon: ImageVector = materialIcon(name = "Filled.Trailer") {
 @Composable
 fun <T> OptionPicker(open: Boolean, title: String, options: List<Pair<T, String>>, selected: T, onPick: (T) -> Unit, onDismiss: () -> Unit) {
     if (LocalDims.current.compact) {
+        // Móvil: tarjeta flotante compacta bajo el botón (no ocupa la pantalla), con desplazamiento si hay muchas opciones
         if (!open) return
-        androidx.compose.ui.window.Dialog(
+        val dy = with(androidx.compose.ui.platform.LocalDensity.current) { 42.dp.roundToPx() }
+        androidx.compose.ui.window.Popup(
+            alignment = Alignment.TopEnd,
+            offset = androidx.compose.ui.unit.IntOffset(0, dy),
             onDismissRequest = onDismiss,
-            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+            properties = androidx.compose.ui.window.PopupProperties(focusable = true),
         ) {
             var shown by remember { mutableStateOf(false) }
             LaunchedEffect(Unit) { shown = true }
-            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.45f))
-                .clickable(interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null) { onDismiss() }) {
-                androidx.compose.animation.AnimatedVisibility(
-                    shown,
-                    enter = androidx.compose.animation.slideInHorizontally { it },
-                    modifier = Modifier.align(Alignment.CenterEnd),
+            androidx.compose.animation.AnimatedVisibility(
+                shown,
+                enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(140)) +
+                    androidx.compose.animation.scaleIn(androidx.compose.animation.core.tween(160), initialScale = 0.92f,
+                        transformOrigin = androidx.compose.ui.graphics.TransformOrigin(1f, 0f)),
+            ) {
+                androidx.compose.foundation.layout.Column(
+                    Modifier.width(220.dp)
+                        .shadow(18.dp, androidx.compose.foundation.shape.RoundedCornerShape(18.dp))
+                        .clip(androidx.compose.foundation.shape.RoundedCornerShape(18.dp))
+                        .background(Col.Surface2)
+                        .border(0.5.dp, Color.White.copy(alpha = 0.10f), androidx.compose.foundation.shape.RoundedCornerShape(18.dp))
+                        .padding(vertical = 6.dp),
                 ) {
-                    androidx.compose.foundation.layout.Column(
-                        Modifier.fillMaxHeight().width(290.dp)
-                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(topStart = 20.dp, bottomStart = 20.dp))
-                            .background(Col.Surface)
-                            .clickable(interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null) { }
-                            .padding(top = 40.dp, bottom = 24.dp),
-                    ) {
-                        Text(title, color = Col.Text, fontSize = 18.sp, fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.padding(start = 22.dp, bottom = 12.dp))
-                        androidx.compose.foundation.lazy.LazyColumn(Modifier.fillMaxSize()) {
-                            items(options.size) { i ->
-                                val (v, label) = options[i]
-                                val sel = v == selected
-                                androidx.compose.foundation.layout.Row(
-                                    Modifier.fillMaxWidth().clickable { onPick(v); onDismiss() }
-                                        .background(if (sel) Color.White.copy(alpha = 0.08f) else Color.Transparent)
-                                        .padding(horizontal = 22.dp, vertical = 12.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Text(label, color = if (sel) Color.White else Col.Sub, fontSize = 15.sp,
-                                        fontWeight = if (sel) FontWeight.SemiBold else FontWeight.Normal, modifier = Modifier.weight(1f))
-                                    if (sel) Text("✓", color = Color.White, fontSize = 15.sp)
-                                }
+                    Text(title.uppercase(), color = Col.Sub, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.sp,
+                        modifier = Modifier.padding(start = 16.dp, top = 6.dp, bottom = 4.dp))
+                    androidx.compose.foundation.lazy.LazyColumn(Modifier.heightIn(max = 340.dp)) {
+                        items(options.size) { i ->
+                            val (v, label) = options[i]
+                            val sel = v == selected
+                            androidx.compose.foundation.layout.Row(
+                                Modifier.fillMaxWidth().clickable { onPick(v); onDismiss() }.padding(horizontal = 16.dp, vertical = 9.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(label, color = if (sel) Color.White else Col.Text.copy(alpha = 0.8f), fontSize = 14.sp,
+                                    fontWeight = if (sel) FontWeight.SemiBold else FontWeight.Normal, modifier = Modifier.weight(1f))
+                                if (sel) Text("✓", color = Color.White, fontSize = 13.sp)
                             }
                         }
                     }

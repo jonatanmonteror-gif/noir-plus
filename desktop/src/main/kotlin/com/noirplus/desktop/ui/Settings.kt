@@ -56,6 +56,7 @@ fun SettingsScreen() {
         }
         Card("Subtítulos") {
             Text("Así se verán en todo lo que reproduzcas. También se pueden cambiar desde el reproductor.", color = Col.Sub, fontSize = 12.sp)
+            SubPreview(changes)
             SubStyleControls(changes, compact = false) {}
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Retardo por defecto", color = Col.Text, fontSize = 13.sp, modifier = Modifier.width(160.dp))
