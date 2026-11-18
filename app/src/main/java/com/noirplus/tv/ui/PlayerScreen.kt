@@ -110,7 +110,6 @@ fun PlayerScreen(req: PlayRequest) {
     var url by remember { mutableStateOf(req.url) }
     var triedAlt by remember { mutableStateOf(false) }
     var retries by remember(url) { mutableIntStateOf(0) }
-    var recovered by remember(cur.key) { mutableStateOf(false) }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     // Directo: calidades del mismo canal (mejor primero). Si una falla se prueba la siguiente.
     val curKey = if (cur.isLive) (channel?.key ?: cur.key) else ""
@@ -406,23 +405,6 @@ fun PlayerScreen(req: PlayRequest) {
                         qIdx += 1
                         triedAlt = false
                         url = src.streamUrl(qualities[qIdx])
-                    }
-                    // Película o episodio que el proveedor ha vuelto a subir (otro número u otro formato): buscar la dirección nueva
-                    !cur.isLive && src != null && httpCode(e) == 404 && !recovered -> {
-                        recovered = true
-                        val c = cur
-                        val failed = url
-                        val ep = c.episodes.getOrNull(c.episodeIndex) ?: Regex("""T(\d+) E(\d+)$""").find(c.title)?.let { m ->
-                            com.noirplus.tv.data.Episode("", "", m.groupValues[1].toInt(), m.groupValues[2].toInt(), "", null, null, null)
-                        }
-                        val name = if (c.key.startsWith("EP:")) c.title.substringBefore(" · T") else c.title
-                        scope.launch {
-                            val nu = com.noirplus.tv.data.Recover.newUrl(src, failed, c.key, name, c.parent, c.seriesName ?: name, ep)
-                            if (nu != null) {
-                                com.noirplus.tv.data.ErrorLog.note("Reproducción", null, "404 resuelto con una dirección nueva")
-                                url = nu
-                            } else error = playError(e)
-                        }
                     }
                     // El servidor ha dicho que no (lleno, cuenta, conexiones): un reintento a los 3 s
                     httpCode(e) != null && retries < 1 -> {

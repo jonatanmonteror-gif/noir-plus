@@ -284,19 +284,6 @@ class Prefs(ctx: Context) {
         return !existed
     }
 
-    /** El proveedor ha vuelto a subir algo de Mi lista con otro número: se cambia por el nuevo. */
-    fun replaceFavorite(oldKey: String, item: Item) {
-        val list = favorites().toMutableList()
-        val i = list.indexOfFirst { it.key == oldKey }
-        if (i < 0 || list.any { it.key == item.key }) return
-        list[i] = item
-        val arr = JSONArray()
-        list.forEach { arr.put(it.toJson()) }
-        sp.edit().putString("favs", arr.toString()).apply()
-        bump()
-        Sync.request()
-    }
-
     // ---------- Continuar viendo ----------
     fun history(): List<Progress> {
         val a = readArr("history")

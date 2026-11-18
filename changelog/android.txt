@@ -1,6 +1,3 @@
 Novedades de la próxima versión de Android (tele y móvil). Una línea por punto, empezando por «- ».
-- Móvil: la ventana de novedades ya se puede cerrar (botón ✕, «Entendido» o tocando fuera).
-- Próximos: se ve la portada entera, con la imagen de fondo suave detrás del texto (tele y móvil).
-- Reproductor: si el proveedor rechaza la reproducción, se reintenta una vez y el aviso explica el motivo (cuenta, máximo de conexiones, contenido retirado o servidor caído) con su número de error.
-- Películas y episodios que el proveedor ha vuelto a subir (daban «Error 404»): la app busca sola la versión nueva y la reproduce; si estaba en Mi lista, se cambia por la nueva.
-- Tele: corregidos cierres inesperados de la app al mostrar listas con elementos repetidos (Continuar viendo, episodios, novedades).
+- Tele: arreglados los cierres de la app (se quita la búsqueda automática de otra versión cuando un contenido no se abría).
+- Tele: listas a prueba de elementos repetidos (Continuar viendo, episodios, novedades) para evitar cierres.

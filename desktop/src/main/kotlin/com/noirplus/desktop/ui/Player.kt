@@ -181,7 +181,6 @@ fun PlayerScreen(start: PlayRequest, mini: Boolean = false) {
     var format by remember { mutableIntStateOf(0) } // 0 ajustar, 1 rellenar, 2 estirar
     var toast by remember { mutableStateOf<String?>(null) }
     var countdown by remember { mutableStateOf<Int?>(null) }
-    var recovered by remember { mutableStateOf(false) }
 
     fun saveProgress(notify: Boolean = false) {
         val r = req
@@ -205,7 +204,6 @@ fun PlayerScreen(start: PlayRequest, mini: Boolean = false) {
         saveProgress()
         val nr = r.copy(url = src.episodeUrl(next), title = "${r.seriesName ?: ""} · T${next.season} E${next.number}",
             key = "EP:${next.id}", image = next.image ?: r.image, startMs = 0, episodeIndex = r.episodeIndex + 1)
-        recovered = false
         req = nr
         load(nr)
     }
@@ -262,25 +260,7 @@ fun PlayerScreen(start: PlayRequest, mini: Boolean = false) {
                         return
                     }
                 }
-                val r = req
-                val src = Repo.source
-                // Película o episodio: si el proveedor lo ha vuelto a subir con otro número u otro formato, se busca la dirección nueva
-                if (!r.isLive && src != null && !recovered) {
-                    recovered = true
-                    scope.launch {
-                        val dead = !Recover.alive(r.url)
-                        val ep = r.episodes.getOrNull(r.episodeIndex) ?: Regex("""T(\d+) E(\d+)$""").find(r.title)?.let { m ->
-                            Episode("", "", m.groupValues[1].toInt(), m.groupValues[2].toInt(), "", null, null, null)
-                        }
-                        val name = if (r.key.startsWith("EP:")) r.title.substringBefore(" · T") else r.title
-                        val nu = if (dead) Recover.newUrl(src, r.url, r.key, name, r.parent, r.seriesName ?: name, ep) else null
-                        if (nu != null) {
-                            val nr = r.copy(url = nu); req = nr; load(nr)
-                        } else error = if (dead) "El proveedor ya no tiene este contenido (no aparece con otro número)." else "No se pudo reproducir este contenido."
-                    }
-                    return
-                }
-                error = if (r.isLive) "No se pudo abrir el canal. Prueba a cambiar el formato de directo en Ajustes."
+                error = if (req.isLive) "No se pudo abrir el canal. Prueba a cambiar el formato de directo en Ajustes."
                 else "No se pudo reproducir este contenido."
             }
         })

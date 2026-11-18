@@ -1,4 +1,4 @@
 Novedades de la próxima versión de Windows. Una línea por punto, empezando por «- ».
-- Películas y episodios que el proveedor ha vuelto a subir (dejaban de reproducirse): Noir+ busca sola la versión nueva y la reproduce; si estaba en Mi lista, se cambia por la nueva.
 - Próximos estrenos en 2 o 3 columnas (se elige en Ajustes → Próximos estrenos y se queda guardado), agrupados por día y con mejores márgenes.
 - En cada estreno, el botón «Tráiler» va encima del de «Avísame» / «Ver ahora».
+- Se quita la búsqueda automática de otra versión cuando un contenido no se abría.
