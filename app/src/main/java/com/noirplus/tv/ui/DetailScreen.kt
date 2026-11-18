@@ -101,11 +101,13 @@ private fun TvInfo(item: Item, details: Details?) {
         Text(item.name, color = Col.Text, fontFamily = InterDisplay, fontSize = 38.sp, fontWeight = FontWeight.Bold,
             maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 42.sp, letterSpacing = (-1).sp)
     }
+    val catV = Tmdb.catalogsVersion.intValue
+    val release = remember(item.key, details, catV) { Tmdb.releaseLabel(item, details) }
     MetaLine(
-        year = details?.year ?: item.year,
+        year = release?.let { "Estreno: $it" },
         rating = details?.rating ?: item.rating,
         genre = null,
-        duration = details?.duration,
+        duration = null,
         modifier = Modifier.padding(top = 10.dp),
     )
     GenreChips(details?.genre, Modifier.padding(top = 10.dp))
@@ -187,7 +189,9 @@ private fun PhoneHeader(item: Item, details: Details?, extra: String? = null) {
                 modifier = Modifier.fillMaxWidth(),
             )
         }
-        val parts = listOfNotNull(details?.year ?: item.year, extra, details?.duration)
+        val catV = Tmdb.catalogsVersion.intValue
+        val release = remember(item.key, details, catV) { Tmdb.releaseLabel(item, details) }
+        val parts = listOfNotNull(release?.let { "Estreno: $it" }, extra)
         if (parts.isNotEmpty()) {
             Text(parts.joinToString("   |   "), color = Col.Sub, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp))
         }

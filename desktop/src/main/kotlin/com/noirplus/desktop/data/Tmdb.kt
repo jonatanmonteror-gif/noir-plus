@@ -185,6 +185,26 @@ object Tmdb {
         return if (best > 0) best else (p.year ?: 0) * 10000
     }
 
+    /** Fecha de estreno para la ficha, p. ej. «14 mar 2024»: la de TMDB, si no la del proveedor, si no el año. */
+    fun releaseLabel(item: Item, details: Details?): String? {
+        val months = listOf("ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic")
+        fun fmt(y: Int, m: Int, d: Int): String? = when {
+            y < 1900 -> null
+            m !in 1..12 -> "$y"
+            d !in 1..31 -> "${months[m - 1]} $y"
+            else -> "$d ${months[m - 1]} $y"
+        }
+        val t = runCatching { releaseDate(item) }.getOrDefault(0)
+        if (t % 10000 != 0) fmt(t / 10000, t / 100 % 100, t % 100)?.let { return it }
+        details?.release?.let { r ->
+            Regex("""(\d{4})-(\d{1,2})-(\d{1,2})""").find(r)?.let { m ->
+                val (y, mo, d) = m.destructured
+                fmt(y.toInt(), mo.toInt(), d.toInt())?.let { return it }
+            }
+        }
+        return (details?.year ?: item.year)?.takeIf { it.isNotBlank() }
+    }
+
     /** Lo más reciente primero (por fecha de estreno); a igualdad, lo último añadido. */
     fun byRelease(list: List<Item>): List<Item> =
         list.map { it to releaseDate(it) }

@@ -39,7 +39,11 @@ private fun Header(item: Item, d: Details?, extra: String?) {
         .pointerHoverIcon(PointerIcon.Hand).padding(horizontal = 10.dp, vertical = 6.dp))
     Text(item.name, color = Col.Text, fontSize = 44.sp, fontFamily = InterDisplay, fontWeight = FontWeight.Bold, lineHeight = 48.sp,
         maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 14.dp))
-    val meta = listOfNotNull(d?.year ?: item.year, extra, d?.duration, d?.genre).filter { it.isNotBlank() }.joinToString("   ·   ")
+    // Fecha de estreno en lugar de la duración (TMDB; si no, la del proveedor)
+    LaunchedEffect(item.kind) { if (item.kind != Kind.LIVE) runCatching { Tmdb.allCatalogs(item.kind) } }
+    val tv = Tmdb.version.intValue
+    val release = remember(item.key, d, tv) { Tmdb.releaseLabel(item, d) }
+    val meta = listOfNotNull(release?.let { "Estreno: $it" }, extra, d?.genre).filter { it.isNotBlank() }.joinToString("   ·   ")
     if (meta.isNotBlank()) Text(meta, color = Col.Sub, fontSize = 14.sp, modifier = Modifier.padding(top = 10.dp))
     // Nota de IMDb (en lugar de la valoración del proveedor)
     val imdb by produceState(Imdb.cached(item), item.key, d?.tmdbId) { value = Imdb.score(item, d?.tmdbId) ?: value }

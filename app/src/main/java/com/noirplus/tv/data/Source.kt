@@ -205,6 +205,7 @@ class XtreamSource(
             rating = info.str("rating") ?: item.rating,
             duration = info.str("duration"),
             tmdbId = info.str("tmdb_id") ?: info.str("tmdb") ?: o.optJSONObject("movie_data")?.str("tmdb_id"),
+            release = info.str("releasedate") ?: info.str("release_date") ?: info.str("releaseDate"),
         )
         movies[item.id] = d
         return d
@@ -265,6 +266,7 @@ class XtreamSource(
             rating = info.str("rating") ?: item.rating,
             duration = null,
             tmdbId = info.str("tmdb") ?: info.str("tmdb_id"),
+            release = info.str("releaseDate") ?: info.str("release_date") ?: info.str("releasedate"),
         )
         val sorted = LinkedHashMap<Int, List<Episode>>()
         for ((k, v) in seasons) sorted[k] = v.sortedBy { it.number }

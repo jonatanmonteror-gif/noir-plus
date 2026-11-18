@@ -63,6 +63,8 @@ data class Details(
     val rating: String?,
     val duration: String?,
     val tmdbId: String? = null,
+    /** Fecha de estreno que da el proveedor (aaaa-mm-dd o similar). */
+    val release: String? = null,
 )
 
 data class Episode(
