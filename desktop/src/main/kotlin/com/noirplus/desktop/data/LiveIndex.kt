@@ -115,14 +115,55 @@ object LiveIndex {
 
     // Palabras clave por temática. «x*» = empieza por x; el resto, palabra o frase completa.
     private val RULES: List<Pair<String, List<String>>> = listOf(
-        "adult" to listOf("xxx", "adult*", "18", "porn*", "hustler", "playboy", "brazzers", "erotic*", "redlight", "dorcel"),
-        "kids" to listOf("disney*", "clan", "nick*", "cartoon*", "boing", "baby*", "kids", "infantil*", "junior", "toon*", "panda", "dreamworks", "cbeebies", "jim jam", "duck", "pocoyo", "peques", "super3", "sx3", "boomerang", "tiji", "gulli", "piwi", "babytv", "minimax", "kika", "rai yoyo"),
-        "news" to listOf("news", "noticias", "24h", "24 h", "canal 24 horas", "cnn*", "bbc world", "euronews", "france 24", "al jazeera", "aljazeera", "cnbc", "bloomberg", "telediario", "rt", "dw", "lci", "bfm*", "sky tg24", "rainews*", "tg24", "informativos", "3 24", "324", "el toro", "libertad digital", "intereconomia"),
-        "sports" to listOf("sport*", "deport*", "dazn*", "laliga*", "liga", "futbol*", "football", "soccer", "f1", "formula 1", "motogp", "moto gp", "eurosport*", "espn*", "golf*", "tenis", "tennis", "nba", "nfl", "nhl", "mlb", "ufc", "boxing", "boxeo", "bein*", "gol*", "real madrid", "barca", "toros", "racing", "ppv", "arena*", "setanta", "fight*", "wwe", "match", "champions", "copa", "premier", "bundesliga", "serie a", "ligue 1", "ciclismo", "cycling", "rugby", "olympic*", "eleven", "supertennis", "teledeporte", "esport*", "polo", "hipica", "caza", "pesca", "motor*"),
-        "docs" to listOf("discovery*", "national geographic", "nat geo*", "natgeo*", "history*", "historia", "odisea", "documental*", "docu*", "animal planet", "bbc earth", "viajar", "cocina", "canal cocina", "decasa", "dmax", "crimen", "crime*", "investigation", "id", "love nature", "curiosity*", "arte", "xplora", "iberalia", "science", "ciencia", "planet*", "travel*", "food*", "nature", "wild", "blaze"),
-        "music" to listOf("music*", "musica", "mtv*", "vh1", "40 tv", "los40", "kiss*", "cadena dial", "radio*", "sol musica", "mezzo", "trace*", "clubbing*", "hit tv", "hits", "deluxe music", "europa fm", "rock*", "jazz", "dance*", "classica", "stingray", "flaix*", "cadena 100", "rne"),
-        "movies" to listOf("cine*", "cinema*", "movie*", "film*", "pelic*", "series", "serie", "axn*", "tnt*", "hollywood*", "comedy*", "comedia", "amc*", "syfy", "cosmo*", "fox*", "calle 13", "warner*", "paramount*", "tcm", "dark", "accion", "action", "drama*", "xtrm", "star*", "hbo*", "showtime", "sky cinema*", "cinemax", "sundance*", "studio universal", "universal*", "enfamilia", "somos", "dizi", "novelas", "telenovela*", "atreseries", "fdf", "energy", "factoria de ficcion", "a3series", "bom cine", "odisea cine", "dark", "acontra*", "max", "netflix", "prime video", "filmin", "skyshowtime", "movistar plus", "plus estrenos", "estrenos*", "clasicos", "western"),
-        "general" to listOf("la 1", "la1", "la 2", "la2", "tve*", "antena 3", "antena3", "a3", "telecinco", "t5", "cuatro", "la sexta", "lasexta", "tv3", "3cat", "etb*", "tvg*", "canal sur*", "telemadrid", "a punt", "apunt", "aragon tv", "cmm", "trece", "13 tv", "8tv", "8 tv", "bbc one", "bbc two", "bbc three", "bbc four", "itv*", "channel 4", "channel 5", "tf1", "france 2", "france 3", "france 5", "m6", "rai 1", "rai 2", "rai 3", "rai*", "canale 5", "italia 1", "rete 4", "rtl*", "zdf", "ard", "sat 1", "rtp*", "sic", "tvi", "ib3", "tpa*", "tvcan*", "7rm", "la 7", "la7", "rtve*", "televisa", "azteca", "las estrellas", "canal 5", "abc", "nbc", "cbs", "pbs", "real time", "be mad", "mega", "ten", "divinity", "nova", "neox", "boing tv", "dkiss", "gol play"),
+        "adult" to listOf("xxx", "adult*", "adultos", "18", "porn*", "hustler", "playboy", "brazzers", "erotic*", "redlight", "dorcel"),
+        "sports" to listOf(
+            "sport*", "deport*", "dazn*", "laliga*", "la liga", "liga*", "campeones", "champions", "europa league", "conference league",
+            "federacion", "rfef", "hypermotion", "smartbank", "copa", "supercopa", "mundial*", "eurocopa", "futbol*", "football", "soccer",
+            "f1", "formula 1", "formula1", "motogp", "moto gp", "moto", "motor*", "rally*", "eurosport*", "espn*", "golf*", "tenis", "tennis",
+            "padel", "wta", "atp", "nba", "nfl", "nhl", "mlb", "acb", "euroliga", "euroleague", "baloncesto", "basket*", "balonmano",
+            "atletismo", "ciclismo", "cycling", "rugby", "hockey", "voley*", "voleibol", "ufc", "boxing", "boxeo", "wwe", "fight*",
+            "bein*", "gol", "gol play", "goltv", "real madrid", "barca", "athletic", "atletico", "toros", "racing", "ppv*", "arena*",
+            "setanta", "match", "premier", "bundesliga", "serie a", "ligue 1", "eredivisie", "olympic*", "olimpic*", "eleven*",
+            "teledeporte", "tdp", "esport*", "vamos", "ellas", "caza", "pesca", "hipica", "nautica", "skysports", "eventos", "evento",
+        ),
+        "news" to listOf(
+            "news", "noticias", "24h", "24 h", "24 horas", "24horas", "cnn*", "bbc world", "euronews", "france 24", "al jazeera", "aljazeera",
+            "cnbc", "bloomberg", "telediario", "informativos", "rt", "dw", "lci", "bfm*", "sky tg24", "tg24", "rainews*", "3 24", "324",
+            "el toro", "libertad digital", "intereconomia", "trece", "negocios", "parlamento", "congreso", "tv5monde", "france info", "franceinfo",
+        ),
+        "kids" to listOf(
+            "disney*", "clan", "nick*", "cartoon*", "cartoonito", "boing", "baby*", "kids", "infantil*", "junior", "jr", "toon*", "panda",
+            "dreamworks", "cbeebies", "jim jam", "duck tv", "pocoyo", "peques", "super3", "sx3", "boomerang", "tiji", "gulli", "piwi",
+            "minimax", "kika", "rai yoyo", "babytv", "kidz*", "dibujos", "anime*", "pequenos",
+        ),
+        "docs" to listOf(
+            "discovery*", "national geographic", "nat geo*", "natgeo*", "history*", "historia", "odisea", "documental*", "docu*",
+            "animal planet", "bbc earth", "viajar", "cocina", "canal cocina", "decasa", "dmax", "crimen", "crime*", "investigation", "id",
+            "love nature", "curiosity*", "arte", "xplora", "iberalia", "science", "ciencia", "planet*", "travel*", "food*", "nature",
+            "wild", "blaze", "naturaleza", "misterio", "ancient",
+        ),
+        "music" to listOf(
+            "music*", "musica*", "mtv*", "vh1", "40 tv", "los40", "kiss*", "cadena dial", "radio*", "sol musica", "mezzo", "trace*",
+            "clubbing*", "hit tv", "deluxe music", "europa fm", "rock*", "jazz", "dance*", "classica", "stingray", "flaix*", "cadena 100",
+            "rne", "conciertos", "videoclips",
+        ),
+        "general" to listOf(
+            "la 1", "la1", "la 2", "la2", "tve*", "antena 3", "antena3", "a3", "telecinco", "t5", "cuatro", "la sexta", "lasexta", "tv3",
+            "3cat", "etb*", "tvg*", "canal sur*", "telemadrid", "a punt", "apunt", "aragon tv", "cmm", "13 tv", "8tv", "8 tv", "bbc one",
+            "bbc two", "bbc three", "bbc four", "itv*", "channel 4", "channel 5", "tf1", "france 2", "france 3", "france 5", "m6", "rai 1",
+            "rai 2", "rai 3", "canale 5", "italia 1", "rete 4", "rtl*", "zdf", "ard", "sat 1", "rtp*", "sic", "tvi", "ib3", "tpa*",
+            "tvcan*", "7rm", "la 7", "la7", "rtve*", "televisa", "azteca", "las estrellas", "canal 5", "abc", "nbc", "cbs", "pbs",
+            "real time", "be mad", "mega", "ten", "divinity", "nova", "neox", "energy", "dkiss", "boing tv", "bom", "squirrel",
+            "telemundo", "univision", "autonomicas", "nacionales", "generalistas",
+        ),
+        "movies" to listOf(
+            "cine*", "cinema*", "movie*", "film*", "pelic*", "series", "serie", "axn*", "tnt*", "hollywood*", "comedy*", "comedia",
+            "amc*", "syfy", "cosmo*", "fox*", "calle 13", "warner*", "paramount*", "tcm", "dark", "accion", "action", "drama*", "xtrm",
+            "star channel", "star", "hbo*", "showtime", "sky cinema*", "cinemax", "sundance*", "studio universal", "universal*",
+            "enfamilia", "somos", "dizi", "novelas", "telenovela*", "atreseries", "fdf", "factoria de ficcion", "a3series", "acontra*",
+            "max", "netflix", "prime video", "filmin", "skyshowtime", "estrenos*", "clasicos", "western", "suspense", "thriller", "terror",
+            "humor", "romance", "hits", "oscars", "autor", "independiente",
+        ),
     )
 
     private val compiled: List<Pair<String, List<Regex>>> = RULES.map { (t, kws) ->
@@ -139,6 +180,16 @@ object LiveIndex {
         for ((t, rs) in compiled) if (rs.any { it.containsMatchIn(n) }) return t
         return null
     }
+
+    /** Temáticas que encajan con un texto (para saber si una carpeta del proveedor es clara o mezcla varias). */
+    private fun classifyAll(text: String): Set<String> {
+        val n = norm(text)
+        if (n.isEmpty()) return emptySet()
+        return compiled.filter { (_, rs) -> rs.any { it.containsMatchIn(n) } }.map { it.first }.toSet()
+    }
+
+    /** Temática de la carpeta del proveedor, solo si es clara (una única temática). */
+    private fun categoryTheme(cat: String): String? = classifyAll(cat).singleOrNull()
 
     /**
      * Construye el índice: [catName] da el nombre de la carpeta del proveedor de cada canal (ayuda a saber país y temática),
@@ -173,7 +224,7 @@ object LiveIndex {
             val first = ps.minByOrNull { it.order }!!
             val theme = overrides[key]
                 ?: classify(first.name)
-                ?: ps.firstNotNullOfOrNull { classify(it.cat) }
+                ?: ps.firstNotNullOfOrNull { categoryTheme(it.cat) }
                 ?: "other"
             Channel(key, first.name, first.country, theme, sorted.map { it.item }, sorted.first().q) to first.order
         }

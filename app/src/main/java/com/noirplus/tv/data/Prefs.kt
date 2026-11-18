@@ -334,8 +334,8 @@ class Prefs(ctx: Context) {
         sp.edit().putString("liveThemes", o.toString()).apply(); bump()
     }
 
-    /** Canales en cajas ("grid") o en lista ("list"). */
+    /** Canales en lista ("list", de entrada) o en cajas ("grid"). */
     var liveView: String
-        get() = sp.getString("liveView", "grid") ?: "grid"
-        set(v) { sp.edit().putString("liveView", v).apply(); bump() }
+        get() = sp.getString("liveViewMode", "list") ?: "list"
+        set(v) { sp.edit().putString("liveViewMode", v).apply(); bump() }
 }

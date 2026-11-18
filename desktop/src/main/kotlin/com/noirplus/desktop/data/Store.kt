@@ -187,8 +187,8 @@ object Store {
         j.put(channelKey, theme); save()
     }
     var liveView: String
-        get() = o.optString("liveView", "grid")
-        set(v) { o.put("liveView", v); save() }
+        get() = o.optString("liveViewMode", "list")
+        set(v) { o.put("liveViewMode", v); save() }
 
     // ---------- Sincronización ----------
     fun str(k: String, def: String = ""): String = o.optString(k, def)
