@@ -117,7 +117,8 @@ object Upcoming {
         val follow = followedKeys()
         val t = today()
         val since = day(System.currentTimeMillis() - 31L * 86400_000L)
-        ups.filter { it.kind != "aired" && it.date >= since }.mapNotNull { up ->
+        // Películas: solo estrenos en plataformas (lo de cines no se sube a la lista)
+        ups.filter { it.kind != "aired" && it.date >= since && !(it.type == "movie" && it.where == "cines") }.mapNotNull { up ->
             val local = if (up.type == "tv") find(up, series) else find(up, movies)
             val followed = local != null && local.key in follow
             if (up.kind == "episode" && !followed) return@mapNotNull null
