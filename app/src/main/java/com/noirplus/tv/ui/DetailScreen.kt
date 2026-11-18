@@ -70,6 +70,7 @@ import com.noirplus.tv.data.Kind
 import com.noirplus.tv.data.PlayRequest
 import com.noirplus.tv.data.Progress
 import com.noirplus.tv.data.Repo
+import com.noirplus.tv.data.Tmdb
 import com.noirplus.tv.data.SeriesDetails
 import kotlinx.coroutines.delay
 
