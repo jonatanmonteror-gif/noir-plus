@@ -51,7 +51,7 @@ import com.noirplus.tv.data.Upcoming
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-private val TYPES = listOf("all" to "Todo", "past" to "Recién estrenados", "film" to "Películas", "new" to "Series nuevas", "season" to "Temporadas", "episode" to "Mis capítulos")
+private val TYPES = listOf("all" to "Próximamente", "past" to "Recién estrenados", "film" to "Películas", "new" to "Series nuevas", "season" to "Temporadas", "episode" to "Mis capítulos")
 
 /** Próximos estrenos (90 días) y lo estrenado el último mes. */
 @Composable
@@ -105,21 +105,31 @@ fun UpcomingContent() {
         }
         Text(
             (if (plats.isNotEmpty()) Platforms.main.filter { it in plats }.joinToString(" + ") + "  ·  " else "") +
-                (if (type == "past") "Lo estrenado en plataformas la última semana." else "Lo que llega en los próximos 3 meses.") + " Toca un estreno y te aviso cuando tu proveedor lo suba.",
+                (if (type == "past") "Lo estrenado en plataformas la última semana." else "Lo que llega el próximo mes.") + " Toca un estreno y te aviso cuando tu proveedor lo suba.",
             color = Col.Sub, fontSize = 12.sp, modifier = Modifier.padding(start = d.edge, end = d.edge, top = 10.dp, bottom = 4.dp),
         )
         if (shown.isEmpty()) return Message(if (l.isEmpty()) "No se pudieron cargar los próximos estrenos. Revisa la conexión." else "Nada con estos filtros")
-        val firstFuture = remember(shown) { shown.indexOfFirst { it.up.date >= today } }
         // Siempre se abre desde arriba (sin recordar dónde se quedó la última vez)
         val listState = remember(shown) { androidx.compose.foundation.lazy.LazyListState() }
+        // Tele y tableta: dos columnas por día; móvil: una
+        val cols = if (d.compact) 1 else 2
+        val rows = remember(shown, cols) {
+            shown.groupBy { it.up.date }.values.flatMap { day -> day.chunked(cols).mapIndexed { j, r -> (j == 0) to r } }
+        }
         LazyColumn(Modifier.fillMaxSize(), state = listState,
             contentPadding = PaddingValues(start = d.edge, end = d.edge, top = 8.dp, bottom = d.bottomPad),
             verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            itemsIndexed(shown, key = { i, s -> "$i:${s.up.key}:${s.up.season}:${s.up.episode}:${s.up.date}" }) { i, s ->
-                val firstOfDay = i == 0 || shown[i - 1].up.date != s.up.date
-                val reminded = remindedKeys.contains(Upcoming.remindKey(s.up))
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    UpcomingEntry(s, reminded, today, showDate = firstOfDay) { onPick(s) }
+            itemsIndexed(rows, key = { i, r -> "$i:${r.second.first().up.date}:${r.second.first().up.key}" }) { _, (firstOfDay, r) ->
+                Row(Modifier.fillMaxWidth()) {
+                    DateColumn(r.first().up.date, today, firstOfDay)
+                    Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                        r.forEach { s ->
+                            Box(Modifier.weight(1f)) {
+                                UpcomingEntry(s, remindedKeys.contains(Upcoming.remindKey(s.up)), today) { onPick(s) }
+                            }
+                        }
+                        repeat(cols - r.size) { Spacer(Modifier.weight(1f)) }
+                    }
                 }
             }
         }
@@ -127,9 +137,16 @@ fun UpcomingContent() {
 }
 
 @Composable
-private fun SectionHeader(text: String, top: Boolean = false) {
-    Text(text, color = Col.Text, fontSize = 17.sp, fontWeight = FontWeight.SemiBold,
-        modifier = Modifier.padding(top = if (top) 14.dp else 0.dp, bottom = 2.dp))
+private fun DateColumn(date: Int, today: Int, show: Boolean) {
+    val d = LocalDims.current
+    Column(Modifier.width(if (d.compact) 42.dp else 64.dp).padding(top = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        if (show) {
+            Text(if (date == today) "HOY" else MONTHS[date / 100 % 100 - 1].uppercase(), color = if (date == today) Col.Text else Col.Sub,
+                fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.8.sp)
+            Text("${date % 100}", color = if (date < today) Col.Sub else Col.Text, fontSize = if (d.compact) 22.sp else 28.sp,
+                fontWeight = FontWeight.Bold, fontFamily = InterDisplay)
+        }
+    }
 }
 
 /** Qué se puede hacer con un estreno: verlo, o que te avisemos cuando tu proveedor lo suba. */
@@ -161,9 +178,8 @@ private fun EntryButtons(s: Upcoming.Shown, st: UpState, onAction: () -> Unit) {
             }
         }) { f -> TrailerPill(f) }
     }
-    // Móvil: uno encima del otro (Tráiler arriba) para que nada se corte; tele: en fila
-    if (compact) Column(verticalArrangement = Arrangement.spacedBy(6.dp)) { trailer(); action() }
-    else Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { action(); trailer() }
+    // Uno encima del otro (Tráiler arriba) para que nada se corte, también en dos columnas
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) { trailer(); action() }
 }
 
 @Composable
@@ -211,25 +227,15 @@ private fun ActionPill(st: UpState, focused: Boolean, small: Boolean = false, sh
 
 /** Vista con imágenes: fecha a la izquierda y tarjeta con la imagen del estreno (como «Próximamente» de las plataformas). */
 @Composable
-private fun UpcomingEntry(s: Upcoming.Shown, reminded: Boolean, today: Int, showDate: Boolean, onClick: () -> Unit) {
+private fun UpcomingEntry(s: Upcoming.Shown, reminded: Boolean, today: Int, onClick: () -> Unit) {
     val d = LocalDims.current
     val up = s.up
-    val past = up.date < today
     val st = stateOf(s, reminded, today)
     Row(Modifier.fillMaxWidth()) {
-        // Fecha
-        Column(Modifier.width(if (d.compact) 42.dp else 64.dp).padding(top = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            if (showDate) {
-                Text(if (up.date == today) "HOY" else MONTHS[up.date / 100 % 100 - 1].uppercase(), color = if (up.date == today) Col.Text else Col.Sub,
-                    fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.8.sp)
-                Text("${up.date % 100}", color = if (past) Col.Sub else Col.Text, fontSize = if (d.compact) 22.sp else 28.sp,
-                    fontWeight = FontWeight.Bold, fontFamily = InterDisplay)
-            }
-        }
         Box(Modifier.weight(1f).clip(RoundedCornerShape(14.dp)).background(Col.Surface)) {
             // Portada vertical completa (sin recortar) y, detrás del texto, la imagen ancha muy oscurecida
             val poster = up.poster ?: up.backdrop
-            val rowH = if (d.compact) 196.dp else 190.dp
+            val rowH = if (d.compact) 196.dp else 212.dp
             up.backdrop?.let {
                 AsyncImage(it, null, contentScale = ContentScale.Crop, alpha = 0.22f, modifier = Modifier.matchParentSize())
                 Box(Modifier.matchParentSize().background(
@@ -245,12 +251,12 @@ private fun UpcomingEntry(s: Upcoming.Shown, reminded: Boolean, today: Int, show
                 ) {
                     if (up.platform.isNotBlank()) Text(up.platform.uppercase(), color = Col.Sub, fontSize = 10.sp,
                         fontWeight = FontWeight.SemiBold, letterSpacing = 1.sp, maxLines = 1)
-                    Text(up.name, color = Col.Text, fontSize = if (d.compact) 15.sp else 20.sp, fontWeight = FontWeight.Bold,
+                    Text(up.name, color = Col.Text, fontSize = if (d.compact) 15.sp else 18.sp, fontWeight = FontWeight.Bold,
                         maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(Upcoming.label(up), color = Col.Text.copy(alpha = 0.8f), fontSize = if (d.compact) 12.sp else 14.sp,
                         maxLines = 1, overflow = TextOverflow.Ellipsis)
                     if (up.overview.isNotBlank()) Text(up.overview, color = Col.Sub, fontSize = if (d.compact) 11.sp else 13.sp,
-                        maxLines = if (d.compact) 1 else 3, overflow = TextOverflow.Ellipsis, lineHeight = if (d.compact) 15.sp else 18.sp)
+                        maxLines = if (d.compact) 1 else 2, overflow = TextOverflow.Ellipsis, lineHeight = if (d.compact) 15.sp else 18.sp)
                     Spacer(Modifier.weight(1f))
                     EntryButtons(s, st, onClick)
                 }

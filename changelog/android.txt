@@ -6,3 +6,5 @@ Novedades de la próxima versión de Android (tele y móvil). Una línea por pun
 - Tele: al volver de ver un tráiler en YouTube vuelves a la misma pantalla y ficha en la que estabas, aunque la tele haya cerrado la app.
 - Tele, Directo: al bajar desde el menú de arriba entras en la temática que tienes elegida (antes saltaba a Favoritos).
 - Próximos: lo ya estrenado va en su propia pestaña, «Recién estrenados», con lo de la última semana; «Todo» enseña solo lo que viene.
+- Próximos: se abre en «Próximamente», solo con el próximo mes; lo de la última semana está en la pestaña «Recién estrenados».
+- Tele: Próximos en dos columnas, con «Tráiler» encima de «Avísame» para que las cajas no se rompan.

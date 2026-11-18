@@ -39,7 +39,7 @@ import com.noirplus.desktop.data.Imdb
 import androidx.compose.material.icons.filled.Movie
 import kotlinx.coroutines.launch
 
-private val TYPES = listOf("all" to "Todo", "past" to "Recién estrenados", "film" to "Películas", "new" to "Series nuevas", "season" to "Temporadas", "episode" to "Mis capítulos")
+private val TYPES = listOf("all" to "Próximamente", "past" to "Recién estrenados", "film" to "Películas", "new" to "Series nuevas", "season" to "Temporadas", "episode" to "Mis capítulos")
 
 /** Próximos estrenos (90 días), agrupados por día. */
 @Composable
@@ -59,7 +59,7 @@ fun UpcomingScreen() {
         LazyRow(contentPadding = PaddingValues(horizontal = 40.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(bottom = 14.dp)) {
             items(Tmdb.platforms, key = { "p:$it" }) { p -> UpChip(p, p in plats, small = true) { plats = if (p in plats) plats - p else plats + p } }
         }
-        Text((if (type == "past") "Lo estrenado en plataformas la última semana. " else "Lo que llega en los próximos 3 meses. ") + "Haz clic en un estreno y te aviso cuando tu proveedor lo suba. «Mis capítulos»: de las series que sigues.", color = Col.Sub, fontSize = 12.sp,
+        Text((if (type == "past") "Lo estrenado en plataformas la última semana. " else "Lo que llega el próximo mes. ") + "Haz clic en un estreno y te aviso cuando tu proveedor lo suba. «Mis capítulos»: de las series que sigues.", color = Col.Sub, fontSize = 12.sp,
             modifier = Modifier.padding(start = 40.dp, bottom = 6.dp))
         val l = list
         val shown = remember(l, type, plats) { l?.filter { (if (type == "past") it.up.date < Upcoming.today() else it.up.date >= Upcoming.today() && (type == "all" || it.up.kind == type)) && (plats.isEmpty() || it.up.platform in plats) }?.sortedBy { it.up.date } }
