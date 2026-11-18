@@ -30,6 +30,7 @@ object Upcoming {
         val last: Int, val lastS: Int, val lastE: Int,
         val pop: Double = 0.0, val lang: String = "",
         val backdrop: String? = null, val overview: String = "",
+        val genres: List<Int> = emptyList(),
     ) {
         val key: String get() = "$type:$id"
     }
@@ -74,6 +75,7 @@ object Upcoming {
                 o.optInt("last"), o.optInt("ls"), o.optInt("le"),
                 o.optDouble("pop", 0.0), o.optString("lang"),
                 o.optString("bd").takeIf { it.isNotBlank() }?.let { "https://image.tmdb.org/t/p/w500$it" }, o.optString("ov"),
+                o.optJSONArray("g")?.let { g -> (0 until g.length()).map { g.optInt(it) } } ?: emptyList(),
             )
         }
     }

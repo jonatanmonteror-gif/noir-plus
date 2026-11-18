@@ -120,7 +120,12 @@ fun UpcomingContent() {
             contentPadding = PaddingValues(start = d.edge, end = d.edge, top = 8.dp, bottom = d.bottomPad),
             verticalArrangement = Arrangement.spacedBy(14.dp)) {
             itemsIndexed(rows, key = { i, r -> "$i:${r.second.first().up.date}:${r.second.first().up.key}" }) { _, (firstOfDay, r) ->
-                Row(Modifier.fillMaxWidth()) {
+                // Móvil: la fecha va encima como título y las cajas a todo el ancho
+                if (d.compact) Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    if (firstOfDay) Text(dayLabel(r.first().up.date, today), color = if (r.first().up.date < today) Col.Sub else Col.Text,
+                        fontSize = 15.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 6.dp))
+                    UpcomingEntry(r.first(), remindedKeys.contains(Upcoming.remindKey(r.first().up)), today) { onPick(r.first()) }
+                } else Row(Modifier.fillMaxWidth()) {
                     DateColumn(r.first().up.date, today, firstOfDay)
                     Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                         r.forEach { s ->
@@ -185,14 +190,18 @@ private fun EntryButtons(s: Upcoming.Shown, st: UpState, onAction: () -> Unit) {
 @Composable
 private fun TrailerPill(focused: Boolean, iconOnly: Boolean = false) {
     val fg = if (focused) Color.Black else Col.Text
-    Row(
-        Modifier.clip(RoundedCornerShape(50)).background(if (focused) Color.White else Color.Transparent)
-            .border(1.dp, if (focused) Color.White else Color.White.copy(alpha = 0.3f), RoundedCornerShape(50))
-            .padding(horizontal = if (iconOnly) 9.dp else 12.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        androidx.compose.material3.Icon(TrailerIcon, "Tráiler", tint = fg, modifier = Modifier.size(15.dp))
-        if (!iconOnly) Text("Tráiler", color = fg, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, softWrap = false,
+    val base = Modifier.clip(RoundedCornerShape(50)).background(if (focused) Color.White else Color.Transparent)
+        .border(1.dp, if (focused) Color.White else Color.White.copy(alpha = 0.3f), RoundedCornerShape(50))
+    if (iconOnly) {
+        // Solo el icono, en un círculo del mismo alto que el otro botón
+        Box(base.size(30.dp), contentAlignment = Alignment.Center) {
+            androidx.compose.material3.Icon(TrailerIcon, "Tráiler", tint = fg, modifier = Modifier.size(17.dp))
+        }
+        return
+    }
+    Row(base.padding(horizontal = 11.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+        androidx.compose.material3.Icon(TrailerIcon, "Tráiler", tint = fg, modifier = Modifier.size(14.dp))
+        Text("Tráiler", color = fg, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, softWrap = false,
             modifier = Modifier.padding(start = 5.dp))
     }
 }
@@ -211,7 +220,7 @@ private fun ActionPill(st: UpState, focused: Boolean, small: Boolean = false, sh
         Modifier.clip(RoundedCornerShape(50))
             .background(if (filled || focused) Color.White else Color.Transparent)
             .then(if (filled || focused) Modifier else Modifier.border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(50)))
-            .padding(horizontal = if (small) 9.dp else 12.dp, vertical = if (small) 4.dp else 6.dp),
+            .padding(horizontal = if (small) 9.dp else 11.dp, vertical = if (small) 4.dp else 5.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         val icon = when (st) {
@@ -219,8 +228,8 @@ private fun ActionPill(st: UpState, focused: Boolean, small: Boolean = false, sh
             UpState.REMINDED -> androidx.compose.material.icons.Icons.Filled.Notifications
             else -> androidx.compose.material.icons.Icons.Outlined.Notifications
         }
-        androidx.compose.material3.Icon(icon, null, tint = fg, modifier = Modifier.size(if (small) 13.dp else 15.dp))
-        Text(txt, color = fg, fontSize = if (small) 11.sp else 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
+        androidx.compose.material3.Icon(icon, null, tint = fg, modifier = Modifier.size(13.dp))
+        Text(txt, color = fg, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
             overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 5.dp))
     }
 }
@@ -235,7 +244,7 @@ private fun UpcomingEntry(s: Upcoming.Shown, reminded: Boolean, today: Int, onCl
         Box(Modifier.weight(1f).clip(RoundedCornerShape(14.dp)).background(Col.Surface)) {
             // Portada vertical completa (sin recortar) y, detrás del texto, la imagen ancha muy oscurecida
             val poster = up.poster ?: up.backdrop
-            val rowH = if (d.compact) 150.dp else 160.dp
+            val rowH = if (d.compact) 140.dp else 150.dp
             up.backdrop?.let {
                 AsyncImage(it, null, contentScale = ContentScale.Crop, alpha = 0.22f, modifier = Modifier.matchParentSize())
                 Box(Modifier.matchParentSize().background(
@@ -253,16 +262,21 @@ private fun UpcomingEntry(s: Upcoming.Shown, reminded: Boolean, today: Int, onCl
                     Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                         if (logo == null && up.platform.isNotBlank()) Text(up.platform.uppercase(), color = Col.Sub, fontSize = 10.sp,
                             fontWeight = FontWeight.SemiBold, letterSpacing = 1.sp, maxLines = 1)
-                        Text(up.name, color = Col.Text, fontSize = if (d.compact) 15.sp else 18.sp, fontWeight = FontWeight.Bold,
-                            maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = if (d.compact) 19.sp else 22.sp)
-                        Text(Upcoming.label(up), color = Col.Text.copy(alpha = 0.8f), fontSize = if (d.compact) 12.sp else 13.sp,
-                            maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(up.name, color = Col.Text, fontSize = if (d.compact) 14.sp else 16.sp, fontWeight = FontWeight.Bold,
+                            maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = if (d.compact) 18.sp else 20.sp)
+                        Text(Upcoming.label(up).uppercase(), color = Col.Text.copy(alpha = 0.75f), fontSize = if (d.compact) 10.sp else 11.sp,
+                            fontWeight = FontWeight.SemiBold, letterSpacing = 0.6.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        // Géneros, con la misma letra que el reparto de las fichas
+                        val kind = if (up.type == "tv") com.noirplus.tv.data.Kind.SERIES else com.noirplus.tv.data.Kind.MOVIE
+                        val gen = remember(up.genres) { up.genres.mapNotNull { com.noirplus.tv.data.Tmdb.genreNames(kind)[it] }.take(3).joinToString(" · ") }
+                        if (gen.isNotEmpty()) Text(gen, color = Col.Sub, fontSize = if (d.compact) 11.sp else 12.sp, maxLines = 1,
+                            overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 1.dp))
                         Spacer(Modifier.weight(1f))
                         EntryButtons(s, st, onClick)
                     }
                     logo?.let {
                         AsyncImage(it, up.platform, contentScale = ContentScale.Fit,
-                            modifier = Modifier.padding(start = 8.dp).size(if (d.compact) 30.dp else 36.dp).clip(RoundedCornerShape(8.dp)))
+                            modifier = Modifier.padding(start = 8.dp).size(if (d.compact) 24.dp else 28.dp).clip(RoundedCornerShape(6.dp)))
                     }
                 }
             }

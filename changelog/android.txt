@@ -9,3 +9,5 @@ Novedades de la próxima versión de Android (tele y móvil). Una línea por pun
 - Próximos: se abre en «Próximamente», solo con el próximo mes; lo de la última semana está en la pestaña «Recién estrenados».
 - Tele: Próximos en dos columnas, con «Tráiler» encima de «Avísame» para que las cajas no se rompan.
 - Próximos: cajas más bajas y limpias: sin descripción, logo de la plataforma arriba a la derecha y los botones «Avísame» y «Tráiler» uno al lado del otro.
+- Próximos: botones y logo de la plataforma más pequeños, título algo menor, tipo de estreno en mayúsculas y los géneros debajo, para que todo quepa aunque el título ocupe dos líneas.
+- Móvil, Próximos: las cajas ocupan todo el ancho, la fecha va encima como título y el botón del tráiler se ve bien.
