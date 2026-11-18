@@ -1,6 +1,3 @@
 Novedades de la próxima versión de Android (tele y móvil). Una línea por punto, empezando por «- ».
-- Tele: Películas y Series se abren siempre por plataformas.
-- Tele: al volver de una ficha sigues en la misma pestaña (ya no vuelve a Inicio).
-- Tele: menú de arriba más limpio, solo texto con una franja debajo de la pestaña en la que estás.
-- Próximos: siempre en filas (se quita el botón de vista) y botón «Tráiler» en español en cada estreno.
-- Continuar viendo: mantén pulsado para «Volver a empezar» o «Quitar de Continuar viendo».
+- Tele: mantener pulsado en «Continuar viendo» ya no abre la película o serie; sale el menú normal con «Volver a empezar» y «Quitar de Continuar viendo».
+- Tele: al abrir cualquier menú manteniendo OK, soltar el botón ya no activa sin querer la primera opción (pasaba también en canales y carátulas).

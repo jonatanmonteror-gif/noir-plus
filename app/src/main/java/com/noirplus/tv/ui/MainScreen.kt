@@ -502,14 +502,7 @@ fun BrowseContent(kind: Kind) {
 fun ContinueRow(history: List<com.noirplus.tv.data.Progress>, memPrefix: String, onHero: (Item) -> Unit) {
     val d = LocalDims.current
     val nav = LocalNav.current
-    var menuFor by remember { mutableStateOf<com.noirplus.tv.data.Progress?>(null) }
-    menuFor?.let { p ->
-        ContinueMenu(p, onClose = { menuFor = null }, onRestart = {
-            menuFor = null
-            Repo.prefs.removeProgress(p.key)
-            nav.push(Screen.Player(PlayRequest(url = p.url, title = p.title, key = p.key, image = p.image, isLive = false, startMs = 0, parent = p.parent)))
-        }, onRemove = { menuFor = null; Repo.prefs.removeProgress(p.key) })
-    }
+    val menu = LocalItemMenu.current
     Column {
         SectionTitle("Continuar viendo")
         TvHorizontalScroll {
@@ -526,7 +519,16 @@ fun ContinueRow(history: List<com.noirplus.tv.data.Progress>, memPrefix: String,
                     memKey = "$memPrefix/${p.key}",
                     onFocus = { onHero(Item(id = p.key, name = p.title, image = p.image, kind = Kind.LIVE)) },
                     // Mantener pulsado: quitar o volver a empezar
-                    onLongClick = { menuFor = p },
+                    onLongClick = {
+                        menu(MenuTarget(p.title, p.image, "Continuar viendo", favItem = null, rate = null, actions = listOf(
+                            "Volver a empezar" to {
+                                Repo.prefs.removeProgress(p.key)
+                                nav.push(Screen.Player(PlayRequest(url = p.url, title = p.title, key = p.key, image = p.image,
+                                    isLive = false, startMs = 0, parent = p.parent)))
+                            },
+                            "Quitar de Continuar viendo" to { Repo.prefs.removeProgress(p.key) },
+                        )))
+                    },
                     onClick = {
                         nav.push(
                             Screen.Player(
@@ -617,29 +619,6 @@ private fun HeroList(hero: @Composable () -> Unit, content: LazyListScope.() -> 
                 TvRowScroll {
                     LazyColumn(Modifier.fillMaxSize(), state = state, contentPadding = PaddingValues(bottom = d.bottomPad + 120.dp)) { content() }
                 }
-            }
-        }
-    }
-}
-
-
-/** Menú de «Continuar viendo» (mantener pulsado): volver a empezar o quitarlo de la fila. */
-@Composable
-private fun ContinueMenu(p: com.noirplus.tv.data.Progress, onClose: () -> Unit, onRestart: () -> Unit, onRemove: () -> Unit) {
-    val fr = remember { FocusRequester() }
-    androidx.activity.compose.BackHandler { onClose() }
-    LaunchedEffect(Unit) { delay(120); runCatching { fr.requestFocus() } }
-    androidx.compose.ui.window.Popup(onDismissRequest = onClose, properties = androidx.compose.ui.window.PopupProperties(focusable = true)) {
-        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.7f)), contentAlignment = Alignment.Center) {
-            Column(
-                Modifier.padding(20.dp).widthIn(max = 420.dp).clip(RoundedCornerShape(16.dp)).background(Col.Surface2).padding(18.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Text(p.title, color = Col.Text, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, maxLines = 2)
-                Text("Continuar viendo", color = Col.Sub, fontSize = 12.sp)
-                ActionButton("Volver a empezar", primary = true, key = "cm-restart", focusRequester = fr, modifier = Modifier.fillMaxWidth()) { onRestart() }
-                ActionButton("Quitar de Continuar viendo", key = "cm-remove", modifier = Modifier.fillMaxWidth()) { onRemove() }
-                ActionButton("Cancelar", key = "cm-cancel", modifier = Modifier.fillMaxWidth()) { onClose() }
             }
         }
     }

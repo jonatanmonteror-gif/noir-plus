@@ -11,6 +11,9 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -60,6 +63,8 @@ data class MenuTarget(
     /** Canales: temática actual y cómo cambiarla. */
     val theme: String? = null,
     val onTheme: ((String) -> Unit)? = null,
+    /** Acciones extra (p. ej. «Volver a empezar»). */
+    val actions: List<Pair<String, () -> Unit>> = emptyList(),
 )
 
 /** Abre el menú de opciones (pulsación larga) desde cualquier pantalla. */
@@ -111,7 +116,20 @@ private fun ItemMenu(t: MenuTarget, onRate: (RateTarget) -> Unit, onClose: () ->
         runCatching { firstFr.requestFocus() }
     }
 
-    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.55f)).pointerInputTap(onClose)) {
+    // El menú se abre manteniendo OK pulsado: hasta que no se vuelva a pulsar OK dentro del menú,
+    // se ignora el soltar de esa pulsación (si no, se activaba la primera opción sin querer)
+    var armed by remember { mutableStateOf(false) }
+    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.55f)).pointerInputTap(onClose)
+        .onPreviewKeyEvent { ev ->
+            val c = ev.nativeKeyEvent.keyCode
+            if (c != android.view.KeyEvent.KEYCODE_DPAD_CENTER && c != android.view.KeyEvent.KEYCODE_ENTER &&
+                c != android.view.KeyEvent.KEYCODE_NUMPAD_ENTER) return@onPreviewKeyEvent false
+            when {
+                armed -> false
+                ev.type == androidx.compose.ui.input.key.KeyEventType.KeyDown && ev.nativeKeyEvent.repeatCount == 0 -> { armed = true; false }
+                else -> true // soltar o repetición de la pulsación larga: se ignora
+            }
+        }) {
         AnimatedVisibility(
             visibleState = shown,
             enter = if (d.compact) slideInVertically(tween(260)) { it } + fadeIn() else scaleIn(tween(200), initialScale = 0.92f) + fadeIn(),
@@ -168,6 +186,11 @@ private fun ItemMenu(t: MenuTarget, onRate: (RateTarget) -> Unit, onClose: () ->
                             prefs.toggleFavorite(fav)
                             onClose()
                         }
+                        first = false
+                    }
+                    t.actions.forEach { (label, act) ->
+                        MenuRow(if (label.startsWith("Quitar")) androidx.compose.material.icons.Icons.Filled.Close else androidx.compose.material.icons.Icons.Filled.Refresh,
+                            label, focusRequester = if (first) firstFr else null) { onClose(); act() }
                         first = false
                     }
                     if (t.onTheme != null) {
