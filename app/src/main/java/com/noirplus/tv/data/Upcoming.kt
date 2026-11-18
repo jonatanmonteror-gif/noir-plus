@@ -1,0 +1,158 @@
+package com.noirplus.tv.data
+
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
+import okhttp3.Request
+import org.json.JSONArray
+import java.io.File
+import java.util.Calendar
+
+/**
+ * Próximos estrenos (90 días): películas, series nuevas, temporadas y capítulos, preparados cada noche en GitHub.
+ * Los capítulos sueltos solo se enseñan de las series que sigues (Mi lista o Continuar viendo).
+ */
+object Upcoming {
+    private const val URL = "https://github.com/jonatanmonteror-gif/noir-plus/releases/download/catalog/upcoming.json.gz"
+
+    data class Up(
+        val type: String,        // "tv" | "movie"
+        val id: String,
+        val name: String,
+        val date: Int,           // aaaammdd (0 en series ya emitidas sin próximo capítulo)
+        val kind: String,        // "new" | "season" | "episode" | "film" | "aired"
+        val season: Int, val episode: Int, val epName: String,
+        val platform: String,    // "Netflix"… o ""
+        val where: String,       // películas: "cines" | "digital"
+        val poster: String?,
+        val keys: List<String>,
+        val last: Int, val lastS: Int, val lastE: Int,
+    ) {
+        val key: String get() = "$type:$id"
+    }
+
+    data class Shown(val up: Up, val local: Item?, val available: Boolean)
+
+    private var cache: List<Up>? = null
+    private var loadedAt = 0L
+    private val lock = Mutex()
+
+    suspend fun all(): List<Up> = lock.withLock {
+        cache?.takeIf { System.currentTimeMillis() - loadedAt < 6 * 3600_000L }?.let { return@withLock it }
+        val list = withContext(Dispatchers.IO) { runCatching { read() }.onFailure { ErrorLog.note("proximos", it) }.getOrNull() }
+        if (list != null) { cache = list; loadedAt = System.currentTimeMillis() }
+        cache ?: emptyList()
+    }
+
+    private fun read(): List<Up> {
+        val dir = Tmdb.cacheDir() ?: File(System.getProperty("java.io.tmpdir") ?: "/tmp")
+        val f = File(dir, "upcoming.json.gz")
+        if (!f.exists() || System.currentTimeMillis() - f.lastModified() > 12 * 3600_000L) runCatching {
+            val req = Request.Builder().url(URL).header("User-Agent", Http.UA).build()
+            Http.client.newCall(req).execute().use { r ->
+                if (r.isSuccessful) {
+                    val tmp = File(dir, "upcoming.tmp")
+                    r.body?.byteStream()?.use { i -> tmp.outputStream().use { i.copyTo(it) } }
+                    if (tmp.length() > 0) { f.delete(); tmp.renameTo(f) }
+                }
+            }
+        }
+        if (!f.exists()) return emptyList()
+        val txt = java.util.zip.GZIPInputStream(f.inputStream()).bufferedReader().readText()
+        val arr = JSONArray(txt)
+        return (0 until arr.length()).mapNotNull { i ->
+            val o = arr.optJSONObject(i) ?: return@mapNotNull null
+            val ks = o.optJSONArray("keys")
+            Up(
+                o.optString("t"), o.optString("id"), o.optString("n"), o.optInt("d"), o.optString("k"),
+                o.optInt("s"), o.optInt("e"), o.optString("en"), o.optString("p"), o.optString("w"),
+                o.optString("img").takeIf { it.isNotBlank() }?.let { "https://image.tmdb.org/t/p/w185$it" },
+                (0 until (ks?.length() ?: 0)).map { ks!!.optString(it) },
+                o.optInt("last"), o.optInt("ls"), o.optInt("le"),
+            )
+        }
+    }
+
+    fun today(): Int = day(System.currentTimeMillis())
+    fun day(ms: Long): Int {
+        val c = Calendar.getInstance().apply { timeInMillis = ms }
+        return c.get(Calendar.YEAR) * 10000 + (c.get(Calendar.MONTH) + 1) * 100 + c.get(Calendar.DAY_OF_MONTH)
+    }
+    private fun providerDay(t: Long): Int = if (t <= 0) 0 else day(if (t > 100_000_000_000L) t else t * 1000)
+
+    /** Tu lista indexada para saber si un estreno ya lo tiene tu proveedor. */
+    private class Local(val byKey: Map<String, Item>, val byTmdb: Map<String, Item>)
+
+    private fun index(items: List<Item>): Local {
+        val k = HashMap<String, Item>(); val t = HashMap<String, Item>()
+        for (it in items) {
+            val p = Tmdb.prep(it)
+            k.putIfAbsent(p.key, it)
+            p.tmdb?.let { id -> t.putIfAbsent(id, it) }
+        }
+        return Local(k, t)
+    }
+
+    private fun find(up: Up, l: Local): Item? = l.byTmdb[up.id] ?: up.keys.firstNotNullOfOrNull { l.byKey[it] }
+
+    /** Series que sigues: Mi lista y Continuar viendo. */
+    private fun followedKeys(): Set<String> {
+        val prefs = Repo.prefs
+        val fav = prefs.favorites().filter { it.kind == Kind.SERIES }.map { it.key }
+        val hist = prefs.history().mapNotNull { it.parent?.takeIf { p -> p.startsWith("SERIES:") } }
+        return (fav + hist).toSet()
+    }
+
+    /** Lista para la sección «Próximos», ya filtrada y con lo que ya está disponible en tu proveedor. */
+    suspend fun shown(): List<Shown> = withContext(Dispatchers.Default) {
+        val src = Repo.source ?: return@withContext emptyList()
+        val ups = all()
+        val series = index(runCatching { src.all(Kind.SERIES) }.getOrDefault(emptyList()))
+        val movies = index(runCatching { src.all(Kind.MOVIE) }.getOrDefault(emptyList()))
+        val follow = followedKeys()
+        val t = today()
+        ups.filter { it.kind != "aired" && it.date >= t - 1 }.mapNotNull { up ->
+            val local = if (up.type == "tv") find(up, series) else find(up, movies)
+            if (up.kind == "episode" && (local == null || local.key !in follow)) return@mapNotNull null
+            val avail = when {
+                local == null || up.date > t -> false
+                up.type == "movie" -> true
+                else -> providerDay(local.added) >= up.date
+            }
+            Shown(up, local, avail)
+        }
+    }
+
+    /** Aviso: capítulos nuevos de series que sigues que ya ha subido tu proveedor (y aún no te hemos avisado). */
+    suspend fun newEpisodes(): List<Pair<Up, Item>> = withContext(Dispatchers.Default) {
+        val src = Repo.source ?: return@withContext emptyList()
+        val follow = followedKeys()
+        if (follow.isEmpty()) return@withContext emptyList()
+        val series = index(runCatching { src.all(Kind.SERIES) }.getOrDefault(emptyList()))
+        val seen = Repo.prefs.strSet("upNotified")
+        val t = today()
+        val limit = day(System.currentTimeMillis() - 10L * 86400_000L)
+        all().filter { it.type == "tv" && it.last in limit..t }.mapNotNull { up ->
+            val local = find(up, series) ?: return@mapNotNull null
+            if (local.key !in follow) return@mapNotNull null
+            if ("${up.id}:${up.last}" in seen) return@mapNotNull null
+            if (providerDay(local.added) < up.last) return@mapNotNull null
+            up to local
+        }.distinctBy { it.first.id }
+    }
+
+    fun markNotified(up: Up) {
+        val p = Repo.prefs
+        val cur = p.strSet("upNotified").toMutableSet()
+        cur += "${up.id}:${up.last}"
+        p.putStrSet("upNotified", cur.toList().takeLast(300).toSet())
+    }
+
+    fun label(up: Up): String = when (up.kind) {
+        "new" -> "Serie nueva"
+        "season" -> "Temporada ${up.season}"
+        "episode" -> "T${up.season} · E${up.episode}" + (up.epName.takeIf { it.isNotBlank() && !it.startsWith("Episodio") }?.let { " · $it" } ?: "")
+        else -> if (up.platform.isNotBlank()) "Película" else if (up.where == "cines") "Película · En cines" else "Película"
+    }
+}

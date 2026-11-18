@@ -36,6 +36,8 @@ object Tmdb {
     // --- Memoria en disco de las plataformas de cada título (para filtrar sin volver a preguntar) ---
     private const val WEEK = 7L * 24 * 3600 * 1000
     private var file: File? = null
+    /** Carpeta de caché (la misma de los catálogos). */
+    fun cacheDir(): File? = file?.parentFile
     private val names = ConcurrentHashMap<String, Pair<Long, List<String>>>()
     @Volatile private var dirty = false
 

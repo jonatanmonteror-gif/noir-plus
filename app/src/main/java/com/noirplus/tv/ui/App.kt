@@ -171,6 +171,7 @@ fun App() {
             }
             if (top == Screen.Main) UpdateNotice()
             if (top == Screen.Main) WhatsNewAfterUpdate()
+            if (top == Screen.Main) NewEpisodeNotice()
             CrashNotice()
             // Vuelta a la app tras varias horas: saludo de nuevo (salvo si se está viendo algo)
             val wr = Repo.welcomeRequest.intValue

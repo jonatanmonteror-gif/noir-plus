@@ -71,7 +71,7 @@ import com.noirplus.tv.data.Repo
 import kotlinx.coroutines.delay
 
 enum class Tab(val label: String) {
-    HOME("Inicio"), LIVE("Directo"), MOVIES("Películas"), SERIES("Series"), MYLIST("Mi lista"), RATINGS("Valoraciones"),
+    HOME("Inicio"), LIVE("Directo"), MOVIES("Películas"), SERIES("Series"), UPCOMING("Próximos"), MYLIST("Mi lista"), RATINGS("Valoraciones"),
     SEARCH("Buscar"), SETTINGS("Ajustes")
 }
 
@@ -128,6 +128,7 @@ private fun BigScreenMain() {
                 Tab.LIVE -> LiveContent()
                 Tab.MOVIES -> BrowseContent(Kind.MOVIE)
                 Tab.SERIES -> BrowseContent(Kind.SERIES)
+                Tab.UPCOMING -> UpcomingContent()
                 Tab.MYLIST -> MyListContent()
                 Tab.RATINGS -> RatingsContent()
                 Tab.SEARCH -> SearchContent()
@@ -180,7 +181,7 @@ internal enum class Section(val label: String, val icon: ImageVector) {
     SETTINGS("Ajustes", Icons.Filled.Settings),
 }
 
-private enum class Filter(val label: String) { ALL("Todo"), SERIES("Series"), MOVIES("Películas"), LIVE("Directo") }
+private enum class Filter(val label: String) { ALL("Todo"), SERIES("Series"), MOVIES("Películas"), LIVE("Directo"), UPCOMING("Próximos") }
 
 @Composable
 private fun PhoneMain() {
@@ -218,6 +219,7 @@ private fun PhoneMain() {
                     "h-SERIES" -> BrowseContent(Kind.SERIES)
                     "h-MOVIES" -> BrowseContent(Kind.MOVIE)
                     "h-LIVE" -> LiveContent()
+                    "h-UPCOMING" -> UpcomingContent()
                     "SEARCH" -> SearchContent()
                     "MYLIST" -> MyListContent()
                     "RATINGS" -> RatingsContent()

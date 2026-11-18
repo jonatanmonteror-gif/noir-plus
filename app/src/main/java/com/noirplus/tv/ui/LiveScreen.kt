@@ -332,7 +332,7 @@ private fun LiveIndex.Channel.qualityLabel(): String = when {
 }
 
 @Composable
-private fun CategoryChip(name: String, selected: Boolean, onClick: () -> Unit) {
+internal fun CategoryChip(name: String, selected: Boolean, onClick: () -> Unit) {
     Focusable(shape = RoundedCornerShape(50), focusScale = 1f, onClick = onClick) { focused ->
         Text(
             name,
