@@ -7,3 +7,4 @@ Novedades de la próxima versión de Windows. Una línea por punto, empezando po
 - Próximos: las películas solo salen por su estreno en plataformas (ya no las de cines). La fecha de cines sigue en la ficha.
 - Próximos: arriba sale lo ya estrenado en las 2 últimas semanas (lo más reciente primero) y debajo «Próximamente».
 - Próximos: pestaña nueva «Ya estrenados» con lo de las 2 últimas semanas, y la lista de estrenos se renueva antes (antes podía quedarse la de esta mañana, sin lo ya estrenado).
+- Aviso de capítulo nuevo o de estreno ya disponible: con 20 de margen por cada lado, casi negro, borde blanco fino y esquinas más redondeadas.

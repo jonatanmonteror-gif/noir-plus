@@ -239,8 +239,9 @@ fun NewEpisodeBanner(modifier: Modifier) {
     val (up, item, isReminder) = queue.firstOrNull() ?: return
     fun next() { if (isReminder) Upcoming.toggleReminder(up) else Upcoming.markNotified(up); queue = queue.drop(1) }
     Row(
-        modifier.clip(RoundedCornerShape(14.dp)).background(Color(0xFF26262B)).border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(14.dp))
-            .padding(horizontal = 14.dp, vertical = 10.dp),
+        modifier.padding(20.dp).clip(RoundedCornerShape(22.dp)).background(Color(0xF20C0C0E))
+            .border(1.dp, Color.White.copy(alpha = 0.32f), RoundedCornerShape(22.dp))
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         up.poster?.let { AsyncImage(it, null, contentScale = ContentScale.Crop, modifier = Modifier.size(width = 36.dp, height = 52.dp).clip(RoundedCornerShape(4.dp))) }

@@ -1,3 +1,4 @@
 Novedades de la próxima versión de Android (tele y móvil). Una línea por punto, empezando por «- ». Empieza con «Tele:» o «Móvil:» lo que es solo de uno.
 - Móvil: el aviso de «Nueva versión lista» ya se puede cerrar (✕ o «Luego»); antes el botón se salía de la pantalla.
 - Las novedades solo enseñan lo de tu aparato: en la tele lo de la tele y en el móvil lo del móvil.
+- Aviso de capítulo nuevo o de estreno ya disponible: con 20 de margen por cada lado, casi negro, borde blanco fino y esquinas más redondeadas.

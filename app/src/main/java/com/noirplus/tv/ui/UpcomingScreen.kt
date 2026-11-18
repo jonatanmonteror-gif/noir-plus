@@ -1,6 +1,8 @@
 package com.noirplus.tv.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -301,10 +303,13 @@ fun NewEpisodeNotice() {
     val compact = LocalDims.current.compact
     Box(Modifier.fillMaxSize(), contentAlignment = if (compact) Alignment.TopCenter else Alignment.TopEnd) {
         Column(
-            Modifier.padding(horizontal = if (compact) 12.dp else 20.dp, vertical = if (compact) 12.dp else 70.dp)
+            // 20 de margen por cada lado, casi negro con un borde blanco fino y esquinas muy redondeadas
+            Modifier.then(if (compact) Modifier.windowInsetsPadding(androidx.compose.foundation.layout.WindowInsets.statusBars) else Modifier)
+                .padding(start = 20.dp, end = 20.dp, top = if (compact) 20.dp else 70.dp)
                 .then(if (compact) Modifier.fillMaxWidth() else Modifier.width(460.dp))
-                .clip(RoundedCornerShape(14.dp)).background(Col.Surface2.copy(alpha = 0.98f))
-                .padding(horizontal = 14.dp, vertical = 10.dp),
+                .clip(RoundedCornerShape(22.dp)).background(Color(0xF20C0C0E))
+                .border(1.dp, Color.White.copy(alpha = 0.32f), RoundedCornerShape(22.dp))
+                .padding(horizontal = 16.dp, vertical = 12.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 up.poster?.let {
