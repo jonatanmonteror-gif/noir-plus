@@ -55,7 +55,12 @@ import com.noirplus.tv.data.Repo
 import kotlinx.coroutines.delay
 
 /** Qué se ha mantenido pulsado: puede ir a Mi lista (favItem) y/o valorarse (rate). */
-data class MenuTarget(val title: String, val image: String?, val label: String, val favItem: Item?, val rate: RateTarget?)
+data class MenuTarget(
+    val title: String, val image: String?, val label: String, val favItem: Item?, val rate: RateTarget?,
+    /** Canales: temática actual y cómo cambiarla. */
+    val theme: String? = null,
+    val onTheme: ((String) -> Unit)? = null,
+)
 
 /** Abre el menú de opciones (pulsación larga) desde cualquier pantalla. */
 val LocalItemMenu = staticCompositionLocalOf<(MenuTarget) -> Unit> { {} }
@@ -94,8 +99,13 @@ private fun ItemMenu(t: MenuTarget, onRate: (RateTarget) -> Unit, onClose: () ->
     val isFav = remember(changes) { t.favItem?.let { prefs.isFavorite(it.key) } ?: false }
     val mine = remember(changes) { t.rate?.let { prefs.rating(it.key) } }
     val firstFr = remember { FocusRequester() }
+    var choosingTheme by remember { mutableStateOf(false) }
+    LaunchedEffect(choosingTheme) {
+        delay(120)
+        runCatching { firstFr.requestFocus() }
+    }
     val shown = remember { MutableTransitionState(false).apply { targetState = true } }
-    BackHandler { onClose() }
+    BackHandler { if (choosingTheme) choosingTheme = false else onClose() }
     LaunchedEffect(Unit) {
         delay(150)
         runCatching { firstFr.requestFocus() }
@@ -132,18 +142,37 @@ private fun ItemMenu(t: MenuTarget, onRate: (RateTarget) -> Unit, onClose: () ->
                     }
                 }
                 Box(Modifier.fillMaxWidth().height(0.5.dp).background(Color.White.copy(alpha = 0.1f)))
+                if (choosingTheme) {
+                    Column(Modifier.padding(top = 6.dp)) {
+                        Text("Mover a…", color = Col.Sub, fontSize = 12.sp, modifier = Modifier.padding(start = 12.dp, bottom = 4.dp))
+                        com.noirplus.tv.data.LiveIndex.THEMES.forEachIndexed { i, th ->
+                            MenuRow(ThemeIcon, th.label, value = if (th.id == t.theme) "✓" else null,
+                                focusRequester = if (i == 0) firstFr else null) {
+                                t.onTheme?.invoke(th.id)
+                                onClose()
+                            }
+                        }
+                    }
+                } else
                 Column(Modifier.padding(top = 6.dp)) {
                     val fav = t.favItem
+                    val live = fav?.kind == com.noirplus.tv.data.Kind.LIVE
                     var first = true
                     if (fav != null) {
                         MenuRow(
                             if (isFav) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                            if (isFav) "Quitar de Mi lista" else "Añadir a Mi lista",
+                            if (live) { if (isFav) "Quitar de Favoritos" else "Añadir a Favoritos" }
+                            else { if (isFav) "Quitar de Mi lista" else "Añadir a Mi lista" },
                             focusRequester = firstFr,
                         ) {
                             prefs.toggleFavorite(fav)
                             onClose()
                         }
+                        first = false
+                    }
+                    if (t.onTheme != null) {
+                        MenuRow(ThemeIcon, "Cambiar temática", value = com.noirplus.tv.data.LiveIndex.label(t.theme ?: "other"),
+                            focusRequester = if (first) firstFr else null) { choosingTheme = true }
                         first = false
                     }
                     t.rate?.takeIf { prefs.ratingsEnabled }?.let { r ->
@@ -182,3 +211,16 @@ fun RateHost(content: @Composable () -> Unit) {
 
 private fun Modifier.pointerInputTap(onTap: () -> Unit): Modifier =
     this.then(Modifier.pointerInput(Unit) { detectTapGestures { onTap() } })
+
+
+/** Icono de carpeta para «Cambiar temática». */
+private val ThemeIcon: ImageVector by lazy {
+    ImageVector.Builder("theme", 24.dp, 24.dp, 24f, 24f).apply {
+        addPath(
+            androidx.compose.ui.graphics.vector.PathParser().parsePathString(
+                "M10,4H4C2.9,4 2,4.9 2,6v12c0,1.1 0.9,2 2,2h16c1.1,0 2,-0.9 2,-2V8c0,-1.1 -0.9,-2 -2,-2h-8L10,4z"
+            ).toNodes(),
+            fill = androidx.compose.ui.graphics.SolidColor(Color.White),
+        )
+    }.build()
+}

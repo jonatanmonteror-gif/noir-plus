@@ -320,4 +320,22 @@ class Prefs(ctx: Context) {
     }
 
     fun replaceHistory(list: List<Progress>) = writeHistory(list.take(60))
+
+    // ---------- Canales por temática ----------
+    /** Temáticas elegidas a mano: clave del canal → temática. */
+    fun liveThemes(): Map<String, String> = runCatching {
+        val o = JSONObject(sp.getString("liveThemes", "{}") ?: "{}")
+        o.keys().asSequence().associateWith { o.getString(it) }
+    }.getOrDefault(emptyMap())
+
+    fun setLiveTheme(channelKey: String, theme: String) {
+        val o = runCatching { JSONObject(sp.getString("liveThemes", "{}") ?: "{}") }.getOrDefault(JSONObject())
+        o.put(channelKey, theme)
+        sp.edit().putString("liveThemes", o.toString()).apply(); bump()
+    }
+
+    /** Canales en cajas ("grid") o en lista ("list"). */
+    var liveView: String
+        get() = sp.getString("liveView", "grid") ?: "grid"
+        set(v) { sp.edit().putString("liveView", v).apply(); bump() }
 }

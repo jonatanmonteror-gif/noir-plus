@@ -108,6 +108,10 @@ fun PlayerScreen(req: PlayRequest) {
     val channel = channels.getOrNull(index)
     var url by remember { mutableStateOf(req.url) }
     var triedAlt by remember { mutableStateOf(false) }
+    // Directo: calidades del mismo canal (mejor primero). Si una falla se prueba la siguiente.
+    val curKey = if (cur.isLive) (channel?.key ?: cur.key) else ""
+    val qualities = remember(curKey) { if (cur.isLive) com.noirplus.tv.data.LiveIndex.alternatives(curKey) else emptyList() }
+    var qIdx by remember(curKey) { mutableIntStateOf(0) }
     var error by remember { mutableStateOf<String?>(null) }
     var infoVisible by remember { mutableStateOf(true) }
     var controlsVisible by remember { mutableStateOf(false) }
@@ -393,6 +397,12 @@ fun PlayerScreen(req: PlayRequest) {
                         triedAlt = true
                         url = if (url.endsWith(".m3u8")) url.removeSuffix(".m3u8") + ".ts" else url.removeSuffix(".ts") + ".m3u8"
                     }
+                    // Después, la siguiente calidad del mismo canal
+                    cur.isLive && src != null && qIdx + 1 < qualities.size -> {
+                        qIdx += 1
+                        triedAlt = false
+                        url = src.streamUrl(qualities[qIdx])
+                    }
                     else -> error = "No se ha podido reproducir este contenido.\n(${e.errorCodeName})"
                 }
             }
@@ -670,6 +680,7 @@ fun PlayerScreen(req: PlayRequest) {
                         "audio" -> "Audio"
                         "speed" -> "Velocidad"
                         "format" -> "Formato de imagen"
+                        "quality" -> "Calidad"
                         else -> "Opciones"
                     },
                     color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
@@ -717,6 +728,14 @@ fun PlayerScreen(req: PlayRequest) {
                 }
                 if (section("format", "Formato de imagen")) {
                     Segmented(ResizeModes.map { it.second }, resize, "pr") { resize = it }
+                }
+                // Directo con varias calidades del mismo canal
+                if (qualities.size > 1 && all) {
+                    val open = expanded["quality"] == true
+                    PanelHeader("Calidad", open, fr()) { expanded["quality"] = !open }
+                    if (open) Segmented(qualities.map { qualityName(it.name) }, qIdx, "pq") { i ->
+                        if (src != null && i != qIdx) { qIdx = i; triedAlt = false; url = src.streamUrl(qualities[i]) }
+                    }
                 }
             }
         }
@@ -868,5 +887,17 @@ private fun TrackRow(name: String, selected: Boolean, focus: FocusRequester?, on
                 modifier = Modifier.width(20.dp))
             Text(name, color = if (f) Color.Black else Color.White, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
+    }
+}
+
+
+/** Nombre corto de la calidad de un canal (por su nombre en la lista). */
+private fun qualityName(name: String): String {
+    val n = name.lowercase()
+    return when {
+        Regex("""(?<![a-z\d])(4k|uhd)(?![a-z\d])|ᵁᴴᴰ""").containsMatchIn(n) -> "4K"
+        Regex("""(?<![a-z\d])(fhd|1080[pi]?)(?![a-z\d])|ᶠᴴᴰ""").containsMatchIn(n) -> "FHD"
+        Regex("""(?<![a-z\d])(sd|576p|low)(?![a-z\d])|ˢᴰ""").containsMatchIn(n) -> "SD"
+        else -> "HD"
     }
 }
