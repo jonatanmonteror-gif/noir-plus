@@ -41,7 +41,7 @@ object Upcoming {
     private val lock = Mutex()
 
     suspend fun all(): List<Up> = lock.withLock {
-        cache?.takeIf { System.currentTimeMillis() - loadedAt < 6 * 3600_000L }?.let { return@withLock it }
+        cache?.takeIf { System.currentTimeMillis() - loadedAt < 3 * 3600_000L }?.let { return@withLock it }
         val list = withContext(Dispatchers.IO) { runCatching { read() }.onFailure { ErrorLog.note("proximos", it) }.getOrNull() }
         if (list != null) { cache = list; loadedAt = System.currentTimeMillis() }
         cache ?: emptyList()
@@ -49,8 +49,8 @@ object Upcoming {
 
     private fun read(): List<Up> {
         val dir = File(AppDirs.root, "tmdb").apply { mkdirs() }
-        val f = File(dir, "upcoming.json.gz")
-        if (!f.exists() || System.currentTimeMillis() - f.lastModified() > 12 * 3600_000L) runCatching {
+        val f = File(dir, "upcoming-v2.json.gz")
+        if (!f.exists() || System.currentTimeMillis() - f.lastModified() > 6 * 3600_000L) runCatching {
             val req = Request.Builder().url(URL).header("User-Agent", "NoirPlus-Desktop").build()
             Http.client.newCall(req).execute().use { r ->
                 if (r.isSuccessful) {

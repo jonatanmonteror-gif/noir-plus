@@ -49,7 +49,7 @@ import com.noirplus.tv.data.Upcoming
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-private val TYPES = listOf("all" to "Todo", "film" to "Películas", "new" to "Series nuevas", "season" to "Temporadas", "episode" to "Mis capítulos")
+private val TYPES = listOf("all" to "Todo", "past" to "Ya estrenados", "film" to "Películas", "new" to "Series nuevas", "season" to "Temporadas", "episode" to "Mis capítulos")
 
 /** Próximos estrenos (90 días) y lo estrenado el último mes. */
 @Composable
@@ -64,8 +64,10 @@ fun UpcomingContent() {
     val plats = remember(platsRaw) { platsRaw.split('|').filter { it.isNotEmpty() }.toSet() }
     val l = list ?: return Loading()
     val shown = remember(l, type, platsRaw) {
-        val f = l.filter { (type == "all" || it.up.kind == type) && (plats.isEmpty() || it.up.platform in plats) }
         val t = Upcoming.today()
+        val f = l.filter {
+            (type == "all" || (type == "past" && it.up.date < t) || it.up.kind == type) && (plats.isEmpty() || it.up.platform in plats)
+        }
         // Primero lo estrenado en las 2 últimas semanas (lo más reciente arriba) y luego lo que viene
         f.filter { it.up.date < t }.sortedByDescending { it.up.date } + f.filter { it.up.date >= t }.sortedBy { it.up.date }
     }
@@ -183,7 +185,7 @@ private fun ActionPill(st: UpState, focused: Boolean, small: Boolean = false, sh
     val (txt, filled) = when (st) {
         UpState.WATCH -> "Ver ahora" to true
         UpState.REMINDED -> "Te avisaré" to false
-        UpState.REMIND_UPLOAD -> (if (small) "Aún no subido" else if (short) "Avísame al subirlo" else "Avísame cuando lo suban") to false
+        UpState.REMIND_UPLOAD -> (if (small) "Aún no subido" else if (short) "Avísame" else "Avísame cuando lo suban") to false
         UpState.REMIND -> "Avísame" to false
     }
     val fg = if (filled || focused) Color.Black else Col.Text
