@@ -1,3 +1,2 @@
 Novedades de la próxima versión de Windows. Una línea por punto, empezando por «- ».
-- Las listas se actualizan solas cada 6 horas (8:00, 14:00, 20:00 y 2:00) mientras Noir+ está abierto, o al abrirlo si ya tocaba.
-- Al actualizar a mano te dice cuántas películas, series y canales hay de nuevo desde la última actualización.
+- Películas y episodios que el proveedor ha vuelto a subir (dejaban de reproducirse): Noir+ busca sola la versión nueva y la reproduce; si estaba en Mi lista, se cambia por la nueva.
