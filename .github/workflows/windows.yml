@@ -36,14 +36,15 @@ jobs:
 
       - name: Compilar instalador
         working-directory: desktop
-        run: gradle packageExe --no-daemon --stacktrace
+        run: gradle packageExe createDistributable --no-daemon --stacktrace
         env:
           RUN_NUMBER: ${{ github.run_number }}
 
       - name: Prueba de arranque (no se publica si no abre)
         shell: pwsh
         run: |
-          $app = Get-ChildItem -Recurse desktop/build/compose/binaries/main/app -Filter NoirPlus.exe | Select-Object -First 1
+          $app = Get-ChildItem -Recurse desktop/build/compose/binaries -Filter *.exe | Where-Object { $_.FullName -notmatch '\\exe\\' } | Select-Object -First 1
+          Get-ChildItem -Recurse desktop/build/compose/binaries -Filter *.exe | ForEach-Object { Write-Host $_.FullName }
           Write-Host "Arrancando $($app.FullName)"
           $p = Start-Process -FilePath $app.FullName -PassThru -RedirectStandardOutput out.txt -RedirectStandardError err.txt
           Start-Sleep -Seconds 40
