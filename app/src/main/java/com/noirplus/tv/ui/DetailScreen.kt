@@ -1,5 +1,6 @@
 package com.noirplus.tv.ui
 
+import androidx.compose.foundation.lazy.itemsIndexed
 import kotlinx.coroutines.launch
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
@@ -556,7 +557,7 @@ private fun SeriesDetail(item: Item) {
                         contentPadding = PaddingValues(horizontal = d.edge + 8.dp, vertical = 12.dp),
                         horizontalArrangement = Arrangement.spacedBy(14.dp),
                     ) {
-                        items(episodes, key = { it.id }) { ep ->
+                        itemsIndexed(episodes, key = { i, it -> "$i:${it.id}" }) { _, ep ->
                             val p = progressMap["EP:${ep.id}"]
                             WideCard(
                                 title = "${ep.number}. ${cleanTitle(ep.title, item.name)}",

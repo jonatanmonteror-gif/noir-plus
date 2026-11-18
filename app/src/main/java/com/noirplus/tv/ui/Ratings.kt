@@ -1,5 +1,6 @@
 package com.noirplus.tv.ui
 
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -201,7 +202,7 @@ fun RatingsContent() {
         contentPadding = PaddingValues(start = d.edge, end = d.edge, top = 8.dp, bottom = d.bottomPad),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        items(list, key = { it.key }) { r ->
+        itemsIndexed(list, key = { i, it -> "$i:${it.key}" }) { _, r ->
             Focusable(
                 Modifier.fillMaxWidth(), key = "rate/${r.key}", shape = RoundedCornerShape(12.dp), focusScale = 1.02f, border = true,
                 onLongClick = { rate(RateTarget(r.key, r.title, r.image, r.item, r.label)) },

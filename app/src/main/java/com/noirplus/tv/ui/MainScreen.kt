@@ -461,7 +461,7 @@ fun BrowseContent(kind: Kind) {
             if (history.isNotEmpty()) item(key = "history") { ContinueRow(history, "${kind.name}-h") { hero = it } }
             when (mode) {
                 "plat" -> {
-                    itemsIndexed(Platforms.main, key = { _, g -> "p:$g" }) { _, g ->
+                    itemsIndexed(Platforms.main, key = { i, g -> "p$i:$g" }) { _, g ->
                         CategoryRow(kind, Category(Library.PLAT + g, g)) { hero = it }
                     }
                     item(key = "noplat") {
@@ -484,7 +484,7 @@ fun BrowseContent(kind: Kind) {
                         )
                     }
                     val genres = Tmdb.genreNames(kind).entries.toList()
-                    itemsIndexed(genres, key = { _, g -> "g:${g.key}" }) { _, g ->
+                    itemsIndexed(genres, key = { i, g -> "g$i:${g.key}" }) { _, g ->
                         CategoryRow(kind, Category(Library.GENRE + g.key, g.value)) { hero = it }
                     }
                 }
@@ -511,7 +511,7 @@ fun ContinueRow(history: List<com.noirplus.tv.data.Progress>, memPrefix: String,
             contentPadding = PaddingValues(horizontal = d.edge, vertical = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(d.gap),
         ) {
-            items(history, key = { it.key }) { p ->
+            itemsIndexed(history, key = { i, it -> "$i:${it.key}" }) { _, p ->
                 WideCard(
                     title = p.title,
                     image = p.image,

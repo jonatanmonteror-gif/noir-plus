@@ -1,5 +1,6 @@
 package com.noirplus.tv.ui
 
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -65,7 +66,7 @@ fun NotesDialog(title: String, notes: List<Updater.Notes>, onClose: () -> Unit) 
             }
             if (notes.isEmpty()) Text("Aún no hay novedades publicadas.", color = Col.Sub, fontSize = 13.sp)
             LazyColumn(Modifier.weight(1f, fill = false), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                items(notes, key = { it.version }) { n ->
+                itemsIndexed(notes, key = { i, it -> "$i:${it.version}" }) { _, n ->
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text("Versión ${n.version}" + (if (n.date.isNotBlank()) "  ·  " + prettyDate(n.date) else ""),
                             color = Col.Sub, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
