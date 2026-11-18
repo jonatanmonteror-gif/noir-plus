@@ -91,6 +91,45 @@ class XtreamSource(
     private val movies = ConcurrentHashMap<String, Details>()
     private val series = ConcurrentHashMap<String, SeriesDetails>()
 
+    /**
+     * Las listas (carpetas y títulos) se guardan en el aparato y al abrir la app se leen de ahí:
+     * solo se vuelven a pedir al servidor en la actualización programada o al actualizar a mano.
+     */
+    private val diskDir: java.io.File? = ListDisk.root?.let {
+        java.io.File(it, (base + "|" + user).hashCode().toUInt().toString(16)).apply { mkdirs() }
+    }
+
+    private suspend fun cachedGet(name: String, url: String): String {
+        val f = diskDir?.let { java.io.File(it, "$name.json") }
+        if (f != null && f.exists() && f.length() > 2) {
+            withContext(Dispatchers.IO) { runCatching { f.readText() }.getOrNull() }?.let { return it }
+        }
+        val old = f?.let { java.io.File(it.path + ".old") }
+        val text = try {
+            Http.get(url)
+        } catch (e: Exception) {
+            // Si el servidor falla al actualizar, se sigue con la lista anterior
+            if (old != null && old.exists()) {
+                withContext(Dispatchers.IO) { runCatching { old.renameTo(f); f!!.readText() }.getOrNull() }?.let { return it }
+            }
+            throw e
+        }
+        if (f != null) withContext(Dispatchers.IO) {
+            runCatching { val tmp = java.io.File(f.path + ".tmp"); tmp.writeText(text); f.delete(); tmp.renameTo(f); old?.delete() }
+        }
+        return text
+    }
+
+    /** Marca las listas guardadas como viejas (se usan solo si la descarga nueva falla). */
+    private fun dropDisk(kind: Kind?) {
+        val d = diskDir ?: return
+        d.listFiles()?.forEach { f ->
+            if (f.name.endsWith(".json") && (kind == null || f.name.startsWith("${kind.name}-"))) {
+                val old = java.io.File(f.path + ".old"); old.delete(); f.renameTo(old)
+            }
+        }
+    }
+
     private fun enc(s: String) = URLEncoder.encode(s, "UTF-8")
     private fun api(params: String) =
         "$base/player_api.php?username=${enc(user)}&password=${enc(pass)}$params"
@@ -125,7 +164,7 @@ class XtreamSource(
 
     override suspend fun categories(kind: Kind): List<Category> {
         cats[kind]?.let { return it }
-        val text = Http.get(api("&action=${catAction(kind)}"))
+        val text = cachedGet("${kind.name}-cats", api("&action=${catAction(kind)}"))
         val list = withContext(Dispatchers.Default) {
             val arr = runCatching { JSONArray(text) }.getOrNull() ?: JSONArray()
             val out = ArrayList<Category>()
@@ -173,6 +212,8 @@ class XtreamSource(
 
     override suspend fun items(kind: Kind, categoryId: String): List<Item> {
         allCache[kind]?.let { all -> return all.filter { it.categoryId == categoryId } }
+        // Con la lista completa guardada en el aparato, la carpeta sale de ahí (sin pedir nada al servidor)
+        if (diskDir != null) return all(kind).filter { it.categoryId == categoryId }
         val key = "${kind.name}:$categoryId"
         itemsCache[key]?.let { return it }
         val text = Http.get(api("&action=${listAction(kind)}&category_id=${enc(categoryId)}"))
@@ -183,7 +224,7 @@ class XtreamSource(
 
     override suspend fun all(kind: Kind): List<Item> {
         allCache[kind]?.let { return it }
-        val text = Http.get(api("&action=${listAction(kind)}"))
+        val text = cachedGet("${kind.name}-all", api("&action=${listAction(kind)}"))
         val list = withContext(Dispatchers.Default) { parseItems(kind, text) }
         allCache[kind] = list
         return list
@@ -284,10 +325,12 @@ class XtreamSource(
     override fun clear(kind: Kind?) {
         if (kind == null) {
             cats.clear(); itemsCache.clear(); allCache.clear(); movies.clear(); series.clear()
+            dropDisk(null)
             return
         }
         cats.remove(kind)
         allCache.remove(kind)
+        dropDisk(kind)
         itemsCache.keys.filter { it.startsWith("${kind.name}:") }.forEach { itemsCache.remove(it) }
         if (kind == Kind.MOVIE) movies.clear()
         if (kind == Kind.SERIES) series.clear()
@@ -360,4 +403,10 @@ class M3uSource(private val url: String) : Source {
     override fun clear(kind: Kind?) {
         data = null
     }
+}
+
+
+/** Carpeta del aparato donde se guardan las listas descargadas. */
+object ListDisk {
+    var root: java.io.File? = null
 }

@@ -51,11 +51,14 @@ object Repo {
     }
 
     private var autoBusy = false
+    /** Cuándo se abrió la app: la actualización automática solo salta si una hora fija pasa con la app abierta. */
+    private val startedAt = System.currentTimeMillis()
 
-    /** Si ha pasado una hora fija desde la última actualización, actualiza en segundo plano. */
+    /** Si una hora fija (8, 14, 20, 2) pasa con la app abierta, actualiza en segundo plano. Al abrir no se descarga nada. */
     suspend fun autoRefreshIfDue() {
         if (source == null || autoBusy) return
-        if (prefs.lastListRefresh >= lastSlot()) return
+        val slot = lastSlot()
+        if (prefs.lastListRefresh >= slot || slot <= startedAt) return
         autoBusy = true
         try { refresh(null) } finally { autoBusy = false }
     }
@@ -88,6 +91,7 @@ object Repo {
     fun init(ctx: Context) {
         if (!::prefs.isInitialized) {
             ErrorLog.init(ctx.applicationContext)
+            ListDisk.root = java.io.File(ctx.applicationContext.filesDir, "listas").apply { mkdirs() }
             prefs = Prefs(ctx.applicationContext)
             setupImages(ctx.applicationContext)
             Tmdb.init(ctx.applicationContext)
@@ -100,8 +104,6 @@ object Repo {
     fun rebuild() {
         dataVersion.intValue = dataVersion.intValue + 1
         loadedAt = System.currentTimeMillis()
-        // Al abrir, las listas se descargan nuevas: cuenta como actualización
-        if (::prefs.isInitialized) prefs.lastListRefresh = System.currentTimeMillis()
         val p = prefs
         source = when (p.type) {
             "xtream" -> XtreamSource(p.server, p.user, p.pass) { p.liveFormat }

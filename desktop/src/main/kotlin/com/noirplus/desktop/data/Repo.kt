@@ -54,10 +54,13 @@ object Repo {
     }
 
     private var autoBusy = false
+    /** La actualización automática solo salta si una hora fija pasa con Noir+ abierto (al abrir no se descarga nada). */
+    private val startedAt = System.currentTimeMillis()
     /** Si ha pasado una hora fija desde la última actualización, actualiza en segundo plano. */
     suspend fun autoRefreshIfDue() {
         if (source == null || autoBusy) return
-        if (Store.lastListRefresh >= lastSlot()) return
+        val slot = lastSlot()
+        if (Store.lastListRefresh >= slot || slot <= startedAt) return
         autoBusy = true
         try { refreshNow() } finally { autoBusy = false }
     }

@@ -142,7 +142,7 @@ fun WelcomeScreen() {
     val steps = remember { mutableStateListOf<Repo.RefreshStep>() }
 
     fun enter() {
-        if (Repo.isStale()) Repo.invalidate(null)
+        // Al entrar no se descarga nada: las listas se renuevan a las horas fijas o con «Actualizar listas»
         prefs.lastVisit = System.currentTimeMillis()
         nav.reset(Screen.Main)
     }

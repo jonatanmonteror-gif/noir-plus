@@ -12,18 +12,26 @@ import java.util.concurrent.ConcurrentHashMap
 /**
  * Guarda las listas (carpetas y títulos) en el disco del PC.
  * Al abrir Noir+ se leen del disco al instante en vez de descargarlas otra vez del servidor;
- * se renuevan solas si tienen más de 12 horas, o al pulsar «Actualizar listas».
+ * solo se renuevan en la actualización programada (8, 14, 20 y 2 h con Noir+ abierto) o al pulsar «Actualizar listas».
  */
 class CachedSource(private val inner: Source, account: String) : Source by inner {
     private val dir = File(AppDirs.root, "listas/" + account.hashCode().toUInt().toString(16)).apply { mkdirs() }
-    private val ttl = 12L * 3600 * 1000
     private val cats = ConcurrentHashMap<Kind, List<Category>>()
     private val alls = ConcurrentHashMap<Kind, List<Item>>()
     private val byCat = ConcurrentHashMap<Kind, Map<String, List<Item>>>()
     private val locks = ConcurrentHashMap<Kind, Mutex>()
 
     private fun file(name: String) = File(dir, name)
-    private fun fresh(f: File) = f.exists() && System.currentTimeMillis() - f.lastModified() < ttl
+    private fun fresh(f: File) = f.exists() && f.length() > 2
+    private fun old(f: File) = File(f.path + ".old")
+
+    /** Descarga nueva; si el servidor falla, se sigue con la lista anterior. */
+    private suspend fun <T> download(f: File, get: suspend () -> T, read: (File) -> T): T = try {
+        get().also { old(f).delete() }
+    } catch (e: Exception) {
+        val o = old(f)
+        if (o.exists()) { o.renameTo(f); read(f) } else throw e
+    }
 
     override suspend fun categories(kind: Kind): List<Category> {
         cats[kind]?.let { return it }
@@ -33,7 +41,11 @@ class CachedSource(private val inner: Source, account: String) : Source by inner
                 val a = JSONArray(f.readText())
                 (0 until a.length()).map { a.getJSONObject(it).let { o -> Category(o.getString("id"), o.getString("name")) } }
             }.getOrNull() else null
-            val list = cached ?: inner.categories(kind).also { l ->
+            val readCats = { file: File ->
+                val a = JSONArray(file.readText())
+                (0 until a.length()).map { a.getJSONObject(it).let { o -> Category(o.getString("id"), o.getString("name")) } }
+            }
+            val list = cached ?: download(f, { inner.categories(kind) }, readCats).also { l ->
                 runCatching { f.writeText(JSONArray(l.map { JSONObject().put("id", it.id).put("name", it.name) }).toString()) }
             }
             cats[kind] = list
@@ -52,7 +64,11 @@ class CachedSource(private val inner: Source, account: String) : Source by inner
                     (0 until a.length()).map { Item.fromJson(a.getJSONObject(it)) }
                 }.getOrNull() else null
                 if (cached != null) Startup.listsFromDisk = true
-                val list = cached ?: inner.all(kind).also { l ->
+                val readAll = { file: File ->
+                    val a = JSONArray(file.readText())
+                    (0 until a.length()).map { Item.fromJson(a.getJSONObject(it)) }
+                }
+                val list = cached ?: download(f, { inner.all(kind) }, readAll).also { l ->
                     runCatching { f.writeText(JSONArray(l.map { it.toJson().put("added", it.added) }).toString()) }
                 }
                 alls[kind] = list
@@ -72,7 +88,9 @@ class CachedSource(private val inner: Source, account: String) : Source by inner
         val kinds = kind?.let { listOf(it) } ?: Kind.entries
         for (k in kinds) {
             cats.remove(k); alls.remove(k); byCat.remove(k)
-            file("cats-${k.name}.json").delete(); file("all-${k.name}.json").delete()
+            for (n in listOf("cats-${k.name}.json", "all-${k.name}.json")) {
+                val f = file(n); if (f.exists()) { old(f).delete(); f.renameTo(old(f)) }
+            }
         }
         inner.clear(kind)
     }
