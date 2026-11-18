@@ -64,14 +64,21 @@ fun UpcomingContent() {
 
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            LazyRow(
-                Modifier.weight(1f),
-                contentPadding = PaddingValues(horizontal = d.edge),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                items(TYPES, key = { it.first }) { (k, label) -> CategoryChip(label, selected = type == k) { type = k } }
+            Box(Modifier.weight(1f)) {
+                LazyRow(
+                    Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(start = d.edge, end = 28.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(TYPES, key = { it.first }) { (k, label) -> CategoryChip(label, selected = type == k) { type = k } }
+                }
+                // Fundido suave hacia el botón de plataformas (las pestañas se esconden poco a poco)
+                Box(
+                    Modifier.align(Alignment.CenterEnd).width(36.dp).height(48.dp)
+                        .background(androidx.compose.ui.graphics.Brush.horizontalGradient(listOf(Col.Bg.copy(alpha = 0f), Col.Bg)))
+                )
             }
-            Box(Modifier.padding(end = d.edge)) {
+            Box(Modifier.padding(start = 4.dp, end = d.edge)) {
                 PlatformButton(plats, Platforms.main) { p -> platsRaw = Platforms.main.filter { it in p }.joinToString("|") }
             }
         }
