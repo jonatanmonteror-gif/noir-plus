@@ -28,6 +28,15 @@ object Repo {
         dataVersion.intValue++
     }
 
+    /** Vuelve a descargar las listas del servidor ahora mismo. Devuelve un resumen o lanza el error. */
+    suspend fun refreshNow(): String {
+        val src = source ?: throw IllegalStateException("no hay ninguna cuenta")
+        src.clear(null)
+        val counts = Kind.entries.map { k -> src.categories(k); k to src.all(k).size }.toMap()
+        dataVersion.intValue++
+        return "Listas actualizadas: ${counts[Kind.MOVIE] ?: 0} películas, ${counts[Kind.SERIES] ?: 0} series y ${counts[Kind.LIVE] ?: 0} canales."
+    }
+
     /** Lo último añadido de un tipo (para la portada e Inicio). */
     suspend fun recent(kind: Kind, n: Int): List<Item> = runCatching {
         source?.all(kind).orEmpty().sortedByDescending { it.added }.take(n)

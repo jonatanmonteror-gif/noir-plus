@@ -28,6 +28,8 @@ fun SettingsScreen() {
     var name by remember { mutableStateOf(Store.name) }
     val info by produceState<String?>(null, Repo.dataVersion.intValue) { value = runCatching { Repo.source?.accountInfo() }.getOrNull() }
     var updStatus by remember { mutableStateOf<String?>(null) }
+    var refreshing by remember { mutableStateOf(false) }
+    var refreshMsg by remember { mutableStateOf<String?>(null) }
     var release by remember { mutableStateOf<Updater.Release?>(null) }
     var progress by remember { mutableStateOf<Float?>(null) }
 
@@ -44,9 +46,19 @@ fun SettingsScreen() {
             if (Store.type == "xtream") { Row2("Servidor", Store.server); Row2("Usuario", Store.user) }
             info?.let { Row2("Estado", it) }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                NButton("Actualizar listas", primary = true) { reloadLists() }
+                NButton(if (refreshing) "Actualizando…" else "Actualizar listas", primary = true) {
+                    if (!refreshing) {
+                        refreshing = true
+                        refreshMsg = "Descargando las listas de tu servidor…"
+                        scope.launch {
+                            refreshMsg = runCatching { Repo.refreshNow() }.fold({ it }, { "No se pudo actualizar: " + friendlyError(it) })
+                            refreshing = false
+                        }
+                    }
+                }
                 NButton("Cambiar de cuenta") { Store.logout(); Repo.rebuild() }
             }
+            refreshMsg?.let { Text(it, color = Col.Sub, fontSize = 13.sp) }
         }
         Card("Sincronización") {
             val sv = Sync.version.intValue
