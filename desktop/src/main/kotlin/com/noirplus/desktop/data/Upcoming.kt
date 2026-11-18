@@ -210,6 +210,11 @@ object Upcoming {
         "new" -> "Serie nueva"
         "season" -> "Temporada ${up.season}"
         "episode" -> "T${up.season} · E${up.episode}" + (up.epName.takeIf { it.isNotBlank() && !it.startsWith("Episodio") }?.let { " · $it" } ?: "")
-        else -> if (up.platform.isNotBlank()) "Película" else if (up.where == "cines") "Película · En cines" else "Película"
+        // Películas: dónde se estrena
+        else -> when {
+            up.where == "cines" -> "Estreno en cines"
+            up.platform.isNotBlank() -> "Estreno en ${up.platform}"
+            else -> "Estreno digital"
+        }
     }
 }

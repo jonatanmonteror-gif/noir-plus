@@ -159,6 +159,44 @@ object Imdb {
         return if (imdb.startsWith("tt")) lookup(imdb) else null
     }
 
+    private val datesCache = ConcurrentHashMap<String, Pair<Int, Int>>()
+
+    /** Películas: (estreno en cines en España, estreno en plataformas/digital en España), aaaammdd o 0. */
+    suspend fun movieDates(item: Item, tmdbHint: String?): Pair<Int, Int>? {
+        if (item.kind != Kind.MOVIE) return null
+        datesCache[item.key]?.let { return it }
+        return withContext(Dispatchers.IO) {
+            api.withPermit {
+                runCatching {
+                    val p = Tmdb.prep(item)
+                    var id = tmdbHint?.takeIf { it.isNotBlank() && it != "0" } ?: p.tmdb ?: Tmdb.tmdbIdOf(item)
+                    if (id == null) {
+                        val (q, _) = Tmdb.clean(item.name)
+                        val params = mutableMapOf("query" to q)
+                        p.year?.let { params["year"] = it.toString() }
+                        id = tmdbJson("search/movie", params)?.optJSONArray("results")?.optJSONObject(0)?.optInt("id")?.takeIf { it > 0 }?.toString()
+                    }
+                    val arr = id?.let { tmdbJson("movie/$it/release_dates")?.optJSONArray("results") } ?: return@runCatching null
+                    var cine = 0; var digital = 0
+                    for (i in 0 until arr.length()) {
+                        val c = arr.optJSONObject(i) ?: continue
+                        if (c.optString("iso_3166_1") != "ES") continue
+                        val ds = c.optJSONArray("release_dates") ?: continue
+                        for (k in 0 until ds.length()) {
+                            val r = ds.optJSONObject(k) ?: continue
+                            val d = r.optString("release_date").take(10).replace("-", "").toIntOrNull() ?: continue
+                            when (r.optInt("type")) {
+                                2, 3 -> if (cine == 0 || d < cine) cine = d
+                                4, 6 -> if (digital == 0 || d < digital) digital = d
+                            }
+                        }
+                    }
+                    (cine to digital).also { datesCache[item.key] = it }
+                }.getOrNull()
+            }
+        }
+    }
+
     private fun findImdb(item: Item, tmdbHint: String?): String {
         val type = if (item.kind == Kind.SERIES) "tv" else "movie"
         val p = Tmdb.prep(item)

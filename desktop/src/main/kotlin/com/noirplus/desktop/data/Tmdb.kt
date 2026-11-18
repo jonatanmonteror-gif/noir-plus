@@ -214,6 +214,7 @@ object Tmdb {
     }
 
     private val MONTHS = listOf("ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic")
+    fun fmtDay(t: Int): String? = fmt(t / 10000, t / 100 % 100, t % 100)
     private fun fmt(y: Int, m: Int, d: Int): String? = when {
         y < 1900 -> null
         m !in 1..12 -> "$y"

@@ -1,4 +1,5 @@
 Novedades de la próxima versión de Android (tele y móvil). Una línea por punto, empezando por «- ».
-- Próximos: toca un estreno y te avisamos cuando tu proveedor lo suba (aparece una campana); vuelve a tocar para quitar el aviso.
-- Al abrir la app sale «Ya está disponible» con lo que tenías marcado y ya puedes ver.
-- «Disponible» / «Pendiente» van ahora en la línea del título. El botón de plataformas queda alineado con las pestañas.
+- Próximos rediseñado: en la tele, en cajas (carátula con la fecha, plataforma y estado) agrupadas en Hoy y mañana, Esta semana, La semana que viene y por meses; con un botón eliges cajas o lista.
+- Próximos: toca un estreno y te avisamos cuando tu proveedor lo suba (campana). Al abrir la app sale «Ya está disponible».
+- Películas en Próximos: «Estreno en cines» o «Estreno en Netflix/Disney+…».
+- Ficha de película: fecha de estreno en cines y fecha en la plataforma («Estreno en cines: … · En Netflix: …»).

@@ -104,8 +104,12 @@ private fun TvInfo(item: Item, details: Details?) {
     }
     val catV = Tmdb.catalogsVersion.intValue
     val release = remember(item.key, details, catV) { Tmdb.releaseLabel(item, details) }
+    // Películas: fecha en cines y fecha en plataformas (si TMDB las tiene)
+    val movieLine by androidx.compose.runtime.produceState<String?>(null, item.key, details?.tmdbId, catV) {
+        value = runCatching { Tmdb.movieReleaseLine(item, details) }.getOrNull()
+    }
     MetaLine(
-        year = release?.let { "Estreno: $it" },
+        year = movieLine ?: release?.let { "Estreno: $it" },
         rating = details?.rating ?: item.rating,
         genre = null,
         duration = null,
@@ -192,7 +196,10 @@ private fun PhoneHeader(item: Item, details: Details?, extra: String? = null) {
         }
         val catV = Tmdb.catalogsVersion.intValue
         val release = remember(item.key, details, catV) { Tmdb.releaseLabel(item, details) }
-        val parts = listOfNotNull(release?.let { "Estreno: $it" }, extra)
+        val movieLine by androidx.compose.runtime.produceState<String?>(null, item.key, details?.tmdbId, catV) {
+            value = runCatching { Tmdb.movieReleaseLine(item, details) }.getOrNull()
+        }
+        val parts = listOfNotNull(movieLine ?: release?.let { "Estreno: $it" }, extra)
         if (parts.isNotEmpty()) {
             Text(parts.joinToString("   |   "), color = Col.Sub, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp))
         }

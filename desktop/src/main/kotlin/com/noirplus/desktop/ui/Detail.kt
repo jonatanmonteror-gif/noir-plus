@@ -43,7 +43,18 @@ private fun Header(item: Item, d: Details?, extra: String?) {
     LaunchedEffect(item.kind) { if (item.kind != Kind.LIVE) runCatching { Tmdb.allCatalogs(item.kind) } }
     val tv = Tmdb.version.intValue
     val release = remember(item.key, d, tv) { Tmdb.releaseLabel(item, d) }
-    val meta = listOfNotNull(release?.let { "Estreno: $it" }, extra, d?.genre).filter { it.isNotBlank() }.joinToString("   ·   ")
+    // Películas: fecha en cines y fecha en plataformas
+    val dates by produceState<Pair<Int, Int>?>(null, item.key, d?.tmdbId) { value = Imdb.movieDates(item, d?.tmdbId) }
+    val movieLine = remember(dates, tv) {
+        dates?.let { (cine, dig) ->
+            val plat = Tmdb.platformsOf(item).firstOrNull() ?: "plataformas"
+            val parts = mutableListOf<String>()
+            if (cine > 0) Tmdb.fmtDay(cine)?.let { parts += "Estreno en cines: $it" }
+            if (dig > 0) Tmdb.fmtDay(dig)?.let { parts += (if (parts.isEmpty()) "Estreno en $plat: " else "En $plat: ") + it }
+            parts.takeIf { it.isNotEmpty() }?.joinToString("   ·   ")
+        }
+    }
+    val meta = listOfNotNull(movieLine ?: release?.let { "Estreno: $it" }, extra, d?.genre).filter { it.isNotBlank() }.joinToString("   ·   ")
     if (meta.isNotBlank()) Text(meta, color = Col.Sub, fontSize = 14.sp, modifier = Modifier.padding(top = 10.dp))
     // Nota de IMDb (en lugar de la valoración del proveedor)
     val imdb by produceState(Imdb.cached(item), item.key, d?.tmdbId) { value = Imdb.score(item, d?.tmdbId) ?: value }

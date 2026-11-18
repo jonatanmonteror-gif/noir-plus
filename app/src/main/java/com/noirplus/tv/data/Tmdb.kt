@@ -176,6 +176,57 @@ object Tmdb {
         return if (lastTxt != null) "$first · Último capítulo: $lastTxt" else first
     }
 
+    /** Plataformas (de los catálogos cargados) en las que está un título. */
+    fun platformsOfItem(item: Item): List<String> {
+        val p = prep(item)
+        val type = if (item.kind == Kind.SERIES) "tv:" else "movie:"
+        return catalogs.entries.filter { it.key.startsWith(type) && it.value.match(p) != null }.map { it.key.removePrefix(type) }
+    }
+
+    private val movieDatesCache = ConcurrentHashMap<String, Pair<Int, Int>>()
+
+    /** Películas: (estreno en cines en España, estreno en plataformas/digital en España), aaaammdd o 0. */
+    suspend fun movieDates(item: Item, tmdbHint: String?): Pair<Int, Int>? {
+        if (item.kind != Kind.MOVIE) return null
+        movieDatesCache[item.key]?.let { return it }
+        val p = prep(item)
+        var id = tmdbHint?.takeIf { it.isNotBlank() && it != "0" } ?: p.tmdb
+            ?: catalogs.entries.firstNotNullOfOrNull { (k, c) -> if (k.startsWith("movie:")) c.match(p) else null }
+        if (id == null) {
+            val (q, y) = clean(item.name)
+            val r = get("/search/movie", "query=${enc(q)}&include_adult=false" + (y?.let { "&year=$it" } ?: ""))
+            id = r?.optJSONArray("results")?.optJSONObject(0)?.optInt("id")?.takeIf { it > 0 }?.toString()
+        }
+        id ?: return null
+        val o = get("/movie/$id/release_dates") ?: return null
+        val arr = o.optJSONArray("results") ?: return null
+        var cine = 0; var digital = 0
+        for (i in 0 until arr.length()) {
+            val c = arr.optJSONObject(i) ?: continue
+            if (c.optString("iso_3166_1") != "ES") continue
+            val ds = c.optJSONArray("release_dates") ?: continue
+            for (k in 0 until ds.length()) {
+                val r = ds.optJSONObject(k) ?: continue
+                val d = r.optString("release_date").take(10).replace("-", "").toIntOrNull() ?: continue
+                when (r.optInt("type")) {
+                    2, 3 -> if (cine == 0 || d < cine) cine = d
+                    4, 6 -> if (digital == 0 || d < digital) digital = d
+                }
+            }
+        }
+        return (cine to digital).also { movieDatesCache[item.key] = it }
+    }
+
+    /** Ficha de película: «Estreno en cines: 12 mar 2025 · En Netflix: 4 jul 2025» (o solo la de plataforma). */
+    suspend fun movieReleaseLine(item: Item, details: Details?): String? {
+        val (cine, digital) = movieDates(item, details?.tmdbId) ?: return null
+        val plat = platformsOfItem(item).firstOrNull()
+        val parts = mutableListOf<String>()
+        fmtDate(cine).takeIf { cine > 0 }?.let { parts += "Estreno en cines: $it" }
+        fmtDate(digital).takeIf { digital > 0 }?.let { parts += (if (parts.isEmpty()) "Estreno en ${plat ?: "plataformas"}: " else "En ${plat ?: "plataformas"}: ") + it }
+        return parts.takeIf { it.isNotEmpty() }?.joinToString(" · ")
+    }
+
     private val MONTHS = listOf("ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic")
     private fun fmt(y: Int, m: Int, d: Int): String? = when {
         y < 1900 -> null
