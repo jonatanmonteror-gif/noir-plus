@@ -37,6 +37,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import androidx.compose.material.icons.filled.Notifications
 import com.noirplus.tv.data.Platforms
 import com.noirplus.tv.data.Repo
 import com.noirplus.tv.data.Upcoming
@@ -60,6 +61,8 @@ fun UpcomingContent() {
         l.filter { (type == "all" || it.up.kind == type) && (plats.isEmpty() || it.up.platform in plats) }
     }
     val groups = remember(shown) { shown.groupBy { it.up.date }.toSortedMap().entries.toList() }
+    var remindVer by remember { mutableStateOf(0) }
+    val remindedKeys = remember(remindVer, changes) { Upcoming.reminders().map { Upcoming.remindKey(it) }.toSet() }
     val today = Upcoming.today()
 
     Column(Modifier.fillMaxSize()) {
@@ -69,12 +72,13 @@ fun UpcomingContent() {
                     Modifier.fillMaxWidth(),
                     contentPadding = PaddingValues(start = d.edge, end = 28.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     items(TYPES, key = { it.first }) { (k, label) -> CategoryChip(label, selected = type == k) { type = k } }
                 }
                 // Fundido suave hacia el botón de plataformas (las pestañas se esconden poco a poco)
                 Box(
-                    Modifier.align(Alignment.CenterEnd).width(36.dp).height(48.dp)
+                    Modifier.align(Alignment.CenterEnd).width(36.dp).height(40.dp)
                         .background(androidx.compose.ui.graphics.Brush.horizontalGradient(listOf(Col.Bg.copy(alpha = 0f), Col.Bg)))
                 )
             }
@@ -84,7 +88,7 @@ fun UpcomingContent() {
         }
         Text(
             (if (plats.isNotEmpty()) Platforms.main.filter { it in plats }.joinToString(" + ") + "  ·  " else "") +
-                "Próximos 3 meses. «Mis capítulos»: de las series que sigues (Mi lista y Continuar viendo).",
+                "Próximos 3 meses. Toca un estreno y te aviso cuando tu proveedor lo suba.",
             color = Col.Sub, fontSize = 12.sp, modifier = Modifier.padding(start = d.edge, end = d.edge, top = 10.dp, bottom = 4.dp),
         )
         if (shown.isEmpty()) return Message(if (l.isEmpty()) "No se pudieron cargar los próximos estrenos. Revisa la conexión." else "Nada con estos filtros")
@@ -95,7 +99,10 @@ fun UpcomingContent() {
                         modifier = Modifier.padding(top = 18.dp, bottom = 8.dp))
                 }
                 itemsIndexed(rows, key = { i, s -> "$day:$i:${s.up.key}:${s.up.season}:${s.up.episode}" }) { _, s ->
-                    UpcomingRow(s) { s.local?.let { nav.push(Screen.Detail(it)) } }
+                    UpcomingRow(s, reminded = remindedKeys.contains(Upcoming.remindKey(s.up))) {
+                        if (s.available && s.local != null) nav.push(Screen.Detail(s.local))
+                        else { Upcoming.toggleReminder(s.up); remindVer++ }
+                    }
                     Spacer(Modifier.height(6.dp))
                 }
             }
@@ -104,7 +111,7 @@ fun UpcomingContent() {
 }
 
 @Composable
-private fun UpcomingRow(s: Upcoming.Shown, onClick: () -> Unit) {
+private fun UpcomingRow(s: Upcoming.Shown, reminded: Boolean, onClick: () -> Unit) {
     val up = s.up
     Focusable(Modifier.fillMaxWidth().height(92.dp), key = "up/${up.key}/${up.season}/${up.episode}", shape = RoundedCornerShape(12.dp),
         focusScale = 1.02f, onClick = onClick) { focused ->
@@ -113,18 +120,25 @@ private fun UpcomingRow(s: Upcoming.Shown, onClick: () -> Unit) {
                 up.poster?.let { AsyncImage(it, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
             }
             Column(Modifier.weight(1f).padding(start = 12.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text(up.name, color = if (focused) Color.Black else Col.Text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(up.name, color = if (focused) Color.Black else Col.Text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                    // En la misma línea que el título: estado o aviso activado
+                    val st = statusOf(s)
+                    when {
+                        st != null -> Text(st.first, color = if (focused) Color.Black.copy(alpha = if (st.second) 1f else 0.6f) else if (st.second) Col.Text else Col.Sub,
+                            fontSize = 12.sp, fontWeight = if (st.second) FontWeight.SemiBold else FontWeight.Normal, maxLines = 1,
+                            modifier = Modifier.padding(start = 8.dp))
+                        reminded -> androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Filled.Notifications, "Te aviso",
+                            tint = if (focused) Color.Black else Col.Text, modifier = Modifier.padding(start = 8.dp).size(16.dp))
+                    }
+                }
                 Text(Upcoming.label(up), color = if (focused) Color.Black.copy(alpha = 0.7f) else Col.Sub, fontSize = 13.sp,
                     maxLines = 1, overflow = TextOverflow.Ellipsis)
                 if (up.platform.isNotBlank()) Text(up.platform, color = if (focused) Color.Black.copy(alpha = 0.7f) else Col.Sub, fontSize = 12.sp)
             }
             // A la derecha: si ya lo tiene tu proveedor
-            statusOf(s)?.let { (txt, strong) ->
-                Text(txt, color = if (focused) Color.Black.copy(alpha = if (strong) 1f else 0.6f) else if (strong) Col.Text else Col.Sub,
-                    fontSize = 12.sp, fontWeight = if (strong) FontWeight.SemiBold else FontWeight.Normal, maxLines = 1,
-                    modifier = Modifier.padding(start = 8.dp))
-            }
+
         }
     }
 }
@@ -160,13 +174,19 @@ private fun dayLabel(day: Int, today: Int): String {
 fun NewEpisodeNotice() {
     val nav = LocalNav.current
     val resume = Repo.resumeCount.intValue
-    var queue by remember { mutableStateOf<List<Pair<Upcoming.Up, com.noirplus.tv.data.Item>>>(emptyList()) }
+    // (estreno, ficha, ¿es un recordatorio?)
+    var queue by remember { mutableStateOf<List<Triple<Upcoming.Up, com.noirplus.tv.data.Item, Boolean>>>(emptyList()) }
     LaunchedEffect(resume, Repo.dataVersion.intValue) {
         delay(4000)
-        queue = runCatching { Upcoming.newEpisodes() }.getOrDefault(emptyList())
+        val rem = runCatching { Upcoming.remindersReady() }.getOrDefault(emptyList()).map { Triple(it.first, it.second, true) }
+        val eps = runCatching { Upcoming.newEpisodes() }.getOrDefault(emptyList()).map { Triple(it.first, it.second, false) }
+        queue = rem + eps.filter { e -> rem.none { it.second.key == e.second.key } }
     }
-    val (up, item) = queue.firstOrNull() ?: return
-    fun next() { Upcoming.markNotified(up); queue = queue.drop(1) }
+    val (up, item, isReminder) = queue.firstOrNull() ?: return
+    fun next() {
+        if (isReminder) Upcoming.toggleReminder(up) else Upcoming.markNotified(up)
+        queue = queue.drop(1)
+    }
     val compact = LocalDims.current.compact
     Box(Modifier.fillMaxSize(), contentAlignment = if (compact) Alignment.TopCenter else Alignment.TopEnd) {
         Column(
@@ -180,9 +200,12 @@ fun NewEpisodeNotice() {
                     AsyncImage(it, null, contentScale = ContentScale.Crop, modifier = Modifier.size(width = 34.dp, height = 50.dp).clip(RoundedCornerShape(4.dp)))
                 }
                 Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
-                    Text("Nuevo capítulo disponible", color = Col.Text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                    Text(up.name + (if (up.lastS > 0) " · T${up.lastS} E${up.lastE}" else ""), color = Col.Sub, fontSize = 12.sp, maxLines = 2,
-                        overflow = TextOverflow.Ellipsis)
+                    Text(if (isReminder) "Ya está disponible" else "Nuevo capítulo disponible", color = Col.Text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    Text(up.name + when {
+                        isReminder -> if (up.type == "tv" && up.kind != "new") " · " + Upcoming.label(up) else ""
+                        up.lastS > 0 -> " · T${up.lastS} E${up.lastE}"
+                        else -> ""
+                    }, color = Col.Sub, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
                 // Cerrar siempre visible
                 Focusable(Modifier.size(32.dp), key = "ne-x", shape = RoundedCornerShape(50), focusScale = 1.1f, onClick = { next() }) { f ->

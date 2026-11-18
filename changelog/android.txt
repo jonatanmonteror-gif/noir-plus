@@ -1,2 +1,4 @@
 Novedades de la próxima versión de Android (tele y móvil). Una línea por punto, empezando por «- ».
-- Próximos: las pestañas (Todo, Películas, Series nuevas…) se funden suavemente junto al botón de plataformas.
+- Próximos: toca un estreno y te avisamos cuando tu proveedor lo suba (aparece una campana); vuelve a tocar para quitar el aviso.
+- Al abrir la app sale «Ya está disponible» con lo que tenías marcado y ya puedes ver.
+- «Disponible» / «Pendiente» van ahora en la línea del título. El botón de plataformas queda alineado con las pestañas.

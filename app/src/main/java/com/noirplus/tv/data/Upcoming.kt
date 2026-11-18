@@ -147,6 +147,52 @@ object Upcoming {
         }.distinctBy { it.first.id }
     }
 
+    // ---------- Recordatorios: «Avísame cuando esté» ----------
+    /** Clave de un estreno concreto (la película, o esa temporada/capítulo). */
+    fun remindKey(up: Up) = "${up.type}:${up.id}:${up.season}:${up.episode}"
+
+    private fun upToJson(up: Up) = org.json.JSONObject().put("t", up.type).put("id", up.id).put("n", up.name).put("d", up.date)
+        .put("k", up.kind).put("s", up.season).put("e", up.episode).put("p", up.platform).put("img", up.poster ?: "")
+        .put("keys", JSONArray(up.keys))
+
+    private fun upFromJson(o: org.json.JSONObject): Up {
+        val ks = o.optJSONArray("keys")
+        return Up(o.optString("t"), o.optString("id"), o.optString("n"), o.optInt("d"), o.optString("k"), o.optInt("s"), o.optInt("e"), "",
+            o.optString("p"), "", o.optString("img").takeIf { it.isNotBlank() }, (0 until (ks?.length() ?: 0)).map { ks!!.optString(it) }, 0, 0, 0)
+    }
+
+    fun reminders(): List<Up> = runCatching {
+        val a = JSONArray(Repo.prefs.str("upReminders", "[]"))
+        (0 until a.length()).mapNotNull { a.optJSONObject(it)?.let(::upFromJson) }
+    }.getOrDefault(emptyList())
+
+    fun isReminded(up: Up): Boolean = reminders().any { remindKey(it) == remindKey(up) }
+
+    /** Activa o quita el aviso. Devuelve true si queda activado. */
+    fun toggleReminder(up: Up): Boolean {
+        val cur = reminders().toMutableList()
+        val on = cur.removeAll { remindKey(it) == remindKey(up) }.not()
+        if (on) cur += up
+        Repo.prefs.putStr("upReminders", JSONArray(cur.takeLast(200).map(::upToJson)).toString())
+        return on
+    }
+
+    /** Recordatorios que ya ha subido tu proveedor. */
+    suspend fun remindersReady(): List<Pair<Up, Item>> = withContext(Dispatchers.Default) {
+        val src = Repo.source ?: return@withContext emptyList()
+        val rem = reminders()
+        if (rem.isEmpty()) return@withContext emptyList()
+        val series = index(runCatching { src.all(Kind.SERIES) }.getOrDefault(emptyList()))
+        val movies = index(runCatching { src.all(Kind.MOVIE) }.getOrDefault(emptyList()))
+        val t = today()
+        rem.mapNotNull { up ->
+            if (up.date > t) return@mapNotNull null
+            val local = (if (up.type == "tv") find(up, series) else find(up, movies)) ?: return@mapNotNull null
+            if (up.type == "tv" && providerDay(local.added) < up.date) return@mapNotNull null
+            up to local
+        }
+    }
+
     private val LANGS = setOf("es", "en", "ca", "eu", "gl")
     private fun relevant(up: Up): Boolean = when {
         up.type == "tv" && up.platform.isBlank() -> up.pop >= 60
