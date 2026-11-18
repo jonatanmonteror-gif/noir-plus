@@ -1,5 +1,2 @@
 Novedades de la próxima versión de Windows. Una línea por punto, empezando por «- ».
-- Nueva sección «Próximos» en el menú: estrenos de los próximos 3 meses (películas, series nuevas, temporadas y capítulos de tus series), por día y con filtro de plataforma.
-- Lo que ya ha subido tu proveedor sale como «Ya disponible»; clic para ir a la ficha.
-- Aviso «Nuevo capítulo disponible» cuando una serie que sigues (Mi lista o Continuar viendo) estrena capítulo y tu proveedor ya lo tiene.
-- Corregido un cierre inesperado del reproductor («Failed to Image::makeFromBitmap») al cambiar de canal, de calidad o de tamaño de vídeo.
+- Próximos: a la derecha, «Disponible» (tu proveedor ya lo ha subido) o «Pendiente» (ya se estrenó, aún no lo tiene). Se quita «En tu lista», que confundía.

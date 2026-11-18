@@ -1,3 +1,3 @@
 Novedades de la próxima versión de Android (tele y móvil). Una línea por punto, empezando por «- ».
-- Próximos: «Ya disponible» pasa al lado derecho de cada estreno; debajo del título queda la plataforma.
+- Próximos: a la derecha, en una sola línea, «Disponible» (tu proveedor ya lo ha subido) o «Pendiente» (ya se estrenó, aún no lo tiene). Se quita «En tu lista», que confundía.
 - El aviso «Nuevo capítulo disponible» cabe bien en el móvil y se cierra con la ✕ o «Ahora no».

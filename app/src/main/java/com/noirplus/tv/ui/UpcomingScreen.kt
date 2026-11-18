@@ -113,15 +113,23 @@ private fun UpcomingRow(s: Upcoming.Shown, onClick: () -> Unit) {
                 if (up.platform.isNotBlank()) Text(up.platform, color = if (focused) Color.Black.copy(alpha = 0.7f) else Col.Sub, fontSize = 12.sp)
             }
             // A la derecha: si ya lo tiene tu proveedor
-            if (s.available || s.local != null) Column(Modifier.padding(start = 8.dp), horizontalAlignment = Alignment.End) {
-                Text(if (s.available) "Ya\ndisponible" else "En tu\nlista",
-                    color = if (s.available) (if (focused) Color.Black else Col.Text) else (if (focused) Color.Black.copy(alpha = 0.6f) else Col.Sub),
-                    fontSize = 11.sp, fontWeight = if (s.available) FontWeight.SemiBold else FontWeight.Normal, lineHeight = 13.sp,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.End)
-                if (s.available) Box(Modifier.padding(top = 4.dp).size(6.dp).clip(RoundedCornerShape(50)).background(if (focused) Color.Black else Color.White))
+            statusOf(s)?.let { (txt, strong) ->
+                Text(txt, color = if (focused) Color.Black.copy(alpha = if (strong) 1f else 0.6f) else if (strong) Col.Text else Col.Sub,
+                    fontSize = 12.sp, fontWeight = if (strong) FontWeight.SemiBold else FontWeight.Normal, maxLines = 1,
+                    modifier = Modifier.padding(start = 8.dp))
             }
         }
     }
+}
+
+/**
+ * Estado a la derecha: «Disponible» = ese estreno ya lo ha subido tu proveedor;
+ * «Pendiente» = ya se ha estrenado pero tu proveedor aún no lo tiene. Si aún no se ha estrenado, nada.
+ */
+internal fun statusOf(s: Upcoming.Shown): Pair<String, Boolean>? = when {
+    s.available -> "Disponible" to true
+    s.local != null && s.up.date <= Upcoming.today() -> "Pendiente" to false
+    else -> null
 }
 
 private val DAYS = listOf("domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado")

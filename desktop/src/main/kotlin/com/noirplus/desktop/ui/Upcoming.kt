@@ -107,12 +107,12 @@ private fun UpRow(s: Upcoming.Shown, onClick: () -> Unit) {
         Column(Modifier.weight(1f).padding(start = 14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(up.name, color = Col.Text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(Upcoming.label(up), color = Col.Sub, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (up.platform.isNotBlank()) Text(up.platform, color = Col.Sub, fontSize = 12.sp, modifier = Modifier.padding(end = 8.dp))
-                if (s.available) Text("Ya disponible", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold,
-                    modifier = Modifier.clip(RoundedCornerShape(50)).background(Color.White).padding(horizontal = 8.dp, vertical = 2.dp))
-                else if (s.local != null) Text("En tu lista", color = Col.Sub, fontSize = 11.sp)
-            }
+            if (up.platform.isNotBlank()) Text(up.platform, color = Col.Sub, fontSize = 12.sp)
+        }
+        // «Disponible»: ya lo ha subido tu proveedor. «Pendiente»: ya se estrenó pero aún no lo tiene.
+        when {
+            s.available -> Text("Disponible", color = Col.Text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 10.dp))
+            s.local != null && up.date <= Upcoming.today() -> Text("Pendiente", color = Col.Sub, fontSize = 13.sp, modifier = Modifier.padding(start = 10.dp))
         }
     }
 }
