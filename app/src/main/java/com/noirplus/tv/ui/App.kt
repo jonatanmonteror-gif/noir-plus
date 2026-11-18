@@ -9,6 +9,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.heightIn
@@ -144,18 +145,23 @@ fun App() {
                 modifier = Modifier.fillMaxSize().background(Col.Bg),
                 label = "screens",
             ) { screen ->
-                Box(Modifier.fillMaxSize().background(Col.Bg)) {
-                    holder.SaveableStateProvider(keyOf(screen)) {
-                        when (screen) {
-                            Screen.Setup -> SetupScreen()
-                            Screen.Main -> MainScreen()
-                            Screen.Welcome -> WelcomeScreen()
-                            Screen.Folders -> FoldersScreen()
-                            is Screen.Detail -> DetailScreen(screen.item)
-                            is Screen.Player -> PlayerScreen(screen.req)
-                            is Screen.Category -> CategoryScreen(screen.kind, screen.cat, screen.search)
+                // Móvil: la barra de abajo está siempre (menos en el reproductor, el saludo y la configuración)
+                val withBar = dims.compact && (screen is Screen.Detail || screen is Screen.Category || screen == Screen.Folders)
+                androidx.compose.foundation.layout.Column(Modifier.fillMaxSize().background(Col.Bg)) {
+                    Box(Modifier.weight(1f).fillMaxWidth()) {
+                        holder.SaveableStateProvider(keyOf(screen)) {
+                            when (screen) {
+                                Screen.Setup -> SetupScreen()
+                                Screen.Main -> MainScreen()
+                                Screen.Welcome -> WelcomeScreen()
+                                Screen.Folders -> FoldersScreen()
+                                is Screen.Detail -> DetailScreen(screen.item)
+                                is Screen.Player -> PlayerScreen(screen.req)
+                                is Screen.Category -> CategoryScreen(screen.kind, screen.cat, screen.search)
+                            }
                         }
                     }
+                    if (withBar) PhoneBottomBar()
                 }
             }
             }

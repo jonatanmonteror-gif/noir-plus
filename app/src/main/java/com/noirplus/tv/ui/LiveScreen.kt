@@ -1,6 +1,7 @@
 package com.noirplus.tv.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -186,17 +187,18 @@ fun LiveContent() {
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            item(key = "view") {
-                CategoryChip(if (asList) "▦  Ver en cajas" else "☰  Ver en lista", selected = false) {
-                    prefs.liveView = if (asList) "grid" else "list"
-                }
-            }
             if (countries.size > 1) {
-                item(key = "c-all") { CategoryChip("Todos los países", selected = country == null) { country = null } }
+                item(key = "c-all") { CountryPill("Todos los países", selected = country == null) { country = null } }
                 itemsIndexed(countries, key = { _, c -> "c-$c" }) { _, c ->
-                    CategoryChip(LiveIndex.COUNTRY_NAMES[c] ?: c, selected = country == c) { country = c }
+                    CountryPill(LiveIndex.COUNTRY_NAMES[c] ?: c, selected = country == c) { country = c }
                 }
             }
+        }
+    }
+    // Cajas / lista: un icono discreto a la derecha (no parece una pestaña)
+    val viewToggle: @Composable () -> Unit = {
+        RoundIconButton(if (asList) GridIcon else ListIcon, if (asList) "Ver en cajas" else "Ver en lista") {
+            prefs.liveView = if (asList) "grid" else "list"
         }
     }
     val hint = if (d.tv) "OK para ver  ·  Mantén OK pulsado: favoritos y temática"
@@ -214,7 +216,10 @@ fun LiveContent() {
             }
             Spacer(Modifier.height(8.dp))
             toolbar()
-            Text(hint, color = Col.Sub, fontSize = 12.sp, modifier = Modifier.padding(horizontal = d.edge, vertical = 10.dp))
+            Row(Modifier.fillMaxWidth().padding(start = d.edge, end = d.edge, top = 8.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(hint, color = Col.Sub, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                viewToggle()
+            }
             grid(Modifier.fillMaxSize())
         }
         return
@@ -239,10 +244,13 @@ fun LiveContent() {
         }
         Spacer(Modifier.width(24.dp))
         Column(Modifier.weight(1f).fillMaxHeight()) {
-            Text(
-                folders.firstOrNull { it.first == selected }?.second ?: "",
-                color = Col.Text, fontSize = 20.sp, fontWeight = FontWeight.Bold, maxLines = 1,
-            )
+            Row(Modifier.fillMaxWidth().padding(end = d.edge), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    folders.firstOrNull { it.first == selected }?.second ?: "",
+                    color = Col.Text, fontSize = 20.sp, fontWeight = FontWeight.Bold, maxLines = 1, modifier = Modifier.weight(1f),
+                )
+                viewToggle()
+            }
             Text(hint, color = Col.Sub, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp, bottom = 8.dp))
             toolbar()
             Spacer(Modifier.height(8.dp))
@@ -378,5 +386,22 @@ private fun ChannelCard(
             ch.name, color = Col.Sub, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(top = 5.dp),
         )
+    }
+}
+
+
+/** Filtro de país: pastilla pequeña con borde, distinta de las pestañas de temática. */
+@Composable
+private fun CountryPill(label: String, selected: Boolean, onClick: () -> Unit) {
+    Focusable(Modifier.height(30.dp), shape = RoundedCornerShape(50), focusScale = 1.05f, onClick = onClick) { focused ->
+        Box(
+            Modifier.fillMaxHeight()
+                .background(if (focused) Color.White else if (selected) Color.White.copy(alpha = 0.16f) else Color.Transparent, RoundedCornerShape(50))
+                .border(1.dp, if (selected || focused) Color.White.copy(alpha = 0.7f) else Color.White.copy(alpha = 0.22f), RoundedCornerShape(50))
+                .padding(horizontal = 12.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(label, color = if (focused) Color.Black else if (selected) Col.Text else Col.Sub, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        }
     }
 }

@@ -172,7 +172,7 @@ private fun TabItem(label: String, selected: Boolean, requester: FocusRequester,
 
 // ───────────────────────────── Móvil ─────────────────────────────
 
-private enum class Section(val label: String, val icon: ImageVector) {
+internal enum class Section(val label: String, val icon: ImageVector) {
     HOME("Inicio", Icons.Filled.Home),
     SEARCH("Buscar", Icons.Filled.Search),
     MYLIST("Mi lista", Icons.Filled.Favorite),
@@ -185,7 +185,7 @@ private enum class Filter(val label: String) { ALL("Todo"), SERIES("Series"), MO
 @Composable
 private fun PhoneMain() {
     val d = LocalDims.current
-    var section by rememberSaveable { mutableStateOf(Section.HOME) }
+    var section by PhoneTabs.section
     var filter by rememberSaveable { mutableStateOf(Filter.ALL) }
 
     Box(Modifier.fillMaxSize()) {
@@ -226,6 +226,21 @@ private fun PhoneMain() {
             }
         }
         BottomBar(section, Modifier.align(Alignment.BottomCenter)) { section = it }
+    }
+}
+
+/** Sección elegida en la barra de abajo del móvil (compartida con las demás pantallas). */
+internal object PhoneTabs {
+    val section = mutableStateOf(Section.HOME)
+}
+
+/** Barra de abajo en las pantallas que se abren encima (ficha, «Ver todo», carpetas…): vuelve a Inicio, Buscar, etc. */
+@Composable
+fun PhoneBottomBar(modifier: Modifier = Modifier) {
+    val nav = LocalNav.current
+    BottomBar(PhoneTabs.section.value, modifier) { s ->
+        PhoneTabs.section.value = s
+        while (nav.top != Screen.Main && nav.pop()) Unit
     }
 }
 

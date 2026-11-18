@@ -123,6 +123,19 @@ val GridIcon: ImageVector = materialIcon(name = "Filled.GridSmall") {
 }
 
 
+/** Icono "lista" (filas). */
+val ListIcon: ImageVector = materialIcon(name = "Filled.ListRows") {
+    materialPath {
+        moveTo(3f, 5f); horizontalLineTo(6f); verticalLineTo(8f); horizontalLineTo(3f); close()
+        moveTo(8f, 5f); horizontalLineTo(21f); verticalLineTo(8f); horizontalLineTo(8f); close()
+        moveTo(3f, 10.5f); horizontalLineTo(6f); verticalLineTo(13.5f); horizontalLineTo(3f); close()
+        moveTo(8f, 10.5f); horizontalLineTo(21f); verticalLineTo(13.5f); horizontalLineTo(8f); close()
+        moveTo(3f, 16f); horizontalLineTo(6f); verticalLineTo(19f); horizontalLineTo(3f); close()
+        moveTo(8f, 16f); horizontalLineTo(21f); verticalLineTo(19f); horizontalLineTo(8f); close()
+    }
+}
+
+
 /** Icono "géneros" (etiqueta). */
 val GenreIcon: ImageVector = materialIcon(name = "Filled.GenreTag") {
     materialPath {
