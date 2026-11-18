@@ -1,6 +1,12 @@
 package com.noirplus.tv.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -202,11 +208,20 @@ fun LiveContent() {
         }
     }
     val hint = if (d.tv) "OK para ver  ·  Mantén OK pulsado: favoritos y temática"
-    else "Toca para ver  ·  Mantén pulsado: favoritos y temática"
+    else "Desliza para cambiar de temática  ·  Mantén pulsado: favoritos"
 
     if (d.compact) {
+        // Deslizar a izquierda o derecha sobre los canales cambia de temática (como las pestañas de WhatsApp o YouTube)
+        val chipsState = rememberLazyListState()
+        val curIdx = folders.indexOfFirst { it.first == selected }.coerceAtLeast(0)
+        LaunchedEffect(curIdx) { runCatching { chipsState.animateScrollToItem((curIdx - 1).coerceAtLeast(0)) } }
+        var dragX by remember { mutableStateOf(0f) }
+        val shift by animateFloatAsState(dragX, label = "swipe")
+        val density = LocalDensity.current
+        val threshold = with(density) { 72.dp.toPx() }
         Column(Modifier.fillMaxSize().padding(top = 8.dp)) {
             LazyRow(
+                state = chipsState,
                 contentPadding = PaddingValues(horizontal = d.edge),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
@@ -220,7 +235,30 @@ fun LiveContent() {
                 Text(hint, color = Col.Sub, fontSize = 12.sp, modifier = Modifier.weight(1f))
                 viewToggle()
             }
-            grid(Modifier.fillMaxSize())
+            Box(
+                Modifier.fillMaxSize()
+                    .pointerInput(folders, curIdx) {
+                        detectHorizontalDragGestures(
+                            onDragEnd = {
+                                val next = when {
+                                    dragX <= -threshold -> curIdx + 1
+                                    dragX >= threshold -> curIdx - 1
+                                    else -> curIdx
+                                }
+                                if (next != curIdx && next in folders.indices) selected = folders[next].first
+                                dragX = 0f
+                            },
+                            onDragCancel = { dragX = 0f },
+                        ) { change, amount ->
+                            change.consume()
+                            dragX += amount
+                        }
+                    }
+                    .graphicsLayer {
+                        translationX = shift * 0.4f
+                        alpha = 1f - (kotlin.math.abs(shift) / (threshold * 4)).coerceIn(0f, 0.4f)
+                    },
+            ) { grid(Modifier.fillMaxSize()) }
         }
         return
     }
