@@ -1,5 +1,8 @@
 package com.noirplus.tv.ui
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
@@ -232,27 +235,73 @@ private fun UpdateNotice() {
         delay(300)
         runCatching { installFr.requestFocus() }
     }
+    val dims = LocalDims.current
+    val pending by androidx.compose.runtime.produceState<List<String>>(emptyList(), r.versionCode) {
+        value = forDevice(Updater.changelog().filter { it.code in (Updater.currentCode + 1)..r.versionCode }.flatMap { it.items }, dims.tv)
+    }
+    val notes: @Composable () -> Unit = {
+        Text("Nueva versión lista", color = Col.Text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+        Text(status ?: "${r.name} · ya descargada", color = Col.Sub, fontSize = 12.sp)
+        pending.take(3).forEach { Text("• $it", color = Col.Text, fontSize = 12.sp, maxLines = 2, modifier = Modifier.padding(top = 3.dp)) }
+        if (pending.size > 3) Text("y ${pending.size - 3} más (Ajustes → Actualizaciones → Novedades)", color = Col.Sub, fontSize = 11.sp)
+    }
+    val install = {
+        status = if (Updater.install(ctx, f)) "Abriendo el instalador…" else "Permite «Instalar apps desconocidas» y vuelve a pulsar"
+    }
+    if (dims.compact) {
+        // Móvil: tarjeta a lo ancho, con ✕ y los botones debajo (antes «Luego» se salía de la pantalla)
+        Box(Modifier.fillMaxSize().windowInsetsPadding(androidx.compose.foundation.layout.WindowInsets.safeDrawing),
+            contentAlignment = Alignment.BottomCenter) {
+            Column(
+                Modifier.padding(start = 12.dp, end = 12.dp, bottom = 96.dp).fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp)).background(Col.Surface2.copy(alpha = 0.98f)).padding(16.dp),
+            ) {
+                Row(verticalAlignment = Alignment.Top) {
+                    Column(Modifier.weight(1f)) { notes() }
+                    Text("✕", color = Col.Sub, fontSize = 18.sp,
+                        modifier = Modifier.clip(RoundedCornerShape(50)).clickable { visible = false }.padding(6.dp))
+                }
+                Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
+                    ActionButton("Luego", key = "upd-later") { visible = false }
+                    ActionButton("Instalar", primary = true, key = "upd-install", focusRequester = installFr) { install() }
+                }
+            }
+        }
+        return
+    }
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomEnd) {
         Row(
-            Modifier.padding(horizontal = 20.dp, vertical = if (LocalDims.current.compact) 88.dp else 24.dp)
+            Modifier.padding(horizontal = 20.dp, vertical = 24.dp)
                 .clip(RoundedCornerShape(14.dp)).background(Col.Surface2.copy(alpha = 0.97f)).padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column(Modifier.padding(end = 14.dp).widthIn(max = 340.dp)) {
-                Text("Nueva versión lista", color = Col.Text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                Text(status ?: "${r.name} · ya descargada", color = Col.Sub, fontSize = 12.sp)
-                // Novedades de lo que vas a instalar
-                val pending by androidx.compose.runtime.produceState<List<String>>(emptyList(), r.versionCode) {
-                    value = Updater.changelog().filter { it.code in (Updater.currentCode + 1)..r.versionCode }.flatMap { it.items }
-                }
-                pending.take(3).forEach { Text("• $it", color = Col.Text, fontSize = 12.sp, maxLines = 2, modifier = Modifier.padding(top = 3.dp)) }
-                if (pending.size > 3) Text("y ${pending.size - 3} más (Ajustes → Actualizaciones → Novedades)", color = Col.Sub, fontSize = 11.sp)
-            }
-            ActionButton("Instalar", primary = true, key = "upd-install", focusRequester = installFr) {
-                status = if (Updater.install(ctx, f)) "Abriendo el instalador…" else "Permite «Instalar apps desconocidas» y vuelve a pulsar"
-            }
+            Column(Modifier.padding(end = 14.dp).widthIn(max = 340.dp)) { notes() }
+            ActionButton("Instalar", primary = true, key = "upd-install", focusRequester = installFr) { install() }
             Spacer(Modifier.width(8.dp))
             ActionButton("Luego", key = "upd-later") { visible = false }
+        }
+    }
+}
+
+/**
+ * Novedades de este aparato: en la tele no salen las del móvil y al revés, y se quita la etiqueta
+ * («Tele:», «Móvil:») porque ya se sabe dónde estás.
+ */
+fun forDevice(items: List<String>, tv: Boolean): List<String> {
+    val mine = if (tv) listOf("tele", "tv", "televisión") else listOf("móvil", "movil", "teléfono")
+    val other = if (tv) listOf("móvil", "movil", "teléfono") else listOf("tele", "tv", "televisión")
+    return items.mapNotNull { line ->
+        val head = line.substringBefore(":", "").trim()
+        val parts = head.split(Regex("""\s*(,|/|\by\b)\s*""")).map { it.trim() }.filter { it.isNotEmpty() }
+        val low = parts.map { it.lowercase() }
+        when {
+            head.isEmpty() || head.length > 30 || low.none { it in mine || it in other } -> line
+            low.any { it in mine } -> {
+                val rest = parts.filter { it.lowercase() !in mine && it.lowercase() !in other }
+                val body = line.substringAfter(":").trim()
+                if (rest.isEmpty()) body.replaceFirstChar { it.uppercase() } else rest.joinToString(", ") + ": " + body
+            }
+            else -> null
         }
     }
 }

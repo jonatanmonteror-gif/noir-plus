@@ -40,7 +40,12 @@ import kotlinx.coroutines.delay
 
 /** Ventana con las novedades de una o varias versiones. */
 @Composable
-fun NotesDialog(title: String, notes: List<Updater.Notes>, onClose: () -> Unit) {
+fun NotesDialog(title: String, allNotes: List<Updater.Notes>, onClose: () -> Unit) {
+    // Solo lo de este aparato (tele o móvil)
+    val tv = LocalDims.current.tv
+    val notes = remember(allNotes, tv) {
+        allNotes.map { it.copy(items = forDevice(it.items, tv)) }.filter { it.items.isNotEmpty() }
+    }
     val fr = remember { FocusRequester() }
     BackHandler { onClose() }
     LaunchedEffect(Unit) { delay(150); runCatching { fr.requestFocus() } }
@@ -99,13 +104,14 @@ fun WhatsNewAfterUpdate() {
     val prefs = Repo.prefs
     val cur = Updater.currentCode
     var notes by remember { mutableStateOf<List<Updater.Notes>?>(null) }
+    val tv = LocalDims.current.tv
     LaunchedEffect(Unit) {
         val seen = prefs.notesSeen
         if (seen >= cur) return@LaunchedEffect
         delay(2500)
         // La primera vez solo lo de esta versión
         val from = if (seen == 0) cur else seen + 1
-        val mine = Updater.changelog().filter { it.code in from..cur }
+        val mine = Updater.changelog().filter { it.code in from..cur && forDevice(it.items, tv).isNotEmpty() }
         if (mine.isEmpty()) prefs.notesSeen = cur else notes = mine
     }
     val n = notes ?: return

@@ -398,7 +398,7 @@ fun SettingsContent() {
             Text("Noir+  ·  ${BuildConfig.VERSION_NAME}", color = Col.Sub, fontSize = 12.sp, modifier = Modifier.padding(start = 4.dp))
         }
 
-        notesList?.let { NotesDialog("Novedades de Noir+ (tele y móvil)", it) { notesList = null } }
+        notesList?.let { NotesDialog("Novedades de Noir+", it) { notesList = null } }
         syncDialog?.let { which ->
             if (which == "url") NameDialog(Sync.url.removePrefix("https://"), title = "Dirección del servidor (tu dominio)", maxLen = 200, url = true,
                 onCancel = { syncDialog = null }) { Sync.setUrl(it); syncDialog = null }

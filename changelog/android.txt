@@ -1,8 +1,3 @@
-Novedades de la próxima versión de Android (tele y móvil). Una línea por punto, empezando por «- ».
-- Tele: arreglados los cierres de la app (se quita la búsqueda automática de otra versión cuando un contenido no se abría).
-- Tele: listas a prueba de elementos repetidos (Continuar viendo, episodios, novedades) para evitar cierres.
-- Al abrir la app ya no se descargan las listas: se usan las guardadas en el aparato. Solo se renuevan a las horas fijas (8, 14, 20 y 2 h, con la app abierta) o con «Actualizar listas»; si el servidor falla al actualizar, se sigue con la lista anterior.
-- Próximos: las películas solo salen por su estreno en plataformas (ya no las de cines). La fecha de cines sigue en la ficha.
-- Próximos: arriba sale lo ya estrenado en las 2 últimas semanas (lo más reciente primero) y debajo «Próximamente».
-- Móvil, Próximos: se abre siempre desde arriba, y los botones «Tráiler» y «Avísame» van uno encima del otro para que no se corten.
-- Próximos: pestaña nueva «Ya estrenados» con lo de las 2 últimas semanas, y la lista de estrenos se renueva antes (antes podía quedarse la de esta mañana, sin lo ya estrenado). En el móvil el botón dice solo «Avísame».
+Novedades de la próxima versión de Android (tele y móvil). Una línea por punto, empezando por «- ». Empieza con «Tele:» o «Móvil:» lo que es solo de uno.
+- Móvil: el aviso de «Nueva versión lista» ya se puede cerrar (✕ o «Luego»); antes el botón se salía de la pantalla.
+- Las novedades solo enseñan lo de tu aparato: en la tele lo de la tele y en el móvil lo del móvil.
