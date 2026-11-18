@@ -239,6 +239,17 @@ fun PlayerScreen(start: PlayRequest, mini: Boolean = false) {
             override fun buffering(mediaPlayer: MediaPlayer, newCache: Float) { buffering = newCache < 100f }
             override fun finished(mediaPlayer: MediaPlayer) { ended = true }
             override fun error(mediaPlayer: MediaPlayer) {
+                // Directo: si el canal tiene otras calidades, se prueba la siguiente antes de dar error
+                if (req.isLive) {
+                    val alts = LiveIndex.alternatives(req.key)
+                    val pos = alts.indexOfFirst { Repo.source?.streamUrl(it) == req.url }
+                    val next = alts.getOrNull(pos + 1)
+                    val u = next?.let { Repo.source?.streamUrl(it) }
+                    if (u != null && pos >= 0) {
+                        scope.launch { val nr = req.copy(url = u); req = nr; load(nr) }
+                        return
+                    }
+                }
                 error = if (req.isLive) "No se pudo abrir el canal. Prueba a cambiar el formato de directo en Ajustes."
                 else "No se pudo reproducir este contenido."
             }

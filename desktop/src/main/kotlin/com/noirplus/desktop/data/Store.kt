@@ -180,6 +180,16 @@ object Store {
         Sync.request()
     }
 
+    // ---------- Canales por temática ----------
+    fun liveThemes(): Map<String, String> = o.optJSONObject("liveThemes")?.let { j -> j.keys().asSequence().associateWith { j.getString(it) } } ?: emptyMap()
+    fun setLiveTheme(channelKey: String, theme: String) {
+        val j = o.optJSONObject("liveThemes") ?: JSONObject().also { o.put("liveThemes", it) }
+        j.put(channelKey, theme); save()
+    }
+    var liveView: String
+        get() = o.optString("liveView", "grid")
+        set(v) { o.put("liveView", v); save() }
+
     // ---------- Sincronización ----------
     fun str(k: String, def: String = ""): String = o.optString(k, def)
     fun putStr(k: String, v: String) { o.put(k, v); save() }
