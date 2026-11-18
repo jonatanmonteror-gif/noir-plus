@@ -111,6 +111,7 @@ private fun Shell() {
                         Screen.Live -> LiveScreen()
                         Screen.Movies -> BrowseScreen(com.noirplus.desktop.data.Kind.MOVIE)
                         Screen.Series -> BrowseScreen(com.noirplus.desktop.data.Kind.SERIES)
+                        Screen.Upcoming -> UpcomingScreen()
                         Screen.MyList -> MyListScreen()
                         Screen.Search -> SearchScreen()
                         Screen.Settings -> SettingsScreen()
@@ -122,6 +123,7 @@ private fun Shell() {
                 update?.let { r ->
                     UpdateBanner(r, Modifier.align(Alignment.BottomEnd).padding(24.dp)) { update = null }
                 }
+                NewEpisodeBanner(Modifier.align(Alignment.TopEnd).padding(24.dp))
             }
         }
         PlayerHost.req?.let { r ->
@@ -150,6 +152,7 @@ private fun Sidebar(nav: Nav) {
         NavItem(Icons.Outlined.LiveTv, Icons.Filled.LiveTv, "Directo", root == Screen.Live) { nav.tab(Screen.Live) }
         NavItem(Icons.Outlined.Movie, Icons.Filled.Movie, "Películas", root == Screen.Movies) { nav.tab(Screen.Movies) }
         NavItem(Icons.Outlined.Tv, Icons.Filled.Tv, "Series", root == Screen.Series) { nav.tab(Screen.Series) }
+        NavItem(Icons.Outlined.Event, Icons.Filled.Event, "Próximos", root == Screen.Upcoming) { nav.tab(Screen.Upcoming) }
         NavItem(Icons.Outlined.BookmarkBorder, Icons.Filled.Bookmark, "Mi lista", root == Screen.MyList) { nav.tab(Screen.MyList) }
         NavItem(Icons.Outlined.Search, Icons.Filled.Search, "Buscar", root == Screen.Search) { nav.tab(Screen.Search) }
         Spacer(Modifier.weight(1f))

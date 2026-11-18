@@ -45,6 +45,7 @@ sealed interface Screen {
     data object Live : Screen
     data object Movies : Screen
     data object Series : Screen
+    data object Upcoming : Screen
     data object MyList : Screen
     data object Search : Screen
     data object Settings : Screen

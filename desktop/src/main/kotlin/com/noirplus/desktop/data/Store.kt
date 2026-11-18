@@ -189,6 +189,9 @@ object Store {
         Sync.request()
     }
 
+    fun strSet(k: String): Set<String> = o.optJSONArray(k)?.let { a -> (0 until a.length()).map { a.optString(it) }.toSet() } ?: emptySet()
+    fun putStrSet(k: String, v: Set<String>) { o.put(k, JSONArray(v.toList())); save() }
+
     // ---------- Canales por temática ----------
     fun liveThemes(): Map<String, String> = o.optJSONObject("liveThemes")?.let { j -> j.keys().asSequence().associateWith { j.getString(it) } } ?: emptyMap()
     fun setLiveTheme(channelKey: String, theme: String) {

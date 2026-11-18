@@ -141,7 +141,8 @@ def build_tv():
         nd = ymd(nxt.get("air_date") or "")
         base = {"t": "tv", "id": tid, "n": d.get("name") or "", "p": plat_of[tid] or (group(((d.get("networks") or [{}])[0]).get("name", "")) or ""),
                 "img": d.get("poster_path") or "", "g": [x.get("id") for x in d.get("genres") or []], "keys": keys_of(d),
-                "last": ymd(last.get("air_date") or ""), "ls": last.get("season_number") or 0, "le": last.get("episode_number") or 0}
+                "last": ymd(last.get("air_date") or ""), "ls": last.get("season_number") or 0, "le": last.get("episode_number") or 0,
+                "pop": round(d.get("popularity") or 0, 1), "lang": d.get("original_language") or ""}
         if nd and TODAY.replace("-", "") <= str(nd) <= UNTIL.replace("-", ""):
             s, e = nxt.get("season_number") or 0, nxt.get("episode_number") or 0
             kind = "new" if (first == 0 or first >= nd) and s <= 1 else ("season" if e == 1 else "episode")
@@ -173,7 +174,8 @@ def build_movies():
         if not d:
             continue
         res.append({"t": "movie", "id": mid, "n": o.get("title") or "", "d": d, "k": "film", "p": g, "w": w,
-                    "img": o.get("poster_path") or "", "g": o.get("genre_ids") or [], "keys": keys_of(o)})
+                    "img": o.get("poster_path") or "", "g": o.get("genre_ids") or [], "keys": keys_of(o),
+                    "pop": round(o.get("popularity") or 0, 1), "lang": o.get("original_language") or ""})
     return res
 
 

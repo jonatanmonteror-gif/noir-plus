@@ -28,6 +28,7 @@ object Upcoming {
         val poster: String?,
         val keys: List<String>,
         val last: Int, val lastS: Int, val lastE: Int,
+        val pop: Double = 0.0, val lang: String = "",
     ) {
         val key: String get() = "$type:$id"
     }
@@ -70,6 +71,7 @@ object Upcoming {
                 o.optString("img").takeIf { it.isNotBlank() }?.let { "https://image.tmdb.org/t/p/w185$it" },
                 (0 until (ks?.length() ?: 0)).map { ks!!.optString(it) },
                 o.optInt("last"), o.optInt("ls"), o.optInt("le"),
+                o.optDouble("pop", 0.0), o.optString("lang"),
             )
         }
     }
@@ -114,7 +116,10 @@ object Upcoming {
         val t = today()
         ups.filter { it.kind != "aired" && it.date >= t - 1 }.mapNotNull { up ->
             val local = if (up.type == "tv") find(up, series) else find(up, movies)
-            if (up.kind == "episode" && (local == null || local.key !in follow)) return@mapNotNull null
+            val followed = local != null && local.key in follow
+            if (up.kind == "episode" && !followed) return@mapNotNull null
+            // Sin ruido: lo de otras cadenas o idiomas poco vistos solo si lo sigues o es popular
+            if (!followed && !relevant(up)) return@mapNotNull null
             val avail = when {
                 local == null || up.date > t -> false
                 up.type == "movie" -> true
@@ -140,6 +145,13 @@ object Upcoming {
             if (providerDay(local.added) < up.last) return@mapNotNull null
             up to local
         }.distinctBy { it.first.id }
+    }
+
+    private val LANGS = setOf("es", "en", "ca", "eu", "gl")
+    private fun relevant(up: Up): Boolean = when {
+        up.type == "tv" && up.platform.isBlank() -> up.pop >= 60
+        up.lang in LANGS -> true
+        else -> up.pop >= 25
     }
 
     fun markNotified(up: Up) {
