@@ -107,62 +107,99 @@ object LiveIndex {
         .replace(Regex("""[^a-z0-9]+"""), " ")
         .trim()
 
+    /** Filas de adorno que algunos proveedores meten como canal («✿✿✿✿ CINE Y SERIES ✿✿✿✿», «[COMUNICADOS]»…). */
     private fun isSeparator(name: String): Boolean {
-        val letters = name.count { it.isLetterOrDigit() }
-        val marks = name.count { it in "#=-*_~|<>" }
-        return letters == 0 || (marks >= 4 && marks >= letters / 2)
+        val t = name.trim()
+        val letters = t.count { it.isLetterOrDigit() }
+        if (letters == 0) return true
+        val marks = t.count { !it.isLetterOrDigit() && !it.isWhitespace() && it !in "+.&'!()-/:" }
+        if (marks >= 4 && marks >= letters / 2) return true
+        if (Regex("""([^\p{L}\p{N}\s])\1\1""").containsMatchIn(t)) return true
+        return t.startsWith("[") && t.endsWith("]")
     }
 
-    // Palabras clave por temática. «x*» = empieza por x; el resto, palabra o frase completa.
+    /**
+     * Clave para juntar el mismo canal escrito de formas distintas:
+     * «M. LIGA DE CAMPEONES 2», «M+ Liga de Campeones 2», «LIGA DE CAMPEONES 2 ORANGE», «mligadecampeones2»…
+     */
+    private val DROP = setOf("tv", "channel", "chanel", "canal", "orange", "sat", "op", "the")
+    private fun groupKey(name: String): String {
+        var toks = norm(name).split(' ').filter { it.isNotEmpty() }
+        toks = when {
+            toks.size > 2 && toks[0] == "m" && toks[1] == "plus" -> toks.drop(2)
+            toks.size > 2 && toks[0] == "movistar" && toks[1] == "plus" -> toks.drop(2)
+            toks.size > 1 && (toks[0] == "m" || toks[0] == "movistar") -> toks.drop(1)
+            else -> toks
+        }
+        var k = toks.filter { it !in DROP }.joinToString("").ifEmpty { toks.joinToString("") }
+        k = k.replace("laliga", "liga").replace("ligadecampeones", "ligacampeones").replace("lcampeones", "ligacampeones")
+            .replace("orange", "").replace("movistar", "")
+        if (k.length > 4 && k.endsWith("tv")) k = k.dropLast(2)
+        if (k.length > 9 && k.endsWith("channel")) k = k.dropLast(7)
+        // Un número suelto («2» de «M+ 2») no basta para identificar un canal
+        if (k.all { it.isDigit() }) k = norm(name).replace(" ", "")
+        return k.ifEmpty { norm(name).replace(" ", "") }
+    }
+
+    // Palabras clave por temática. «x*» = empieza por x; el resto, palabra o frase completa. El orden importa: gana la primera.
     private val RULES: List<Pair<String, List<String>>> = listOf(
         "adult" to listOf("xxx", "adult*", "adultos", "18", "porn*", "hustler", "playboy", "brazzers", "erotic*", "redlight", "dorcel"),
         "sports" to listOf(
-            "sport*", "deport*", "dazn*", "laliga*", "la liga", "liga*", "campeones", "champions", "europa league", "conference league",
-            "federacion", "rfef", "hypermotion", "smartbank", "copa", "supercopa", "mundial*", "eurocopa", "futbol*", "football", "soccer",
-            "f1", "formula 1", "formula1", "motogp", "moto gp", "moto", "motor*", "rally*", "eurosport*", "espn*", "golf*", "tenis", "tennis",
-            "padel", "wta", "atp", "nba", "nfl", "nhl", "mlb", "acb", "euroliga", "euroleague", "baloncesto", "basket*", "balonmano",
-            "atletismo", "ciclismo", "cycling", "rugby", "hockey", "voley*", "voleibol", "ufc", "boxing", "boxeo", "wwe", "fight*",
-            "bein*", "gol", "gol play", "goltv", "real madrid", "barca", "athletic", "atletico", "toros", "racing", "ppv*", "arena*",
-            "setanta", "match", "premier", "bundesliga", "serie a", "ligue 1", "eredivisie", "olympic*", "olimpic*", "eleven*",
-            "teledeporte", "tdp", "esport*", "vamos", "ellas", "caza", "pesca", "hipica", "nautica", "skysports", "eventos", "evento",
+            "sport*", "deport*", "dazn*", "danz", "laliga*", "la liga", "liga*", "lcampeones", "campeones", "champions", "europa league",
+            "conference league", "federacion", "rfef", "hypermotion", "smartbank", "copa", "supercopa", "mundial*", "eurocopa", "futbol*",
+            "football", "soccer", "f1", "formula 1", "formula1", "motogp", "moto gp", "moto", "motoadv", "moto adv", "automoto", "motor*",
+            "rally*", "wrc", "eurosport*", "espn*", "golf*", "tenis", "tennis", "padel", "wta", "atp", "nba", "nfl", "nhl", "mlb", "acb",
+            "euroliga", "euroleague", "baloncesto", "basket*", "balonmano", "atletismo", "ciclismo", "cycling", "bici", "billar", "rugby",
+            "hockey", "voley*", "voleibol", "ufc", "boxing", "boxeo", "wwe", "fight*", "bein*", "gol", "gol play", "golplay", "goltv",
+            "gol stadium", "real madrid*", "realmadrid*", "barca", "betis", "athletic", "atletico", "toros", "onetoro", "one toro", "racing",
+            "ppv*", "arena*", "setanta", "match", "premier", "bundesliga", "serie a", "ligue 1", "eredivisie", "olympic*", "olimpic*",
+            "eleven*", "teledeporte", "tdp", "esport*", "vamos", "ellas", "caza*", "pesca", "hipica", "horse", "nautic*", "surf*",
+            "red bull", "redbull*", "skysports", "eventos", "evento",
         ),
         "news" to listOf(
             "news", "noticias", "24h", "24 h", "24 horas", "24horas", "cnn*", "bbc world", "euronews", "france 24", "al jazeera", "aljazeera",
             "cnbc", "bloomberg", "telediario", "informativos", "rt", "dw", "lci", "bfm*", "sky tg24", "tg24", "rainews*", "3 24", "324",
-            "el toro", "libertad digital", "intereconomia", "trece", "negocios", "parlamento", "congreso", "tv5monde", "france info", "franceinfo",
+            "el toro", "eltoro*", "libertad digital", "intereconomia", "trece", "13tv", "13 tv", "negocios*", "parlamento", "congreso",
+            "tv5monde", "france info", "franceinfo",
         ),
         "kids" to listOf(
-            "disney*", "clan", "nick*", "cartoon*", "cartoonito", "boing", "baby*", "kids", "infantil*", "junior", "jr", "toon*", "panda",
-            "dreamworks", "cbeebies", "jim jam", "duck tv", "pocoyo", "peques", "super3", "sx3", "boomerang", "tiji", "gulli", "piwi",
-            "minimax", "kika", "rai yoyo", "babytv", "kidz*", "dibujos", "anime*", "pequenos",
+            "disney*", "clan", "nick*", "cartoon*", "boing", "baby*", "kids", "junior", "jr", "toon*", "panda", "dreamworks", "cbeebies",
+            "jim jam", "duck tv", "pocoyo", "peques", "super 3", "super3", "sx3", "boomerang", "tiji", "gulli", "piwi", "minimax", "kika",
+            "rai yoyo", "kidz*", "dibujos", "pequenos", "paka paka", "pakapaka",
         ),
         "docs" to listOf(
-            "discovery*", "national geographic", "nat geo*", "natgeo*", "history*", "historia", "odisea", "documental*", "docu*",
-            "animal planet", "bbc earth", "viajar", "cocina", "canal cocina", "decasa", "dmax", "crimen", "crime*", "investigation", "id",
-            "love nature", "curiosity*", "arte", "xplora", "iberalia", "science", "ciencia", "planet*", "travel*", "food*", "nature",
-            "wild", "blaze", "naturaleza", "misterio", "ancient",
+            "discovery*", "national geographic", "nationalgeo*", "nat geo*", "natgeo*", "history*", "historia", "odisea", "documental*",
+            "docu*", "animal planet", "bbc earth", "viajar", "viaje*", "dviaje", "buenviaje", "escapa*", "cocina", "canalcocina", "decasa",
+            "canaldecasa", "dcasa", "dmax", "crimen", "crime*", "investigation", "id", "love nature", "curiosity*", "arte", "xplora",
+            "iberalia", "science", "ciencia", "planet*", "travel*", "food*", "nature", "wild", "blaze", "naturaleza", "misterio",
+            "ancient", "lifestyle", "estilo de vida", "top gear", "topgear", "cultura",
         ),
         "music" to listOf(
-            "music*", "musica*", "mtv*", "vh1", "40 tv", "los40", "kiss*", "cadena dial", "radio*", "sol musica", "mezzo", "trace*",
-            "clubbing*", "hit tv", "deluxe music", "europa fm", "rock*", "jazz", "dance*", "classica", "stingray", "flaix*", "cadena 100",
-            "rne", "conciertos", "videoclips",
-        ),
-        "general" to listOf(
-            "la 1", "la1", "la 2", "la2", "tve*", "antena 3", "antena3", "a3", "telecinco", "t5", "cuatro", "la sexta", "lasexta", "tv3",
-            "3cat", "etb*", "tvg*", "canal sur*", "telemadrid", "a punt", "apunt", "aragon tv", "cmm", "13 tv", "8tv", "8 tv", "bbc one",
-            "bbc two", "bbc three", "bbc four", "itv*", "channel 4", "channel 5", "tf1", "france 2", "france 3", "france 5", "m6", "rai 1",
-            "rai 2", "rai 3", "canale 5", "italia 1", "rete 4", "rtl*", "zdf", "ard", "sat 1", "rtp*", "sic", "tvi", "ib3", "tpa*",
-            "tvcan*", "7rm", "la 7", "la7", "rtve*", "televisa", "azteca", "las estrellas", "canal 5", "abc", "nbc", "cbs", "pbs",
-            "real time", "be mad", "mega", "ten", "divinity", "nova", "neox", "energy", "dkiss", "boing tv", "bom", "squirrel",
-            "telemundo", "univision", "autonomicas", "nacionales", "generalistas",
+            "music*", "musica*", "musical*", "mtv*", "vh1", "40 tv", "los40", "kiss*", "cadena dial", "radio*", "sol musica", "sol",
+            "mezzo*", "trace*", "clubbing*", "hit tv", "deluxe music", "dlx*", "europa fm", "rock*", "jazz", "dance*", "classica", "clasica",
+            "stingray", "flaix*", "cadena 100", "rne", "conciertos", "videoclips", "flamenco", "hqm*", "q music", "qmusic", "now 70", "now 80",
+            "now 90", "now rock", "cadena elite", "musik*", "nortevision",
         ),
         "movies" to listOf(
             "cine*", "cinema*", "movie*", "film*", "pelic*", "series", "serie", "axn*", "tnt*", "hollywood*", "comedy*", "comedia",
-            "amc*", "syfy", "cosmo*", "fox*", "calle 13", "warner*", "paramount*", "tcm", "dark", "accion", "action", "drama*", "xtrm",
-            "star channel", "star", "hbo*", "showtime", "sky cinema*", "cinemax", "sundance*", "studio universal", "universal*",
-            "enfamilia", "somos", "dizi", "novelas", "telenovela*", "atreseries", "fdf", "factoria de ficcion", "a3series", "acontra*",
-            "max", "netflix", "prime video", "filmin", "skyshowtime", "estrenos*", "clasicos", "western", "suspense", "thriller", "terror",
-            "humor", "romance", "hits", "oscars", "autor", "independiente",
+            "amc*", "syfy", "cosmo*", "fox*", "calle 13", "calle13", "warner*", "paramount*", "tcm", "dark", "accion", "action", "drama*",
+            "xtrm", "star channel", "star", "hbo*", "showtime*", "sky showtime*", "skyshowtime*", "cinemax", "sundance*",
+            "studio universal", "universal*", "enfamilia", "somos", "dizi", "novelas", "telenovela*", "atreseries", "a3series", "fdf",
+            "factoria de ficcion", "factoriadeficcion", "acontra*", "max", "netflix", "prime video", "filmin", "estrenos*", "clasico*",
+            "western", "suspense", "thriller", "terror", "humor", "romance", "hits", "oscars", "autor", "independiente", "indie",
+            "originales", "pops", "ciclo", "los 2000", "los 90", "los 80", "flix ole", "flixole", "bom cine", "cineman",
+        ),
+        "general" to listOf(
+            "la 1", "la1", "la 2", "la2", "tve*", "antena 3", "antena3", "a3", "telecinco", "t5", "cuatro", "la sexta", "lasexta",
+            "tv3*", "3cat", "etb*", "eitb*", "tvg*", "canal sur*", "canalsur*", "telemadrid", "a punt", "apunt", "aragon*", "cmm", "8tv",
+            "8 tv", "bbc one", "bbc two", "bbc three", "bbc four", "itv*", "channel 4", "channel 5", "tf1", "france 2", "france 3",
+            "france 5", "m6", "rai 1", "rai 2", "rai 3", "canale 5", "italia 1", "rete 4", "rtl*", "zdf", "ard", "sat 1", "rtp*", "sic",
+            "tvi", "ib3", "tpa*", "tvcan*", "7rm", "la 7", "la7", "rtve*", "televisa", "azteca", "las estrellas", "canal 5", "abc", "nbc",
+            "cbs", "pbs", "real time", "be mad", "bemad", "mega", "ten", "divinity", "nova", "neox", "energy", "dkiss", "bom", "squirrel",
+            "telemundo", "univision", "caracol*", "tele caracol", "m plus", "m plus 2", "cero", "la resistencia", "resistencia",
+            "canaria*", "tele canarias", "galicia*", "extremadura*", "castilla*", "andalucia", "onda*", "levante*", "sevilla*", "malaga",
+            "cadiz", "huelva", "teleonuba", "fibracat*", "la otra", "la septima", "lebrija*", "sal tv", "101 tv", "7tv", "ptv", "local",
+            "autonomic*", "nacionales", "generalistas", "tdt",
         ),
     )
 
@@ -174,10 +211,23 @@ object LiveIndex {
         }
     }
 
+    // Para nombres pegados («mligadecampeones2», «canalsurandalucia»): palabras largas buscadas dentro del nombre
+    private val compact: List<Pair<String, List<String>>> = RULES.map { (t, kws) ->
+        t to kws.map { it.removeSuffix("*").replace(" ", "") }.filter { it.length >= 6 }
+    }
+
+    private fun match(n: String): String? {
+        for ((t, rs) in compiled) if (rs.any { it.containsMatchIn(n) }) return t
+        if (!n.contains(' ')) for ((t, ks) in compact) if (ks.any { n.contains(it) }) return t
+        return null
+    }
+
     fun classify(text: String): String? {
         val n = norm(text)
         if (n.isEmpty()) return null
-        for ((t, rs) in compiled) if (rs.any { it.containsMatchIn(n) }) return t
+        match(n)?.let { return it }
+        // «mgolf», «mvamos», «mcine»…: la «m» delante es de Movistar
+        if (!n.contains(' ') && n.length >= 5 && n.startsWith("m")) match(n.drop(1))?.let { return it }
         return null
     }
 
@@ -207,26 +257,40 @@ object LiveIndex {
                 val (cc, _) = splitCountry(cat)
                 country = cc ?: norm(cat).split(' ').firstNotNullOfOrNull { w -> WORD_COUNTRY[w] }
             }
-            val q = quality(rest)
+            // Las carpetas de «bajas conexiones» son la misma señal en peor calidad: van detrás
+            val low = norm(cat).let { c -> c.contains("bajas conexiones") || c.contains("baja calidad") || c.contains("low") }
+            val q = if (low) 5 else quality(rest)
             val clean = rest.replace(QUALITY, " ").replace(JUNK, " ")
                 .replace(Regex("""\(\s*\)|\[\s*]"""), " ")
                 .replace(Regex("""\s{2,}"""), " ").trim(' ', '-', ':', '.', '–')
             val name = clean.ifBlank { it.name.trim() }
-            val base = norm(name).ifBlank { norm(it.name) }
+            val base = groupKey(name)
             parsed += Parsed(it, country, name, base, q, cat, i)
         }
 
         val groups = LinkedHashMap<String, MutableList<Parsed>>()
         for (p in parsed) groups.getOrPut("${p.country ?: "-"}|${p.base}") { mutableListOf() } += p
+        // «mdeportes3» (nombre pegado con la m de Movistar) se junta con «deportes3» si existe
+        for (k in groups.keys.toList()) {
+            val (c, b) = k.split('|', limit = 2).let { it[0] to it[1] }
+            if (b.length > 4 && b.startsWith("m")) {
+                val other = "$c|${b.drop(1)}"
+                if (other != k && groups.containsKey(other)) groups[other]!!.addAll(groups.remove(k)!!)
+            }
+        }
 
         val channels = groups.map { (key, ps) ->
             val sorted = ps.sortedWith(compareByDescending<Parsed> { it.q }.thenBy { it.order })
             val first = ps.minByOrNull { it.order }!!
+            // Nombre a mostrar: el mejor escrito (con espacios, de una carpeta normal)
+            val shown = ps.filter { it.q > 5 && it.name.contains(' ') }.minByOrNull { it.order }
+                ?: ps.filter { it.q > 5 }.minByOrNull { it.order } ?: first
             val theme = overrides[key]
-                ?: classify(first.name)
+                ?: classify(shown.name)
+                ?: ps.firstNotNullOfOrNull { classify(it.name) }
                 ?: ps.firstNotNullOfOrNull { categoryTheme(it.cat) }
                 ?: "other"
-            Channel(key, first.name, first.country, theme, sorted.map { it.item }, sorted.first().q) to first.order
+            Channel(key, shown.name, shown.country, theme, sorted.map { it.item }, sorted.first().q) to first.order
         }
         // España primero; después por país con más canales; dentro, el orden del proveedor
         val countryRank = channels.groupingBy { it.first.country }.eachCount()
