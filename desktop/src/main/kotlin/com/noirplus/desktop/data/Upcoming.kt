@@ -29,6 +29,7 @@ object Upcoming {
         val keys: List<String>,
         val last: Int, val lastS: Int, val lastE: Int,
         val pop: Double = 0.0, val lang: String = "",
+        val backdrop: String? = null, val overview: String = "",
     ) {
         val key: String get() = "$type:$id"
     }
@@ -72,6 +73,7 @@ object Upcoming {
                 (0 until (ks?.length() ?: 0)).map { ks!!.optString(it) },
                 o.optInt("last"), o.optInt("ls"), o.optInt("le"),
                 o.optDouble("pop", 0.0), o.optString("lang"),
+                o.optString("bd").takeIf { it.isNotBlank() }?.let { "https://image.tmdb.org/t/p/w500$it" }, o.optString("ov"),
             )
         }
     }
@@ -114,7 +116,8 @@ object Upcoming {
         val movies = index(runCatching { src.all(Kind.MOVIE) }.getOrDefault(emptyList()))
         val follow = followedKeys()
         val t = today()
-        ups.filter { it.kind != "aired" && it.date >= t - 1 }.mapNotNull { up ->
+        val since = day(System.currentTimeMillis() - 31L * 86400_000L)
+        ups.filter { it.kind != "aired" && it.date >= since }.mapNotNull { up ->
             val local = if (up.type == "tv") find(up, series) else find(up, movies)
             val followed = local != null && local.key in follow
             if (up.kind == "episode" && !followed) return@mapNotNull null
@@ -152,13 +155,14 @@ object Upcoming {
     fun remindKey(up: Up) = "${up.type}:${up.id}:${up.season}:${up.episode}"
 
     private fun upToJson(up: Up) = org.json.JSONObject().put("t", up.type).put("id", up.id).put("n", up.name).put("d", up.date)
-        .put("k", up.kind).put("s", up.season).put("e", up.episode).put("p", up.platform).put("img", up.poster ?: "")
+        .put("k", up.kind).put("s", up.season).put("e", up.episode).put("p", up.platform).put("img", up.poster ?: "").put("bd", up.backdrop ?: "")
         .put("keys", JSONArray(up.keys))
 
     private fun upFromJson(o: org.json.JSONObject): Up {
         val ks = o.optJSONArray("keys")
         return Up(o.optString("t"), o.optString("id"), o.optString("n"), o.optInt("d"), o.optString("k"), o.optInt("s"), o.optInt("e"), "",
-            o.optString("p"), "", o.optString("img").takeIf { it.isNotBlank() }, (0 until (ks?.length() ?: 0)).map { ks!!.optString(it) }, 0, 0, 0)
+            o.optString("p"), "", o.optString("img").takeIf { it.isNotBlank() }, (0 until (ks?.length() ?: 0)).map { ks!!.optString(it) }, 0, 0, 0,
+            backdrop = o.optString("bd").takeIf { it.isNotBlank() })
     }
 
     fun reminders(): List<Up> = runCatching {

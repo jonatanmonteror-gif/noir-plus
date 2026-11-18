@@ -1,6 +1,11 @@
 package com.noirplus.tv.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -45,7 +50,7 @@ import kotlinx.coroutines.delay
 
 private val TYPES = listOf("all" to "Todo", "film" to "Películas", "new" to "Series nuevas", "season" to "Temporadas", "episode" to "Mis capítulos")
 
-/** Próximos estrenos (90 días), agrupados por día. */
+/** Próximos estrenos (90 días) y lo estrenado el último mes. */
 @Composable
 fun UpcomingContent() {
     val d = LocalDims.current
@@ -58,14 +63,13 @@ fun UpcomingContent() {
     val plats = remember(platsRaw) { platsRaw.split('|').filter { it.isNotEmpty() }.toSet() }
     val l = list ?: return Loading()
     val shown = remember(l, type, platsRaw) {
-        l.filter { (type == "all" || it.up.kind == type) && (plats.isEmpty() || it.up.platform in plats) }
+        l.filter { (type == "all" || it.up.kind == type) && (plats.isEmpty() || it.up.platform in plats) }.sortedBy { it.up.date }
     }
-    val groups = remember(shown) { shown.groupBy { it.up.date }.toSortedMap().entries.toList() }
     var remindVer by remember { mutableStateOf(0) }
     val remindedKeys = remember(remindVer, changes) { Upcoming.reminders().map { Upcoming.remindKey(it) }.toSet() }
     val today = Upcoming.today()
-    // En la tele, cajas por defecto; en el móvil, lista
-    val asGrid = Repo.prefs.str("upView", if (d.tv) "grid" else "list") == "grid"
+    // «Calendario» (con imagen, por defecto) o «Compacta»
+    val compactView = Repo.prefs.str("upView2", "cal") == "list"
     val onPick: (Upcoming.Shown) -> Unit = { s ->
         if (s.available && s.local != null) nav.push(Screen.Detail(s.local))
         else { Upcoming.toggleReminder(s.up); remindVer++ }
@@ -82,7 +86,6 @@ fun UpcomingContent() {
                 ) {
                     items(TYPES, key = { it.first }) { (k, label) -> CategoryChip(label, selected = type == k) { type = k } }
                 }
-                // Fundido suave hacia el botón de plataformas (las pestañas se esconden poco a poco)
                 Box(
                     Modifier.align(Alignment.CenterEnd).width(36.dp).height(40.dp)
                         .background(androidx.compose.ui.graphics.Brush.horizontalGradient(listOf(Col.Bg.copy(alpha = 0f), Col.Bg)))
@@ -90,162 +93,157 @@ fun UpcomingContent() {
             }
             Row(Modifier.padding(start = 4.dp, end = d.edge), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 PlatformButton(plats, Platforms.main) { p -> platsRaw = Platforms.main.filter { it in p }.joinToString("|") }
-                // Cajas o lista
-                RoundIconButton(if (asGrid) ListIcon else GridIcon, if (asGrid) "Ver en lista" else "Ver en cajas") {
-                    Repo.prefs.putStr("upView", if (asGrid) "list" else "grid")
+                RoundIconButton(if (compactView) GridIcon else ListIcon, if (compactView) "Vista con imágenes" else "Vista compacta") {
+                    Repo.prefs.putStr("upView2", if (compactView) "cal" else "list")
                 }
             }
         }
         Text(
             (if (plats.isNotEmpty()) Platforms.main.filter { it in plats }.joinToString(" + ") + "  ·  " else "") +
-                "Próximos 3 meses. Toca un estreno y te aviso cuando tu proveedor lo suba.",
+                "Del último mes a los próximos 3. Toca un estreno y te aviso cuando tu proveedor lo suba.",
             color = Col.Sub, fontSize = 12.sp, modifier = Modifier.padding(start = d.edge, end = d.edge, top = 10.dp, bottom = 4.dp),
         )
         if (shown.isEmpty()) return Message(if (l.isEmpty()) "No se pudieron cargar los próximos estrenos. Revisa la conexión." else "Nada con estos filtros")
-        if (asGrid) {
-            // Cajas: una fila de carátulas por periodo (Esta semana, La semana que viene, Diciembre…)
-            val periods = remember(shown) { shown.sortedBy { it.up.date }.groupBy { periodLabel(it.up.date, today) }.entries.toList() }
-            TvRowScroll {
-                LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(top = 6.dp, bottom = d.bottomPad)) {
-                    periods.forEach { (title, rows) ->
-                        item(key = "p:$title") {
-                            Column {
-                                SectionTitle(title, year = rows.size.toString())
-                                LazyRow(
-                                    contentPadding = PaddingValues(horizontal = d.edge),
-                                    horizontalArrangement = Arrangement.spacedBy(d.gap),
-                                ) {
-                                    itemsIndexed(rows, key = { i, s -> "$i:${s.up.key}:${s.up.season}:${s.up.episode}" }) { _, s ->
-                                        UpcomingCard(s, remindedKeys.contains(Upcoming.remindKey(s.up)), today) { onPick(s) }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            return@Column
-        }
-        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = d.edge, end = d.edge, bottom = d.bottomPad)) {
-            groups.forEach { (day, rows) ->
-                item(key = "h$day") {
-                    Text(dayLabel(day, today), color = Col.Text, fontSize = 16.sp, fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(top = 18.dp, bottom = 8.dp))
-                }
-                itemsIndexed(rows, key = { i, s -> "$day:$i:${s.up.key}:${s.up.season}:${s.up.episode}" }) { _, s ->
-                    UpcomingRow(s, reminded = remindedKeys.contains(Upcoming.remindKey(s.up))) { onPick(s) }
-                    Spacer(Modifier.height(6.dp))
+        // Se abre en «hoy» (lo del último mes queda encima)
+        val state = androidx.compose.foundation.lazy.rememberLazyListState()
+        val todayIndex = remember(shown) { shown.indexOfFirst { it.up.date >= today }.coerceAtLeast(0) }
+        LaunchedEffect(shown) { runCatching { state.scrollToItem(todayIndex) } }
+        LazyColumn(Modifier.fillMaxSize(), state = state,
+            contentPadding = PaddingValues(start = d.edge, end = d.edge, top = 8.dp, bottom = d.bottomPad),
+            verticalArrangement = Arrangement.spacedBy(if (compactView) 6.dp else 14.dp)) {
+            itemsIndexed(shown, key = { i, s -> "$i:${s.up.key}:${s.up.season}:${s.up.episode}:${s.up.date}" }) { i, s ->
+                val firstOfDay = i == 0 || shown[i - 1].up.date != s.up.date
+                val reminded = remindedKeys.contains(Upcoming.remindKey(s.up))
+                if (compactView) {
+                    if (firstOfDay) Text(dayLabel(s.up.date, today), color = if (s.up.date < today) Col.Sub else Col.Text, fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 12.dp, bottom = 2.dp))
+                    UpcomingRow(s, reminded, today) { onPick(s) }
+                } else {
+                    UpcomingEntry(s, reminded, today, showDate = firstOfDay) { onPick(s) }
                 }
             }
         }
     }
 }
 
+/** Qué se puede hacer con un estreno: verlo, o que te avisemos cuando tu proveedor lo suba. */
+private enum class UpState { WATCH, REMINDED, REMIND_UPLOAD, REMIND }
+
+private fun stateOf(s: Upcoming.Shown, reminded: Boolean, today: Int): UpState = when {
+    s.available -> UpState.WATCH
+    reminded -> UpState.REMINDED
+    s.up.date <= today -> UpState.REMIND_UPLOAD
+    else -> UpState.REMIND
+}
+
+/** Botón de acción del estreno (como «Recordarme» de las plataformas). */
 @Composable
-private fun UpcomingRow(s: Upcoming.Shown, reminded: Boolean, onClick: () -> Unit) {
+private fun ActionPill(st: UpState, focused: Boolean, small: Boolean = false) {
+    val (txt, filled) = when (st) {
+        UpState.WATCH -> "Ver ahora" to true
+        UpState.REMINDED -> "Te avisaré" to false
+        UpState.REMIND_UPLOAD -> (if (small) "Aún no subido" else "Avísame cuando lo suban") to false
+        UpState.REMIND -> "Avísame" to false
+    }
+    val fg = if (filled) Color.Black else if (focused) Color.Black else Col.Text
+    Row(
+        Modifier.clip(RoundedCornerShape(50))
+            .background(if (filled) Color.White else if (focused) Color.Black.copy(alpha = 0.08f) else Color.Transparent)
+            .then(if (filled) Modifier else androidx.compose.ui.Modifier.border(1.dp, if (focused) Color.Black.copy(alpha = 0.35f) else Color.White.copy(alpha = 0.3f), RoundedCornerShape(50)))
+            .padding(horizontal = if (small) 9.dp else 12.dp, vertical = if (small) 4.dp else 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        val icon = when (st) {
+            UpState.WATCH -> androidx.compose.material.icons.Icons.Filled.PlayArrow
+            UpState.REMINDED -> androidx.compose.material.icons.Icons.Filled.Notifications
+            else -> androidx.compose.material.icons.Icons.Outlined.Notifications
+        }
+        androidx.compose.material3.Icon(icon, null, tint = fg, modifier = Modifier.size(if (small) 13.dp else 15.dp))
+        Text(txt, color = fg, fontSize = if (small) 11.sp else 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
+            modifier = Modifier.padding(start = 5.dp))
+    }
+}
+
+/** Vista con imágenes: fecha a la izquierda y tarjeta con la imagen del estreno (como «Próximamente» de las plataformas). */
+@Composable
+private fun UpcomingEntry(s: Upcoming.Shown, reminded: Boolean, today: Int, showDate: Boolean, onClick: () -> Unit) {
+    val d = LocalDims.current
     val up = s.up
-    Focusable(Modifier.fillMaxWidth().height(92.dp), key = "up/${up.key}/${up.season}/${up.episode}", shape = RoundedCornerShape(12.dp),
-        focusScale = 1.02f, onClick = onClick) { focused ->
-        Row(Modifier.fillMaxSize().background(if (focused) Color.White else Col.Surface).padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.width(52.dp).height(76.dp).clip(RoundedCornerShape(6.dp)).background(Col.Surface2)) {
+    val past = up.date < today
+    val st = stateOf(s, reminded, today)
+    Row(Modifier.fillMaxWidth()) {
+        // Fecha
+        Column(Modifier.width(if (d.compact) 42.dp else 64.dp).padding(top = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            if (showDate) {
+                Text(if (up.date == today) "HOY" else MONTHS[up.date / 100 % 100 - 1].uppercase(), color = if (up.date == today) Col.Text else Col.Sub,
+                    fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.8.sp)
+                Text("${up.date % 100}", color = if (past) Col.Sub else Col.Text, fontSize = if (d.compact) 22.sp else 28.sp,
+                    fontWeight = FontWeight.Bold, fontFamily = InterDisplay)
+            }
+        }
+        Focusable(Modifier.weight(1f), key = "upe/${up.key}/${up.season}/${up.episode}", shape = RoundedCornerShape(14.dp),
+            focusScale = 1.08f, onClick = onClick) { focused ->
+            val img = up.backdrop ?: up.poster
+            val textCol = if (focused && !d.tv) Color.Black else Col.Text
+            if (d.compact) {
+                Column(Modifier.fillMaxWidth().background(Col.Surface)) {
+                    Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(Col.Surface2)) {
+                        img?.let { AsyncImage(it, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
+                        if (up.platform.isNotBlank()) PlatformTag(up.platform, Modifier.align(Alignment.TopStart).padding(8.dp))
+                    }
+                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(up.name, color = Col.Text, fontSize = 16.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(Upcoming.label(up), color = Col.Sub, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        if (up.overview.isNotBlank()) Text(up.overview, color = Col.Sub, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                            lineHeight = 16.sp)
+                        Box(Modifier.padding(top = 6.dp)) { ActionPill(st, focused = false) }
+                    }
+                }
+            } else {
+                Row(Modifier.fillMaxWidth().height(150.dp).background(if (focused) Col.Surface2 else Col.Surface)) {
+                    Box(Modifier.fillMaxHeight().aspectRatio(16f / 9f).background(Col.Surface2)) {
+                        img?.let { AsyncImage(it, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
+                        if (up.platform.isNotBlank()) PlatformTag(up.platform, Modifier.align(Alignment.TopStart).padding(8.dp))
+                    }
+                    Column(Modifier.weight(1f).fillMaxHeight().padding(horizontal = 18.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(up.name, color = textCol, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(Upcoming.label(up), color = Col.Sub, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        if (up.overview.isNotBlank()) Text(up.overview, color = Col.Sub, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                            lineHeight = 16.sp)
+                        Spacer(Modifier.weight(1f))
+                        ActionPill(st, focused = false)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Etiqueta de la plataforma sobre la imagen. */
+@Composable
+private fun PlatformTag(name: String, modifier: Modifier) {
+    Text(name, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
+        modifier = modifier.clip(RoundedCornerShape(6.dp)).background(Color.Black.copy(alpha = 0.7f)).padding(horizontal = 7.dp, vertical = 3.dp))
+}
+
+/** Vista compacta: una fila por estreno. */
+@Composable
+private fun UpcomingRow(s: Upcoming.Shown, reminded: Boolean, today: Int, onClick: () -> Unit) {
+    val up = s.up
+    val st = stateOf(s, reminded, today)
+    Focusable(Modifier.fillMaxWidth().height(84.dp), key = "up/${up.key}/${up.season}/${up.episode}", shape = RoundedCornerShape(12.dp),
+        focusScale = 1.08f, onClick = onClick) { focused ->
+        Row(Modifier.fillMaxSize().background(if (focused) Col.Surface2 else Col.Surface).padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.width(46.dp).height(68.dp).clip(RoundedCornerShape(6.dp)).background(Col.Surface2)) {
                 up.poster?.let { AsyncImage(it, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
             }
             Column(Modifier.weight(1f).padding(start = 12.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(up.name, color = if (focused) Color.Black else Col.Text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                    // En la misma línea que el título: estado o aviso activado
-                    val st = statusOf(s)
-                    when {
-                        st != null -> Text(st.first, color = if (focused) Color.Black.copy(alpha = if (st.second) 1f else 0.6f) else if (st.second) Col.Text else Col.Sub,
-                            fontSize = 12.sp, fontWeight = if (st.second) FontWeight.SemiBold else FontWeight.Normal, maxLines = 1,
-                            modifier = Modifier.padding(start = 8.dp))
-                        reminded -> androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Filled.Notifications, "Te aviso",
-                            tint = if (focused) Color.Black else Col.Text, modifier = Modifier.padding(start = 8.dp).size(16.dp))
-                    }
-                }
-                Text(Upcoming.label(up), color = if (focused) Color.Black.copy(alpha = 0.7f) else Col.Sub, fontSize = 13.sp,
+                Text(up.name, color = Col.Text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(Upcoming.label(up) + if (up.platform.isNotBlank()) "  ·  ${up.platform}" else "", color = Col.Sub, fontSize = 12.sp,
                     maxLines = 1, overflow = TextOverflow.Ellipsis)
-                if (up.platform.isNotBlank()) Text(up.platform, color = if (focused) Color.Black.copy(alpha = 0.7f) else Col.Sub, fontSize = 12.sp)
             }
-            // A la derecha: si ya lo tiene tu proveedor
-
+            Box(Modifier.padding(start = 8.dp)) { ActionPill(st, focused = false, small = true) }
         }
-    }
-}
-
-/**
- * Estado a la derecha: «Disponible» = ese estreno ya lo ha subido tu proveedor;
- * «Pendiente» = ya se ha estrenado pero tu proveedor aún no lo tiene. Si aún no se ha estrenado, nada.
- */
-internal fun statusOf(s: Upcoming.Shown): Pair<String, Boolean>? = when {
-    s.available -> "Disponible" to true
-    s.local != null && s.up.date <= Upcoming.today() -> "Pendiente" to false
-    else -> null
-}
-
-/** Caja de estreno: carátula con la fecha encima, título y qué es (temporada, serie nueva, estreno en cines…). */
-@Composable
-private fun UpcomingCard(s: Upcoming.Shown, reminded: Boolean, today: Int, onClick: () -> Unit) {
-    val d = LocalDims.current
-    val up = s.up
-    val w = d.poster
-    Column(Modifier.width(w)) {
-        Focusable(Modifier.width(w).height(w * 1.5f), key = "upc/${up.key}/${up.season}/${up.episode}", focusScale = 1.08f, onClick = onClick) { _ ->
-            Box(Modifier.fillMaxSize().background(Col.Surface2)) {
-                up.poster?.let { AsyncImage(it, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
-                    ?: Text(up.name, color = Col.Sub, fontSize = 12.sp, modifier = Modifier.align(Alignment.Center).padding(8.dp), maxLines = 3)
-                // Fecha arriba a la izquierda
-                Column(
-                    Modifier.align(Alignment.TopStart).padding(6.dp).clip(RoundedCornerShape(8.dp))
-                        .background(Color.Black.copy(alpha = 0.72f)).padding(horizontal = 7.dp, vertical = 4.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Text(shortDow(up.date, today), color = Col.Sub, fontSize = 9.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.6.sp)
-                    Text("${up.date % 100}", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold, lineHeight = 17.sp)
-                    Text(MONTHS[up.date / 100 % 100 - 1].uppercase(), color = Col.Sub, fontSize = 9.sp, fontWeight = FontWeight.SemiBold)
-                }
-                // Arriba a la derecha: disponible o aviso activado
-                when {
-                    s.available -> Text("DISPONIBLE", color = Color.Black, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp,
-                        modifier = Modifier.align(Alignment.TopEnd).padding(6.dp).clip(RoundedCornerShape(50)).background(Color.White)
-                            .padding(horizontal = 7.dp, vertical = 3.dp))
-                    reminded -> Box(Modifier.align(Alignment.TopEnd).padding(6.dp).size(24.dp).clip(RoundedCornerShape(50))
-                        .background(Color.Black.copy(alpha = 0.72f)), contentAlignment = Alignment.Center) {
-                        androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Filled.Notifications, "Te aviso",
-                            tint = Color.White, modifier = Modifier.size(14.dp))
-                    }
-                }
-                // Abajo: plataforma sobre un degradado
-                if (up.platform.isNotBlank()) Box(
-                    Modifier.align(Alignment.BottomCenter).fillMaxWidth()
-                        .background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f))))
-                        .padding(start = 8.dp, end = 8.dp, top = 18.dp, bottom = 6.dp),
-                ) { Text(up.platform, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1) }
-            }
-        }
-        Text(up.name, color = Col.Text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(top = 8.dp))
-        Text(Upcoming.label(up), color = Col.Sub, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-    }
-}
-
-private fun shortDow(day: Int, today: Int): String {
-    if (day == today) return "HOY"
-    val c = java.util.Calendar.getInstance().apply { set(day / 10000, day / 100 % 100 - 1, day % 100, 12, 0, 0) }
-    return listOf("DOM", "LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB")[c.get(java.util.Calendar.DAY_OF_WEEK) - 1]
-}
-
-/** Periodo para agrupar las cajas: Hoy y mañana, Esta semana, La semana que viene, y después por meses. */
-private fun periodLabel(day: Int, today: Int): String {
-    fun cal(x: Int) = java.util.Calendar.getInstance().apply { set(x / 10000, x / 100 % 100 - 1, x % 100, 12, 0, 0) }
-    val diff = ((cal(day).timeInMillis - cal(today).timeInMillis) / 86_400_000L).toInt()
-    val months = listOf("Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre")
-    return when {
-        diff <= 1 -> "Hoy y mañana"
-        diff <= 7 -> "Esta semana"
-        diff <= 14 -> "La semana que viene"
-        else -> months[day / 100 % 100 - 1] + if (day / 10000 != today / 10000) " ${day / 10000}" else ""
     }
 }
 

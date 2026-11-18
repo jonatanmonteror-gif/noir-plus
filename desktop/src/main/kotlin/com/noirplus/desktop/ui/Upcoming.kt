@@ -26,6 +26,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Notifications
 import com.noirplus.desktop.data.Item
 import com.noirplus.desktop.data.Repo
@@ -53,29 +55,26 @@ fun UpcomingScreen() {
         LazyRow(contentPadding = PaddingValues(horizontal = 40.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(bottom = 14.dp)) {
             items(Tmdb.platforms, key = { "p:$it" }) { p -> UpChip(p, p in plats, small = true) { plats = if (p in plats) plats - p else plats + p } }
         }
-        Text("Próximos 3 meses. Haz clic en un estreno y te aviso cuando tu proveedor lo suba. «Mis capítulos»: de las series que sigues.", color = Col.Sub, fontSize = 12.sp,
+        Text("Del último mes a los próximos 3. Haz clic en un estreno y te aviso cuando tu proveedor lo suba. «Mis capítulos»: de las series que sigues.", color = Col.Sub, fontSize = 12.sp,
             modifier = Modifier.padding(start = 40.dp, bottom = 6.dp))
         val l = list
-        val shown = remember(l, type, plats) { l?.filter { (type == "all" || it.up.kind == type) && (plats.isEmpty() || it.up.platform in plats) } }
+        val shown = remember(l, type, plats) { l?.filter { (type == "all" || it.up.kind == type) && (plats.isEmpty() || it.up.platform in plats) }?.sortedBy { it.up.date } }
         when {
             l == null -> Loading()
             shown.isNullOrEmpty() -> Message(if (l.isEmpty()) "No se pudieron cargar los próximos estrenos." else "Nada con estos filtros")
             else -> {
-                val groups = remember(shown) { shown.groupBy { it.up.date }.toSortedMap().entries.toList() }
+                val today = Upcoming.today()
                 var remindVer by remember { mutableStateOf(0) }
                 val reminded = remember(remindVer) { Upcoming.reminders().map { Upcoming.remindKey(it) }.toSet() }
-                val today = Upcoming.today()
-                LazyColumn(contentPadding = PaddingValues(start = 40.dp, end = 40.dp, bottom = 40.dp)) {
-                    groups.forEach { (day, rows) ->
-                        item(key = "h$day") {
-                            Text(dayLabel(day, today), color = Col.Text, fontSize = 18.sp, fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(top = 20.dp, bottom = 10.dp))
-                        }
-                        itemsIndexed(rows, key = { i, s -> "$day:$i:${s.up.key}:${s.up.season}:${s.up.episode}" }) { _, s ->
-                            UpRow(s, Upcoming.remindKey(s.up) in reminded) {
-                                if (s.available && s.local != null) nav.push(Screen.Detail(s.local)) else { Upcoming.toggleReminder(s.up); remindVer++ }
-                            }
-                            Spacer(Modifier.height(8.dp))
+                val state = androidx.compose.foundation.lazy.rememberLazyListState()
+                val todayIndex = remember(shown) { shown.indexOfFirst { it.up.date >= today }.coerceAtLeast(0) }
+                LaunchedEffect(shown) { runCatching { state.scrollToItem(todayIndex) } }
+                LazyColumn(state = state, contentPadding = PaddingValues(start = 40.dp, end = 40.dp, top = 6.dp, bottom = 40.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    itemsIndexed(shown, key = { i, s -> "$i:${s.up.key}:${s.up.season}:${s.up.episode}:${s.up.date}" }) { i, s ->
+                        val first = i == 0 || shown[i - 1].up.date != s.up.date
+                        UpEntry(s, Upcoming.remindKey(s.up) in reminded, today, first) {
+                            if (s.available && s.local != null) nav.push(Screen.Detail(s.local)) else { Upcoming.toggleReminder(s.up); remindVer++ }
                         }
                     }
                 }
@@ -94,38 +93,59 @@ private fun UpChip(label: String, on: Boolean, small: Boolean = false, onClick: 
             .clickable(onClick = onClick).pointerHoverIcon(PointerIcon.Hand).padding(horizontal = 14.dp, vertical = if (small) 5.dp else 7.dp))
 }
 
+/** Estreno: fecha a la izquierda y tarjeta con imagen, título, qué es, resumen y botón de acción. */
 @Composable
-private fun UpRow(s: Upcoming.Shown, reminded: Boolean, onClick: () -> Unit) {
+private fun UpEntry(s: Upcoming.Shown, reminded: Boolean, today: Int, showDate: Boolean, onClick: () -> Unit) {
     val up = s.up
     val src = remember { MutableInteractionSource() }
     val hovered by src.collectIsHoveredAsState()
+    Row(Modifier.fillMaxWidth().widthIn(max = 1100.dp)) {
+        Column(Modifier.width(70.dp).padding(top = 6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            if (showDate) {
+                Text(if (up.date == today) "HOY" else MONTHS[up.date / 100 % 100 - 1].uppercase(), color = if (up.date == today) Col.Text else Col.Sub,
+                    fontSize = 12.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.8.sp)
+                Text("${up.date % 100}", color = if (up.date < today) Col.Sub else Col.Text, fontSize = 30.sp, fontWeight = FontWeight.Bold, fontFamily = InterDisplay)
+            }
+        }
+        Row(
+            Modifier.weight(1f).height(160.dp).clip(RoundedCornerShape(14.dp)).background(if (hovered) Color(0xFF2A2A30) else Col.Surface)
+                .hoverable(src).clickable(interactionSource = src, indication = null) { onClick() }.pointerHoverIcon(PointerIcon.Hand),
+        ) {
+            Box(Modifier.fillMaxHeight().aspectRatio(16f / 9f).background(Color(0xFF2A2A2E))) {
+                (up.backdrop ?: up.poster)?.let { AsyncImage(it, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
+                if (up.platform.isNotBlank()) Text(up.platform, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.align(Alignment.TopStart).padding(8.dp).clip(RoundedCornerShape(6.dp)).background(Color.Black.copy(alpha = 0.7f))
+                        .padding(horizontal = 7.dp, vertical = 3.dp))
+            }
+            Column(Modifier.weight(1f).fillMaxHeight().padding(horizontal = 20.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Text(up.name, color = Col.Text, fontSize = 19.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(Upcoming.label(up), color = Col.Sub, fontSize = 13.sp, maxLines = 1)
+                if (up.overview.isNotBlank()) Text(up.overview, color = Col.Sub, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 17.sp)
+                Spacer(Modifier.weight(1f))
+                ActionPill(s, reminded, today)
+            }
+        }
+    }
+}
+
+/** Ver ahora / Avísame / Te avisaré. */
+@Composable
+private fun ActionPill(s: Upcoming.Shown, reminded: Boolean, today: Int) {
+    val (txt, filled, icon) = when {
+        s.available -> Triple("Ver ahora", true, androidx.compose.material.icons.Icons.Filled.PlayArrow)
+        reminded -> Triple("Te avisaré", false, androidx.compose.material.icons.Icons.Filled.Notifications)
+        s.up.date <= today -> Triple("Avísame cuando lo suban", false, androidx.compose.material.icons.Icons.Outlined.Notifications)
+        else -> Triple("Avísame", false, androidx.compose.material.icons.Icons.Outlined.Notifications)
+    }
+    val fg = if (filled) Color.Black else Col.Text
     Row(
-        Modifier.fillMaxWidth().widthIn(max = 980.dp).height(100.dp).clip(RoundedCornerShape(12.dp))
-            .background(if (hovered) Color(0xFF2E2E34) else Col.Surface)
-            .hoverable(src).clickable(interactionSource = src, indication = null) { onClick() }
-            .pointerHoverIcon(PointerIcon.Hand).padding(10.dp),
+        Modifier.clip(RoundedCornerShape(50)).background(if (filled) Color.White else Color.Transparent)
+            .then(if (filled) Modifier else Modifier.border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(50)))
+            .padding(horizontal = 12.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.width(56.dp).height(80.dp).clip(RoundedCornerShape(6.dp)).background(Color(0xFF2A2A2E))) {
-            up.poster?.let { AsyncImage(it, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
-        }
-        Column(Modifier.weight(1f).padding(start = 14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(up.name, color = Col.Text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false))
-                // En la línea del título: estado, o campana si te aviso
-                when {
-                    s.available -> Text("Disponible", color = Col.Text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 12.dp))
-                    s.local != null && up.date <= Upcoming.today() -> Text("Pendiente", color = Col.Sub, fontSize = 13.sp, modifier = Modifier.padding(start = 12.dp))
-                    reminded -> androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Filled.Notifications, "Te aviso", tint = Col.Text,
-                        modifier = Modifier.padding(start = 10.dp).size(16.dp))
-                    hovered -> Text("Avisarme", color = Col.Sub, fontSize = 12.sp, modifier = Modifier.padding(start = 12.dp))
-                }
-            }
-            Text(Upcoming.label(up), color = Col.Sub, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (up.platform.isNotBlank()) Text(up.platform, color = Col.Sub, fontSize = 12.sp)
-        }
-
+        androidx.compose.material3.Icon(icon, null, tint = fg, modifier = Modifier.size(15.dp))
+        Text(txt, color = fg, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 5.dp))
     }
 }
 

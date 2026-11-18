@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Próximos estrenos (90 días) para la sección «Próximos» de la app, a partir de TMDB.
+Próximos estrenos (90 días) y lo estrenado el último mes para la sección «Próximos» de la app, a partir de TMDB.
 
 Salida: upcoming.json.gz — lista de estrenos:
   {"t": "tv"|"movie", "id": 123, "n": "Título", "d": aaaammdd, "k": "new"|"season"|"episode"|"film",
@@ -18,7 +18,7 @@ if not KEY:
 DAYS = 90
 TODAY = time.strftime("%Y-%m-%d")
 UNTIL = time.strftime("%Y-%m-%d", time.gmtime(time.time() + DAYS * 86400))
-PAST = time.strftime("%Y-%m-%d", time.gmtime(time.time() - 10 * 86400))  # para avisos de capítulos recién salidos
+PAST = time.strftime("%Y-%m-%d", time.gmtime(time.time() - 31 * 86400))  # también lo estrenado el último mes
 
 MAIN = ["Netflix", "Disney+", "Max", "Prime Video", "Apple TV+", "Movistar Plus+", "SkyShowtime", "Filmin"]
 RULES = [
@@ -140,15 +140,24 @@ def build_tv():
         first = ymd(d.get("first_air_date") or "")
         nd = ymd(nxt.get("air_date") or "")
         base = {"t": "tv", "id": tid, "n": d.get("name") or "", "p": plat_of[tid] or (group(((d.get("networks") or [{}])[0]).get("name", "")) or ""),
-                "img": d.get("poster_path") or "", "g": [x.get("id") for x in d.get("genres") or []], "keys": keys_of(d),
+                "img": d.get("poster_path") or "", "bd": d.get("backdrop_path") or "", "ov": (d.get("overview") or "")[:220],
+                "g": [x.get("id") for x in d.get("genres") or []], "keys": keys_of(d),
                 "last": ymd(last.get("air_date") or ""), "ls": last.get("season_number") or 0, "le": last.get("episode_number") or 0,
                 "pop": round(d.get("popularity") or 0, 1), "lang": d.get("original_language") or ""}
+        def kind_of(s, e, day):
+            return "new" if (first == 0 or first >= day) and s <= 1 else ("season" if e == 1 else "episode")
+        added = False
         if nd and TODAY.replace("-", "") <= str(nd) <= UNTIL.replace("-", ""):
             s, e = nxt.get("season_number") or 0, nxt.get("episode_number") or 0
-            kind = "new" if (first == 0 or first >= nd) and s <= 1 else ("season" if e == 1 else "episode")
-            out.append(dict(base, d=nd, k=kind, s=s, e=e, en=nxt.get("name") or ""))
-        elif base["last"]:
-            # Sin próximo capítulo conocido: solo sirve para avisar de capítulos recién salidos
+            out.append(dict(base, d=nd, k=kind_of(s, e, nd), s=s, e=e, en=nxt.get("name") or ""))
+            added = True
+        ld = base["last"]
+        if ld and PAST.replace("-", "") <= str(ld) <= TODAY.replace("-", ""):
+            # Lo estrenado en el último mes (para ver si tu proveedor ya lo tiene)
+            s, e = base["ls"], base["le"]
+            out.append(dict(base, d=ld, k=kind_of(s, e, ld), s=s, e=e, en=last.get("name") or ""))
+            added = True
+        if not added and base["last"]:
             out.append(dict(base, d=0, k="aired", s=0, e=0, en=""))
     return out
 
@@ -160,12 +169,12 @@ def build_movies():
         if g not in MAIN:
             continue
         for o in discover_all("/discover/movie", {"watch_region": "ES", "with_watch_providers": "|".join(pids),
-                                                  "primary_release_date.gte": TODAY, "primary_release_date.lte": UNTIL,
+                                                  "primary_release_date.gte": PAST, "primary_release_date.lte": UNTIL,
                                                   "sort_by": "popularity.desc"}, max_pages=10):
             out.setdefault(o["id"], (o, g, "digital"))
     # Estrenos en cines y en digital en España
     for rtype, label in (("2|3", "cines"), ("4|6", "digital")):
-        for o in discover_all("/discover/movie", {"region": "ES", "with_release_type": rtype, "release_date.gte": TODAY,
+        for o in discover_all("/discover/movie", {"region": "ES", "with_release_type": rtype, "release_date.gte": PAST,
                                                   "release_date.lte": UNTIL, "sort_by": "popularity.desc"}, max_pages=10):
             out.setdefault(o["id"], (o, "", label))
     res = []
@@ -174,7 +183,8 @@ def build_movies():
         if not d:
             continue
         res.append({"t": "movie", "id": mid, "n": o.get("title") or "", "d": d, "k": "film", "p": g, "w": w,
-                    "img": o.get("poster_path") or "", "g": o.get("genre_ids") or [], "keys": keys_of(o),
+                    "img": o.get("poster_path") or "", "bd": o.get("backdrop_path") or "", "ov": (o.get("overview") or "")[:220],
+                    "g": o.get("genre_ids") or [], "keys": keys_of(o),
                     "pop": round(o.get("popularity") or 0, 1), "lang": o.get("original_language") or ""})
     return res
 

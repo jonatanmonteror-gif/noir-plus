@@ -1,4 +1,4 @@
 Novedades de la próxima versión de Windows. Una línea por punto, empezando por «- ».
-- Próximos: haz clic en un estreno y te avisamos cuando tu proveedor lo suba (campana). «Disponible» / «Pendiente» en la línea del título, y más separación entre pestañas y plataformas.
-- Películas en Próximos: «Estreno en cines» o «Estreno en Netflix/Disney+…».
-- Ficha de película: fecha de estreno en cines y fecha en la plataforma («Estreno en cines: … · En Netflix: …»).
+- Próximos rediseñado: fecha a la izquierda y tarjeta con la imagen del estreno, plataforma, qué es y un resumen. Se abre en «hoy».
+- Ahora también sale lo estrenado el último mes, para ver si tu proveedor ya lo ha subido.
+- En lugar de «Disponible», cada estreno tiene un botón: «Ver ahora», «Avísame», «Avísame cuando lo suban» o «Te avisaré».
