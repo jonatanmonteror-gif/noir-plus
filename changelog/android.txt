@@ -1,4 +1,3 @@
 Novedades de la próxima versión de Android (tele y móvil). Una línea por punto, empezando por «- ».
-- Nueva sección «Próximos»: estrenos de los próximos 3 meses (películas, series nuevas, temporadas y capítulos de tus series), por día y con filtro de plataforma.
-- Lo que ya ha subido tu proveedor sale como «Ya disponible»; toca para ir a la ficha.
-- Aviso «Nuevo capítulo disponible» cuando una serie que sigues (Mi lista o Continuar viendo) estrena capítulo y tu proveedor ya lo tiene.
+- Próximos: «Ya disponible» pasa al lado derecho de cada estreno; debajo del título queda la plataforma.
+- El aviso «Nuevo capítulo disponible» cabe bien en el móvil y se cierra con la ✕ o «Ahora no».

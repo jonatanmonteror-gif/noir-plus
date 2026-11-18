@@ -110,14 +110,15 @@ private fun UpcomingRow(s: Upcoming.Shown, onClick: () -> Unit) {
                     maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(Upcoming.label(up), color = if (focused) Color.Black.copy(alpha = 0.7f) else Col.Sub, fontSize = 13.sp,
                     maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (up.platform.isNotBlank()) Text(up.platform, color = if (focused) Color.Black.copy(alpha = 0.7f) else Col.Sub, fontSize = 12.sp)
-                    if (s.available) Text("Ya disponible", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(start = if (up.platform.isNotBlank()) 8.dp else 0.dp).clip(RoundedCornerShape(50))
-                            .background(if (focused) Col.Surface2.copy(alpha = 0.2f) else Color.White).padding(horizontal = 8.dp, vertical = 2.dp))
-                    else if (s.local != null) Text("En tu lista", color = if (focused) Color.Black.copy(alpha = 0.6f) else Col.Sub, fontSize = 11.sp,
-                        modifier = Modifier.padding(start = 8.dp))
-                }
+                if (up.platform.isNotBlank()) Text(up.platform, color = if (focused) Color.Black.copy(alpha = 0.7f) else Col.Sub, fontSize = 12.sp)
+            }
+            // A la derecha: si ya lo tiene tu proveedor
+            if (s.available || s.local != null) Column(Modifier.padding(start = 8.dp), horizontalAlignment = Alignment.End) {
+                Text(if (s.available) "Ya\ndisponible" else "En tu\nlista",
+                    color = if (s.available) (if (focused) Color.Black else Col.Text) else (if (focused) Color.Black.copy(alpha = 0.6f) else Col.Sub),
+                    fontSize = 11.sp, fontWeight = if (s.available) FontWeight.SemiBold else FontWeight.Normal, lineHeight = 13.sp,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.End)
+                if (s.available) Box(Modifier.padding(top = 4.dp).size(6.dp).clip(RoundedCornerShape(50)).background(if (focused) Color.Black else Color.White))
             }
         }
     }
@@ -151,23 +152,35 @@ fun NewEpisodeNotice() {
     }
     val (up, item) = queue.firstOrNull() ?: return
     fun next() { Upcoming.markNotified(up); queue = queue.drop(1) }
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopEnd) {
-        Row(
-            Modifier.padding(horizontal = 20.dp, vertical = 70.dp).clip(RoundedCornerShape(14.dp)).background(Col.Surface2.copy(alpha = 0.97f))
+    val compact = LocalDims.current.compact
+    Box(Modifier.fillMaxSize(), contentAlignment = if (compact) Alignment.TopCenter else Alignment.TopEnd) {
+        Column(
+            Modifier.padding(horizontal = if (compact) 12.dp else 20.dp, vertical = if (compact) 12.dp else 70.dp)
+                .then(if (compact) Modifier.fillMaxWidth() else Modifier.width(460.dp))
+                .clip(RoundedCornerShape(14.dp)).background(Col.Surface2.copy(alpha = 0.98f))
                 .padding(horizontal = 14.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
         ) {
-            up.poster?.let {
-                AsyncImage(it, null, contentScale = ContentScale.Crop, modifier = Modifier.size(width = 34.dp, height = 50.dp).clip(RoundedCornerShape(4.dp)))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                up.poster?.let {
+                    AsyncImage(it, null, contentScale = ContentScale.Crop, modifier = Modifier.size(width = 34.dp, height = 50.dp).clip(RoundedCornerShape(4.dp)))
+                }
+                Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                    Text("Nuevo capítulo disponible", color = Col.Text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    Text(up.name + (if (up.lastS > 0) " · T${up.lastS} E${up.lastE}" else ""), color = Col.Sub, fontSize = 12.sp, maxLines = 2,
+                        overflow = TextOverflow.Ellipsis)
+                }
+                // Cerrar siempre visible
+                Focusable(Modifier.size(32.dp), key = "ne-x", shape = RoundedCornerShape(50), focusScale = 1.1f, onClick = { next() }) { f ->
+                    Box(Modifier.fillMaxSize().background(if (f) Color.White else Color.White.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
+                        Text("✕", color = if (f) Color.Black else Col.Text, fontSize = 14.sp)
+                    }
+                }
             }
-            Column(Modifier.padding(horizontal = 12.dp)) {
-                Text("Nuevo capítulo disponible", color = Col.Text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                Text(up.name + (if (up.lastS > 0) " · T${up.lastS} E${up.lastE}" else ""), color = Col.Sub, fontSize = 12.sp, maxLines = 1,
-                    overflow = TextOverflow.Ellipsis, modifier = Modifier.width(220.dp))
+            Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.End) {
+                ActionButton("Ahora no", key = "ne-close") { next() }
+                Spacer(Modifier.width(8.dp))
+                ActionButton("Ver", primary = true, key = "ne-ver") { next(); nav.push(Screen.Detail(item)) }
             }
-            ActionButton("Ver", primary = true, key = "ne-ver") { next(); nav.push(Screen.Detail(item)) }
-            Spacer(Modifier.width(8.dp))
-            ActionButton("Cerrar", key = "ne-close") { next() }
         }
     }
 }
