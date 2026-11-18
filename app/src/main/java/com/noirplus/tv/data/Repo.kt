@@ -35,23 +35,52 @@ object Repo {
         dataVersion.intValue = dataVersion.intValue + 1
     }
 
-    data class RefreshStep(val kind: Kind, val count: Int?, val error: String? = null)
+    data class RefreshStep(val kind: Kind, val count: Int?, val error: String? = null, val new: Int? = null)
+
+    /** Horas fijas de actualización automática: cada 6 horas desde las 8 de la mañana. */
+    private val SLOTS = listOf(2, 8, 14, 20)
+
+    /** Momento de la última hora fija ya pasada (hoy o ayer). */
+    fun lastSlot(now: Long = System.currentTimeMillis()): Long {
+        val c = java.util.Calendar.getInstance().apply { timeInMillis = now; set(java.util.Calendar.MINUTE, 0); set(java.util.Calendar.SECOND, 0); set(java.util.Calendar.MILLISECOND, 0) }
+        val h = java.util.Calendar.getInstance().apply { timeInMillis = now }.get(java.util.Calendar.HOUR_OF_DAY)
+        val slot = SLOTS.lastOrNull { it <= h }
+        if (slot != null) c.set(java.util.Calendar.HOUR_OF_DAY, slot)
+        else { c.add(java.util.Calendar.DAY_OF_YEAR, -1); c.set(java.util.Calendar.HOUR_OF_DAY, SLOTS.last()) }
+        return c.timeInMillis
+    }
+
+    private var autoBusy = false
+
+    /** Si ha pasado una hora fija desde la última actualización, actualiza en segundo plano. */
+    suspend fun autoRefreshIfDue() {
+        if (source == null || autoBusy) return
+        if (prefs.lastListRefresh >= lastSlot()) return
+        autoBusy = true
+        try { refresh(null) } finally { autoBusy = false }
+    }
 
     /** Vuelve a descargar las listas indicadas (todas si kinds es null) y avisa del progreso. */
     suspend fun refresh(kinds: List<Kind>? = null, onStep: (RefreshStep) -> Unit = {}) {
         val src = source ?: return
         val list = kinds ?: Kind.entries.toList()
+        // Lo «nuevo» es lo que tu proveedor ha añadido desde la actualización anterior
+        val since = prefs.lastListRefresh
         Platforms.clear()
         if (kinds == null) src.clear(null) else list.forEach { src.clear(it) }
         for (k in list) {
             onStep(RefreshStep(k, null))
+            var newCount: Int? = null
             val r = runCatching {
                 src.categories(k)
-                src.all(k).size
+                val all = src.all(k)
+                if (since > 0) newCount = all.count { (if (it.added > 100_000_000_000L) it.added else it.added * 1000) > since }
+                all.size
             }
             r.exceptionOrNull()?.let { ErrorLog.note("Actualizar lista (${k.name})", it) }
-            onStep(RefreshStep(k, r.getOrNull(), r.exceptionOrNull()?.let { friendlyError(it) }))
+            onStep(RefreshStep(k, r.getOrNull(), r.exceptionOrNull()?.let { friendlyError(it) }, newCount))
         }
+        if (kinds == null) prefs.lastListRefresh = System.currentTimeMillis()
         loadedAt = System.currentTimeMillis()
         dataVersion.intValue = dataVersion.intValue + 1
     }
@@ -71,6 +100,8 @@ object Repo {
     fun rebuild() {
         dataVersion.intValue = dataVersion.intValue + 1
         loadedAt = System.currentTimeMillis()
+        // Al abrir, las listas se descargan nuevas: cuenta como actualización
+        if (::prefs.isInitialized) prefs.lastListRefresh = System.currentTimeMillis()
         val p = prefs
         source = when (p.type) {
             "xtream" -> XtreamSource(p.server, p.user, p.pass) { p.liveFormat }

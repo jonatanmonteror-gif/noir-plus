@@ -141,6 +141,11 @@ object Store {
     fun startMode(kind: Kind): String = s("start_${kind.name}").takeIf { it == "plat" || it == "genre" || it == "new" } ?: "new"
     fun setStartMode(kind: Kind, v: String) { o.put("start_${kind.name}", v); save() }
 
+    /** Última vez que se actualizaron todas las listas. */
+    var lastListRefresh: Long
+        get() = o.optLong("lastListRefresh", 0L)
+        set(v) { o.put("lastListRefresh", v); save() }
+
     /** Última versión cuyas novedades ya se han enseñado. */
     var notesSeen: Int
         get() = o.optInt("notesSeen", 0)

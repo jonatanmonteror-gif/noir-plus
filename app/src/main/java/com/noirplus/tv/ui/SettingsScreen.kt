@@ -137,7 +137,9 @@ fun SettingsContent() {
         scope.launch {
             val nf = java.text.NumberFormat.getIntegerInstance(java.util.Locale("es", "ES"))
             val done = mutableListOf<String>()
+            val news = mutableListOf<String>()
             Repo.refresh(kinds) { st ->
+                if (st.count != null && st.new != null) news += "${nf.format(st.new)} ${kindPlural(st.kind)}"
                 refreshStatus = when {
                     st.error != null -> "Error en ${kindPlural(st.kind)}: ${st.error}"
                     st.count == null -> (done + "actualizando ${kindPlural(st.kind)}…").joinToString("  ·  ")
@@ -147,7 +149,8 @@ fun SettingsContent() {
                     }
                 }
             }
-            refreshStatus = "Listo: " + done.joinToString("  ·  ")
+            refreshStatus = "Listo: " + done.joinToString("  ·  ") +
+                if (news.isNotEmpty()) "\nNuevo desde la última actualización: " + news.joinToString(", ") else ""
             refreshing = false
         }
     }

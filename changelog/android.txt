@@ -1,3 +1,5 @@
 Novedades de la próxima versión de Android (tele y móvil). Una línea por punto, empezando por «- ».
 - Tele: mantener pulsado en «Continuar viendo» ya no abre la película o serie; sale el menú normal con «Volver a empezar» y «Quitar de Continuar viendo».
 - Tele: al abrir cualquier menú manteniendo OK, soltar el botón ya no activa sin querer la primera opción (pasaba también en canales y carátulas).
+- Las listas se actualizan solas cada 6 horas (8:00, 14:00, 20:00 y 2:00) mientras la app está abierta o al volver a ella.
+- Al actualizar a mano (Ajustes → Actualizar listas) te dice cuánto hay de nuevo desde la última actualización.

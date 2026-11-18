@@ -83,6 +83,14 @@ private fun Shell() {
             kotlinx.coroutines.delay(180_000)
         }
     }
+    // Listas: se actualizan solas a horas fijas (8:00, 14:00, 20:00 y 2:00)
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(20_000)
+        while (true) {
+            runCatching { Repo.autoRefreshIfDue() }
+            kotlinx.coroutines.delay(10 * 60_000L)
+        }
+    }
 
     // Esc / Retroceso = volver atrás
     KeyHandler { e ->

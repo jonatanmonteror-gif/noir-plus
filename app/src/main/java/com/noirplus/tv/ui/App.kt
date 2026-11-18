@@ -170,6 +170,15 @@ fun App() {
                 mem.restore = false
             }
             if (top == Screen.Main) UpdateNotice()
+            // Actualización automática de las listas a horas fijas (8:00, 14:00, 20:00 y 2:00)
+            val resumes = Repo.resumeCount.intValue
+            LaunchedEffect(resumes) {
+                delay(8000)
+                while (true) {
+                    runCatching { Repo.autoRefreshIfDue() }
+                    delay(10 * 60_000L)
+                }
+            }
             if (top == Screen.Main) WhatsNewAfterUpdate()
             if (top == Screen.Main) NewEpisodeNotice()
             CrashNotice()
