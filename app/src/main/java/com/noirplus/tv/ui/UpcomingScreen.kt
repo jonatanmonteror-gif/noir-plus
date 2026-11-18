@@ -264,13 +264,17 @@ private fun UpcomingEntry(s: Upcoming.Shown, reminded: Boolean, today: Int, onCl
                             fontWeight = FontWeight.SemiBold, letterSpacing = 1.sp, maxLines = 1)
                         Text(up.name, color = Col.Text, fontSize = if (d.compact) 14.sp else 16.sp, fontWeight = FontWeight.Bold,
                             maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = if (d.compact) 18.sp else 20.sp)
-                        Text(Upcoming.label(up).uppercase(), color = Col.Text.copy(alpha = 0.75f), fontSize = if (d.compact) 10.sp else 11.sp,
-                            fontWeight = FontWeight.SemiBold, letterSpacing = 0.6.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        // Géneros, con la misma letra que el reparto de las fichas
-                        val kind = if (up.type == "tv") com.noirplus.tv.data.Kind.SERIES else com.noirplus.tv.data.Kind.MOVIE
-                        val gen = remember(up.genres) { up.genres.mapNotNull { com.noirplus.tv.data.Tmdb.genreNames(kind)[it] }.take(3).joinToString(" · ") }
-                        if (gen.isNotEmpty()) Text(gen, color = Col.Sub, fontSize = if (d.compact) 11.sp else 12.sp, maxLines = 1,
-                            overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 1.dp))
+                        // Tipo de estreno y, pegados debajo, los géneros (misma letra que el reparto de las fichas)
+                        Column {
+                            val lbl = if (d.compact && up.kind == "new") "Nueva serie" else Upcoming.label(up)
+                            Text(lbl.uppercase(), color = Col.Text.copy(alpha = 0.75f), fontSize = if (d.compact) 10.sp else 11.sp,
+                                fontWeight = FontWeight.SemiBold, letterSpacing = 0.6.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                                lineHeight = if (d.compact) 13.sp else 15.sp)
+                            val kind = if (up.type == "tv") com.noirplus.tv.data.Kind.SERIES else com.noirplus.tv.data.Kind.MOVIE
+                            val gen = remember(up.genres) { up.genres.mapNotNull { com.noirplus.tv.data.Tmdb.genreNames(kind)[it] }.take(3).joinToString(" · ") }
+                            if (gen.isNotEmpty()) Text(gen, color = Col.Sub, fontSize = if (d.compact) 11.sp else 12.sp, maxLines = 1,
+                                overflow = TextOverflow.Ellipsis, lineHeight = if (d.compact) 14.sp else 16.sp)
+                        }
                         Spacer(Modifier.weight(1f))
                         EntryButtons(s, st, onClick)
                     }

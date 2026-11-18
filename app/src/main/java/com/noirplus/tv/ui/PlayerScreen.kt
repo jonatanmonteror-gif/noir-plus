@@ -118,6 +118,10 @@ fun PlayerScreen(req: PlayRequest) {
     var error by remember { mutableStateOf<String?>(null) }
     var infoVisible by remember { mutableStateOf(true) }
     var controlsVisible by remember { mutableStateOf(false) }
+    // Avance rápido con el mando: 10 s, y si se vuelve a pulsar seguido 20, 50 y 100 s
+    val seek = remember { LongArray(3) } // [última pulsación, paso, 1 = modo avance]
+    var seekLabel by remember { mutableStateOf<String?>(null) }
+    var seekTick by remember { mutableIntStateOf(0) }
     var panelOpen by remember { mutableStateOf(false) }
     var panelSection by remember { mutableStateOf("all") }
     // Secciones desplegadas dentro de la ruedita (todas recogidas al abrir)
@@ -283,6 +287,40 @@ fun PlayerScreen(req: PlayRequest) {
             }
             return false
         }
+        // Izquierda / derecha: siempre avanzar o retroceder (salvo si has entrado en los controles con la flecha abajo)
+        if (dims.tv && (ev.keyCode == KeyEvent.KEYCODE_DPAD_LEFT || ev.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) &&
+            (!view.isControllerFullyVisible || seek[2] == 1L)
+        ) {
+            if (down && ev.repeatCount % 3 == 0) {
+                val now = System.currentTimeMillis()
+                val steps = longArrayOf(10, 20, 50, 100)
+                val fwd = ev.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
+                val same = seek[2] == 1L && now - seek[0] < 1800 && (seek[1] > 0) == fwd
+                val i = if (same) (kotlin.math.abs(seek[1]).toInt() + 1).coerceAtMost(steps.size - 1) else 0
+                seek[0] = now; seek[1] = if (fwd) i.toLong() + 1 else -(i.toLong() + 1); seek[2] = 1L
+                if (!fwd) seek[1] = -(i.toLong() + 1)
+                val ms = steps[i] * 1000
+                val dur = exo.duration.takeIf { it > 0 } ?: Long.MAX_VALUE
+                exo.seekTo(if (fwd) (exo.currentPosition + ms).coerceAtMost(dur - 1000) else (exo.currentPosition - ms).coerceAtLeast(0))
+                seekLabel = (if (fwd) "» +" else "« −") + "${steps[i]} s"
+                seekTick++
+                view.showController()
+            }
+            return true
+        }
+        // Flecha abajo: abre los controles (pausa, opciones…) y ahí las flechas ya se mueven por los botones
+        if (dims.tv && ev.keyCode == KeyEvent.KEYCODE_DPAD_DOWN && (!view.isControllerFullyVisible || seek[2] == 1L)) {
+            if (down && ev.repeatCount == 0) {
+                seek[2] = 0L
+                view.showController()
+                view.post { view.findViewById<View>(androidx.media3.ui.R.id.exo_play_pause)?.requestFocus() }
+            }
+            return true
+        }
+        if (seek[2] == 1L && (ev.keyCode == KeyEvent.KEYCODE_DPAD_CENTER || ev.keyCode == KeyEvent.KEYCODE_ENTER)) {
+            if (down && ev.repeatCount == 0) { if (exo.isPlaying) exo.pause() else exo.play() }
+            return true
+        }
         if (!view.isControllerFullyVisible) {
             when (ev.keyCode) {
                 // OK del centro: pausa / reanuda sin abrir los controles
@@ -297,7 +335,7 @@ fun PlayerScreen(req: PlayRequest) {
                     if (down && ev.repeatCount == 0) openPanel("audio")
                     return true
                 }
-                // Flecha abajo: elegir subtítulos
+                // Flecha abajo (móvil con mando): elegir subtítulos
                 KeyEvent.KEYCODE_DPAD_DOWN -> {
                     if (down && ev.repeatCount == 0) openPanel("cc")
                     return true
@@ -353,6 +391,10 @@ fun PlayerScreen(req: PlayRequest) {
     }
 
     LaunchedEffect(speed) { exo.setPlaybackSpeed(speed) }
+
+    LaunchedEffect(seekTick) {
+        if (seekTick > 0) { delay(1400); seekLabel = null }
+    }
 
     LaunchedEffect(formatToast) {
         if (formatToast > 0) {
@@ -480,8 +522,13 @@ fun PlayerScreen(req: PlayRequest) {
                         // La ruedita solo aparece si queda algo dentro (lo que es botón no se repite en ella)
                         if (QuickKeys.any { !prefs.quick(it) }) add(com.noirplus.tv.R.drawable.ic_gear, "Opciones") { openPanel("all") }
                     }
+                    // En la tele la barra de progreso no se puede seleccionar con el mando (se avanza con izquierda/derecha)
+                    if (dims.tv) findViewById<View>(androidx.media3.ui.R.id.exo_progress)?.apply { isFocusable = false; isFocusableInTouchMode = false }
                     setControllerVisibilityListener(
-                        PlayerView.ControllerVisibilityListener { v -> controlsVisible = v == View.VISIBLE }
+                        PlayerView.ControllerVisibilityListener { v ->
+                            controlsVisible = v == View.VISIBLE
+                            if (v != View.VISIBLE) seek[2] = 0L
+                        }
                     )
                     if (!dims.tv) {
                         // Gestos: mitad izquierda = brillo, mitad derecha = volumen (arrastrar arriba/abajo)
@@ -581,6 +628,16 @@ fun PlayerScreen(req: PlayRequest) {
                 ResizeModes[resize].second,
                 Modifier.clip(RoundedCornerShape(50)).background(Color.Black.copy(alpha = 0.65f)).padding(horizontal = 18.dp, vertical = 8.dp),
                 color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+            )
+        }
+
+        // Cuánto se ha avanzado o retrocedido con el mando
+        seekLabel?.let { lbl ->
+            Text(
+                lbl,
+                Modifier.align(Alignment.Center).clip(RoundedCornerShape(50)).background(Color.Black.copy(alpha = 0.65f))
+                    .padding(horizontal = 22.dp, vertical = 10.dp),
+                color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold,
             )
         }
 
