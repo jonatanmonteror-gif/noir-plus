@@ -40,6 +40,22 @@ jobs:
         env:
           RUN_NUMBER: ${{ github.run_number }}
 
+      - name: Prueba de arranque (no se publica si no abre)
+        shell: pwsh
+        run: |
+          $app = Get-ChildItem -Recurse desktop/build/compose/binaries/main/app -Filter NoirPlus.exe | Select-Object -First 1
+          Write-Host "Arrancando $($app.FullName)"
+          $p = Start-Process -FilePath $app.FullName -PassThru -RedirectStandardOutput out.txt -RedirectStandardError err.txt
+          Start-Sleep -Seconds 40
+          $alive = -not $p.HasExited
+          Write-Host "Sigue abierto tras 40 s: $alive"
+          Get-Content out.txt -ErrorAction SilentlyContinue | Select-Object -Last 40
+          Get-Content err.txt -ErrorAction SilentlyContinue | Select-Object -Last 80
+          $log = Join-Path $env:APPDATA 'NoirPlus/errors.log'
+          if (Test-Path $log) { Write-Host '--- errors.log ---'; Get-Content $log | Select-Object -Last 80 }
+          Get-ChildItem -Recurse -Filter 'hs_err*.log' -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "--- $($_.FullName) ---"; Get-Content $_.FullName | Select-Object -First 60 }
+          if ($alive) { Stop-Process -Id $p.Id -Force } else { Write-Host "Código de salida: $($p.ExitCode)"; exit 1 }
+
       - name: Preparar instalador y huella SHA-256
         shell: pwsh
         run: |
