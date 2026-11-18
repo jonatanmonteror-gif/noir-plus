@@ -167,7 +167,7 @@ private fun EntryButtons(s: Upcoming.Shown, st: UpState, onAction: () -> Unit) {
     val compact = LocalDims.current.compact
     val action: @Composable () -> Unit = {
         Focusable(key = "upa/${Upcoming.remindKey(s.up)}", shape = RoundedCornerShape(50), focusScale = 1.08f, onClick = onAction) { f ->
-            ActionPill(st, focused = f, short = compact)
+            ActionPill(st, focused = f, short = true)
         }
     }
     val trailer: @Composable () -> Unit = {
@@ -176,23 +176,23 @@ private fun EntryButtons(s: Upcoming.Shown, st: UpState, onAction: () -> Unit) {
                 val url = runCatching { com.noirplus.tv.data.Tmdb.trailerById(s.up.type, s.up.id) }.getOrNull()
                 openTrailer(ctx, url, s.up.name)
             }
-        }) { f -> TrailerPill(f) }
+        }) { f -> TrailerPill(f, iconOnly = compact) }
     }
-    // Uno encima del otro (Tráiler arriba) para que nada se corte, también en dos columnas
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) { trailer(); action() }
+    // Uno al lado del otro: primero el aviso y luego el tráiler (en el móvil el tráiler solo con su icono)
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) { action(); trailer() }
 }
 
 @Composable
-private fun TrailerPill(focused: Boolean) {
+private fun TrailerPill(focused: Boolean, iconOnly: Boolean = false) {
     val fg = if (focused) Color.Black else Col.Text
     Row(
         Modifier.clip(RoundedCornerShape(50)).background(if (focused) Color.White else Color.Transparent)
             .border(1.dp, if (focused) Color.White else Color.White.copy(alpha = 0.3f), RoundedCornerShape(50))
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            .padding(horizontal = if (iconOnly) 9.dp else 12.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        androidx.compose.material3.Icon(TrailerIcon, null, tint = fg, modifier = Modifier.size(15.dp))
-        Text("Tráiler", color = fg, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, softWrap = false,
+        androidx.compose.material3.Icon(TrailerIcon, "Tráiler", tint = fg, modifier = Modifier.size(15.dp))
+        if (!iconOnly) Text("Tráiler", color = fg, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, softWrap = false,
             modifier = Modifier.padding(start = 5.dp))
     }
 }
@@ -235,7 +235,7 @@ private fun UpcomingEntry(s: Upcoming.Shown, reminded: Boolean, today: Int, onCl
         Box(Modifier.weight(1f).clip(RoundedCornerShape(14.dp)).background(Col.Surface)) {
             // Portada vertical completa (sin recortar) y, detrás del texto, la imagen ancha muy oscurecida
             val poster = up.poster ?: up.backdrop
-            val rowH = if (d.compact) 196.dp else 212.dp
+            val rowH = if (d.compact) 150.dp else 160.dp
             up.backdrop?.let {
                 AsyncImage(it, null, contentScale = ContentScale.Crop, alpha = 0.22f, modifier = Modifier.matchParentSize())
                 Box(Modifier.matchParentSize().background(
@@ -245,20 +245,25 @@ private fun UpcomingEntry(s: Upcoming.Shown, reminded: Boolean, today: Int, onCl
                 Box(Modifier.fillMaxHeight().aspectRatio(2f / 3f).background(Col.Surface2)) {
                     poster?.let { AsyncImage(it, null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize()) }
                 }
-                Column(
-                    Modifier.weight(1f).fillMaxHeight().padding(horizontal = if (d.compact) 12.dp else 20.dp, vertical = if (d.compact) 10.dp else 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(if (d.compact) 3.dp else 5.dp),
-                ) {
-                    if (up.platform.isNotBlank()) Text(up.platform.uppercase(), color = Col.Sub, fontSize = 10.sp,
-                        fontWeight = FontWeight.SemiBold, letterSpacing = 1.sp, maxLines = 1)
-                    Text(up.name, color = Col.Text, fontSize = if (d.compact) 15.sp else 18.sp, fontWeight = FontWeight.Bold,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(Upcoming.label(up), color = Col.Text.copy(alpha = 0.8f), fontSize = if (d.compact) 12.sp else 14.sp,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    if (up.overview.isNotBlank()) Text(up.overview, color = Col.Sub, fontSize = if (d.compact) 11.sp else 13.sp,
-                        maxLines = if (d.compact) 1 else 2, overflow = TextOverflow.Ellipsis, lineHeight = if (d.compact) 15.sp else 18.sp)
-                    Spacer(Modifier.weight(1f))
-                    EntryButtons(s, st, onClick)
+                // Logo de la plataforma arriba a la derecha (si no hay logo, el nombre encima del título)
+                val logo by produceState<String?>(null, up.platform) {
+                    value = if (up.platform.isBlank()) null else runCatching { com.noirplus.tv.data.Tmdb.logo(up.platform) }.getOrNull()
+                }
+                Row(Modifier.weight(1f).fillMaxHeight().padding(start = if (d.compact) 12.dp else 18.dp, end = 12.dp, top = 12.dp, bottom = 12.dp)) {
+                    Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        if (logo == null && up.platform.isNotBlank()) Text(up.platform.uppercase(), color = Col.Sub, fontSize = 10.sp,
+                            fontWeight = FontWeight.SemiBold, letterSpacing = 1.sp, maxLines = 1)
+                        Text(up.name, color = Col.Text, fontSize = if (d.compact) 15.sp else 18.sp, fontWeight = FontWeight.Bold,
+                            maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = if (d.compact) 19.sp else 22.sp)
+                        Text(Upcoming.label(up), color = Col.Text.copy(alpha = 0.8f), fontSize = if (d.compact) 12.sp else 13.sp,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Spacer(Modifier.weight(1f))
+                        EntryButtons(s, st, onClick)
+                    }
+                    logo?.let {
+                        AsyncImage(it, up.platform, contentScale = ContentScale.Fit,
+                            modifier = Modifier.padding(start = 8.dp).size(if (d.compact) 30.dp else 36.dp).clip(RoundedCornerShape(8.dp)))
+                    }
                 }
             }
         }
