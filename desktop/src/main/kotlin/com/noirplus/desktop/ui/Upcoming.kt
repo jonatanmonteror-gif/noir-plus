@@ -47,10 +47,10 @@ fun UpcomingScreen() {
         Row(Modifier.fillMaxWidth().padding(start = 40.dp, end = 40.dp, top = 24.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("Próximos estrenos", color = Col.Text, fontSize = 34.sp, fontFamily = InterDisplay, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
         }
-        LazyRow(contentPadding = PaddingValues(horizontal = 40.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(bottom = 6.dp)) {
+        LazyRow(contentPadding = PaddingValues(horizontal = 40.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(bottom = 18.dp)) {
             items(TYPES, key = { it.first }) { (k, l) -> UpChip(l, type == k) { type = k } }
         }
-        LazyRow(contentPadding = PaddingValues(horizontal = 40.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(bottom = 8.dp)) {
+        LazyRow(contentPadding = PaddingValues(horizontal = 40.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(bottom = 14.dp)) {
             items(Tmdb.platforms, key = { "p:$it" }) { p -> UpChip(p, p in plats, small = true) { plats = if (p in plats) plats - p else plats + p } }
         }
         Text("Próximos 3 meses. Haz clic en un estreno y te aviso cuando tu proveedor lo suba. «Mis capítulos»: de las series que sigues.", color = Col.Sub, fontSize = 12.sp,

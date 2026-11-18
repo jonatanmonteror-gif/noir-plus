@@ -2,3 +2,4 @@ Novedades de la próxima versión de Windows. Una línea por punto, empezando po
 - Próximos: haz clic en un estreno y te avisamos cuando tu proveedor lo suba (aparece una campana); otro clic quita el aviso.
 - Al abrir (y cada 30 minutos) sale «Ya está disponible» con lo que tenías marcado y ya puedes ver.
 - «Disponible» / «Pendiente» van ahora en la línea del título.
+- Más separación entre las pestañas (Todo, Películas…) y las de plataformas.
