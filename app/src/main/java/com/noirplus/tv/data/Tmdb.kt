@@ -363,6 +363,11 @@ object Tmdb {
             id = get("/search/$type", "query=${enc(q)}&include_adult=false$yp")?.optJSONArray("results")
                 ?.optJSONObject(0)?.optString("id")?.takeIf { it.isNotBlank() } ?: return null
         }
+        return trailerById(type, id)
+    }
+
+    /** Tráiler en español (de España si lo hay) de un título de TMDB. */
+    suspend fun trailerById(type: String, id: String): String? {
         val arr = get("/$type/$id/videos", "include_video_language=es")?.optJSONArray("results") ?: return null
         val vids = (0 until arr.length()).mapNotNull { arr.optJSONObject(it) }
             .filter { it.optString("site") == "YouTube" && it.optString("iso_639_1") == "es" && it.optString("key").isNotBlank() }

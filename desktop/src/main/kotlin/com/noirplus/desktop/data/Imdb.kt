@@ -159,6 +159,21 @@ object Imdb {
         return if (imdb.startsWith("tt")) lookup(imdb) else null
     }
 
+    /** Tráiler en español (de España si lo hay) en YouTube; si no hay, una búsqueda en YouTube. */
+    suspend fun trailerUrl(type: String, id: String, title: String): String = withContext(Dispatchers.IO) {
+        val best = runCatching {
+            val arr = tmdbJson("$type/$id/videos", mapOf("include_video_language" to "es"))?.optJSONArray("results")
+            (0 until (arr?.length() ?: 0)).mapNotNull { arr!!.optJSONObject(it) }
+                .filter { it.optString("site") == "YouTube" && it.optString("iso_639_1") == "es" && it.optString("key").isNotBlank() }
+                .minByOrNull {
+                    (if (it.optString("iso_3166_1") == "ES") 0 else 10) +
+                        when (it.optString("type")) { "Trailer" -> 0; "Teaser" -> 3; else -> 6 } + (if (it.optBoolean("official")) 0 else 1)
+                }
+        }.getOrNull()
+        best?.let { "https://www.youtube.com/watch?v=" + it.optString("key") }
+            ?: ("https://www.youtube.com/results?search_query=" + java.net.URLEncoder.encode("$title tráiler español", "UTF-8"))
+    }
+
     private val datesCache = ConcurrentHashMap<String, Pair<Int, Int>>()
 
     /** Películas: (estreno en cines en España, estreno en plataformas/digital en España), aaaammdd o 0. */

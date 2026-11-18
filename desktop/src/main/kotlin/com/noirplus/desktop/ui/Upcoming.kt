@@ -34,6 +34,9 @@ import com.noirplus.desktop.data.Repo
 import com.noirplus.desktop.data.Tmdb
 import com.noirplus.desktop.data.Upcoming
 import kotlinx.coroutines.delay
+import com.noirplus.desktop.data.Imdb
+import androidx.compose.material.icons.filled.Movie
+import kotlinx.coroutines.launch
 
 private val TYPES = listOf("all" to "Todo", "film" to "Películas", "new" to "Series nuevas", "season" to "Temporadas", "episode" to "Mis capítulos")
 
@@ -108,11 +111,12 @@ private fun UpEntry(s: Upcoming.Shown, reminded: Boolean, today: Int, showDate: 
             }
         }
         Row(
-            Modifier.weight(1f).height(160.dp).clip(RoundedCornerShape(14.dp)).background(if (hovered) Color(0xFF2A2A30) else Col.Surface)
+            Modifier.weight(1f).height(180.dp).clip(RoundedCornerShape(14.dp)).background(if (hovered) Color(0xFF2A2A30) else Col.Surface)
                 .hoverable(src).clickable(interactionSource = src, indication = null) { onClick() }.pointerHoverIcon(PointerIcon.Hand),
         ) {
-            Box(Modifier.fillMaxHeight().aspectRatio(16f / 9f).background(Color(0xFF2A2A2E))) {
-                (up.backdrop ?: up.poster)?.let { AsyncImage(it, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
+            // Portada completa (vertical), sin recortar
+            Box(Modifier.fillMaxHeight().aspectRatio(2f / 3f).background(Color(0xFF2A2A2E))) {
+                (up.poster ?: up.backdrop)?.let { AsyncImage(it, null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize()) }
                 if (up.platform.isNotBlank()) Text(up.platform, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.align(Alignment.TopStart).padding(8.dp).clip(RoundedCornerShape(6.dp)).background(Color.Black.copy(alpha = 0.7f))
                         .padding(horizontal = 7.dp, vertical = 3.dp))
@@ -122,7 +126,24 @@ private fun UpEntry(s: Upcoming.Shown, reminded: Boolean, today: Int, showDate: 
                 Text(Upcoming.label(up), color = Col.Sub, fontSize = 13.sp, maxLines = 1)
                 if (up.overview.isNotBlank()) Text(up.overview, color = Col.Sub, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 17.sp)
                 Spacer(Modifier.weight(1f))
-                ActionPill(s, reminded, today)
+                val scope = rememberCoroutineScope()
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    ActionPill(s, reminded, today)
+                    // Tráiler en español (se abre en el navegador)
+                    Row(
+                        Modifier.clip(RoundedCornerShape(50)).border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(50))
+                            .clickable {
+                                scope.launch {
+                                    val url = Imdb.trailerUrl(up.type, up.id, up.name)
+                                    runCatching { java.awt.Desktop.getDesktop().browse(java.net.URI(url)) }
+                                }
+                            }.pointerHoverIcon(PointerIcon.Hand).padding(horizontal = 12.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Filled.Movie, null, tint = Col.Text, modifier = Modifier.size(15.dp))
+                        Text("Tráiler", color = Col.Text, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 5.dp))
+                    }
+                }
             }
         }
     }

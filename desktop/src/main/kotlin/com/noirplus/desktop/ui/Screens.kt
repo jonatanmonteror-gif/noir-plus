@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+
 package com.noirplus.desktop.ui
 
 import androidx.compose.foundation.background
@@ -168,10 +170,23 @@ fun HomeScreen() {
         }
         if (history.isNotEmpty()) item(key = "h") {
             SectionTitle("Continuar viendo")
+            Text("Clic derecho en uno para volver a empezar o quitarlo.", color = Col.Sub, fontSize = 12.sp, modifier = Modifier.padding(start = 40.dp, bottom = 6.dp))
             ScrollRow(history, { it.key }) { p ->
-                WideCard(p.title, p.image, p.fraction) {
-                    nav.push(Screen.Player(PlayRequest(url = p.url, title = p.title, key = p.key, image = p.image, isLive = false,
-                        startMs = p.position, parent = p.parent)))
+                // Clic derecho: volver a empezar o quitarlo de la fila
+                androidx.compose.foundation.ContextMenuArea(items = {
+                    listOf(
+                        androidx.compose.foundation.ContextMenuItem("Volver a empezar") {
+                            Store.removeProgress(p.key)
+                            nav.push(Screen.Player(PlayRequest(url = p.url, title = p.title, key = p.key, image = p.image, isLive = false,
+                                startMs = 0, parent = p.parent)))
+                        },
+                        androidx.compose.foundation.ContextMenuItem("Quitar de Continuar viendo") { Store.removeProgress(p.key) },
+                    )
+                }) {
+                    WideCard(p.title, p.image, p.fraction) {
+                        nav.push(Screen.Player(PlayRequest(url = p.url, title = p.title, key = p.key, image = p.image, isLive = false,
+                            startMs = p.position, parent = p.parent)))
+                    }
                 }
             }
         }

@@ -1,4 +1,3 @@
 Novedades de la próxima versión de Windows. Una línea por punto, empezando por «- ».
-- Próximos rediseñado: fecha a la izquierda y tarjeta con la imagen del estreno, plataforma, qué es y un resumen. Se abre en «hoy».
-- Ahora también sale lo estrenado el último mes, para ver si tu proveedor ya lo ha subido.
-- En lugar de «Disponible», cada estreno tiene un botón: «Ver ahora», «Avísame», «Avísame cuando lo suban» o «Te avisaré».
+- Próximos: portada completa (sin recortar) y botón «Tráiler» en español en cada estreno.
+- Continuar viendo: clic derecho para «Volver a empezar» o «Quitar de Continuar viendo».

@@ -47,6 +47,7 @@ import com.noirplus.tv.data.Platforms
 import com.noirplus.tv.data.Repo
 import com.noirplus.tv.data.Upcoming
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 private val TYPES = listOf("all" to "Todo", "film" to "Películas", "new" to "Series nuevas", "season" to "Temporadas", "episode" to "Mis capítulos")
 
@@ -68,8 +69,6 @@ fun UpcomingContent() {
     var remindVer by remember { mutableStateOf(0) }
     val remindedKeys = remember(remindVer, changes) { Upcoming.reminders().map { Upcoming.remindKey(it) }.toSet() }
     val today = Upcoming.today()
-    // «Calendario» (con imagen, por defecto) o «Compacta»
-    val compactView = Repo.prefs.str("upView2", "cal") == "list"
     val onPick: (Upcoming.Shown) -> Unit = { s ->
         if (s.available && s.local != null) nav.push(Screen.Detail(s.local))
         else { Upcoming.toggleReminder(s.up); remindVer++ }
@@ -93,9 +92,6 @@ fun UpcomingContent() {
             }
             Row(Modifier.padding(start = 4.dp, end = d.edge), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 PlatformButton(plats, Platforms.main) { p -> platsRaw = Platforms.main.filter { it in p }.joinToString("|") }
-                RoundIconButton(if (compactView) GridIcon else ListIcon, if (compactView) "Vista con imágenes" else "Vista compacta") {
-                    Repo.prefs.putStr("upView2", if (compactView) "cal" else "list")
-                }
             }
         }
         Text(
@@ -110,17 +106,11 @@ fun UpcomingContent() {
         LaunchedEffect(shown) { runCatching { state.scrollToItem(todayIndex) } }
         LazyColumn(Modifier.fillMaxSize(), state = state,
             contentPadding = PaddingValues(start = d.edge, end = d.edge, top = 8.dp, bottom = d.bottomPad),
-            verticalArrangement = Arrangement.spacedBy(if (compactView) 6.dp else 14.dp)) {
+            verticalArrangement = Arrangement.spacedBy(14.dp)) {
             itemsIndexed(shown, key = { i, s -> "$i:${s.up.key}:${s.up.season}:${s.up.episode}:${s.up.date}" }) { i, s ->
                 val firstOfDay = i == 0 || shown[i - 1].up.date != s.up.date
                 val reminded = remindedKeys.contains(Upcoming.remindKey(s.up))
-                if (compactView) {
-                    if (firstOfDay) Text(dayLabel(s.up.date, today), color = if (s.up.date < today) Col.Sub else Col.Text, fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 12.dp, bottom = 2.dp))
-                    UpcomingRow(s, reminded, today) { onPick(s) }
-                } else {
-                    UpcomingEntry(s, reminded, today, showDate = firstOfDay) { onPick(s) }
-                }
+                UpcomingEntry(s, reminded, today, showDate = firstOfDay) { onPick(s) }
             }
         }
     }
@@ -136,7 +126,39 @@ private fun stateOf(s: Upcoming.Shown, reminded: Boolean, today: Int): UpState =
     else -> UpState.REMIND
 }
 
-/** Botón de acción del estreno (como «Recordarme» de las plataformas). */
+/** Botones del estreno: acción (Ver ahora / Avísame) y Tráiler. */
+@Composable
+private fun EntryButtons(s: Upcoming.Shown, st: UpState, onAction: () -> Unit) {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Focusable(key = "upa/${Upcoming.remindKey(s.up)}", shape = RoundedCornerShape(50), focusScale = 1.08f, onClick = onAction) { f ->
+            ActionPill(st, focused = f)
+        }
+        Focusable(key = "upt/${Upcoming.remindKey(s.up)}", shape = RoundedCornerShape(50), focusScale = 1.08f, onClick = {
+            scope.launch {
+                val url = runCatching { com.noirplus.tv.data.Tmdb.trailerById(s.up.type, s.up.id) }.getOrNull()
+                openTrailer(ctx, url, s.up.name)
+            }
+        }) { f -> TrailerPill(f) }
+    }
+}
+
+@Composable
+private fun TrailerPill(focused: Boolean) {
+    val fg = if (focused) Color.Black else Col.Text
+    Row(
+        Modifier.clip(RoundedCornerShape(50)).background(if (focused) Color.White else Color.Transparent)
+            .border(1.dp, if (focused) Color.White else Color.White.copy(alpha = 0.3f), RoundedCornerShape(50))
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        androidx.compose.material3.Icon(TrailerIcon, null, tint = fg, modifier = Modifier.size(15.dp))
+        Text("Tráiler", color = fg, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 5.dp))
+    }
+}
+
+/** Aspecto del botón de acción (como «Recordarme» de las plataformas). */
 @Composable
 private fun ActionPill(st: UpState, focused: Boolean, small: Boolean = false) {
     val (txt, filled) = when (st) {
@@ -145,11 +167,11 @@ private fun ActionPill(st: UpState, focused: Boolean, small: Boolean = false) {
         UpState.REMIND_UPLOAD -> (if (small) "Aún no subido" else "Avísame cuando lo suban") to false
         UpState.REMIND -> "Avísame" to false
     }
-    val fg = if (filled) Color.Black else if (focused) Color.Black else Col.Text
+    val fg = if (filled || focused) Color.Black else Col.Text
     Row(
         Modifier.clip(RoundedCornerShape(50))
-            .background(if (filled) Color.White else if (focused) Color.Black.copy(alpha = 0.08f) else Color.Transparent)
-            .then(if (filled) Modifier else androidx.compose.ui.Modifier.border(1.dp, if (focused) Color.Black.copy(alpha = 0.35f) else Color.White.copy(alpha = 0.3f), RoundedCornerShape(50)))
+            .background(if (filled || focused) Color.White else Color.Transparent)
+            .then(if (filled || focused) Modifier else Modifier.border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(50)))
             .padding(horizontal = if (small) 9.dp else 12.dp, vertical = if (small) 4.dp else 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -181,10 +203,9 @@ private fun UpcomingEntry(s: Upcoming.Shown, reminded: Boolean, today: Int, show
                     fontWeight = FontWeight.Bold, fontFamily = InterDisplay)
             }
         }
-        Focusable(Modifier.weight(1f), key = "upe/${up.key}/${up.season}/${up.episode}", shape = RoundedCornerShape(14.dp),
-            focusScale = 1.08f, onClick = onClick) { focused ->
+        Box(Modifier.weight(1f).clip(RoundedCornerShape(14.dp))) {
             val img = up.backdrop ?: up.poster
-            val textCol = if (focused && !d.tv) Color.Black else Col.Text
+            val textCol = Col.Text
             if (d.compact) {
                 Column(Modifier.fillMaxWidth().background(Col.Surface)) {
                     Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(Col.Surface2)) {
@@ -196,11 +217,11 @@ private fun UpcomingEntry(s: Upcoming.Shown, reminded: Boolean, today: Int, show
                         Text(Upcoming.label(up), color = Col.Sub, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         if (up.overview.isNotBlank()) Text(up.overview, color = Col.Sub, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
                             lineHeight = 16.sp)
-                        Box(Modifier.padding(top = 6.dp)) { ActionPill(st, focused = false) }
+                        Box(Modifier.padding(top = 6.dp)) { EntryButtons(s, st, onClick) }
                     }
                 }
             } else {
-                Row(Modifier.fillMaxWidth().height(150.dp).background(if (focused) Col.Surface2 else Col.Surface)) {
+                Row(Modifier.fillMaxWidth().height(150.dp).background(Col.Surface)) {
                     Box(Modifier.fillMaxHeight().aspectRatio(16f / 9f).background(Col.Surface2)) {
                         img?.let { AsyncImage(it, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
                         if (up.platform.isNotBlank()) PlatformTag(up.platform, Modifier.align(Alignment.TopStart).padding(8.dp))
@@ -211,7 +232,7 @@ private fun UpcomingEntry(s: Upcoming.Shown, reminded: Boolean, today: Int, show
                         if (up.overview.isNotBlank()) Text(up.overview, color = Col.Sub, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
                             lineHeight = 16.sp)
                         Spacer(Modifier.weight(1f))
-                        ActionPill(st, focused = false)
+                        EntryButtons(s, st, onClick)
                     }
                 }
             }
@@ -224,27 +245,6 @@ private fun UpcomingEntry(s: Upcoming.Shown, reminded: Boolean, today: Int, show
 private fun PlatformTag(name: String, modifier: Modifier) {
     Text(name, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
         modifier = modifier.clip(RoundedCornerShape(6.dp)).background(Color.Black.copy(alpha = 0.7f)).padding(horizontal = 7.dp, vertical = 3.dp))
-}
-
-/** Vista compacta: una fila por estreno. */
-@Composable
-private fun UpcomingRow(s: Upcoming.Shown, reminded: Boolean, today: Int, onClick: () -> Unit) {
-    val up = s.up
-    val st = stateOf(s, reminded, today)
-    Focusable(Modifier.fillMaxWidth().height(84.dp), key = "up/${up.key}/${up.season}/${up.episode}", shape = RoundedCornerShape(12.dp),
-        focusScale = 1.08f, onClick = onClick) { focused ->
-        Row(Modifier.fillMaxSize().background(if (focused) Col.Surface2 else Col.Surface).padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.width(46.dp).height(68.dp).clip(RoundedCornerShape(6.dp)).background(Col.Surface2)) {
-                up.poster?.let { AsyncImage(it, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
-            }
-            Column(Modifier.weight(1f).padding(start = 12.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text(up.name, color = Col.Text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(Upcoming.label(up) + if (up.platform.isNotBlank()) "  ·  ${up.platform}" else "", color = Col.Sub, fontSize = 12.sp,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-            Box(Modifier.padding(start = 8.dp)) { ActionPill(st, focused = false, small = true) }
-        }
-    }
 }
 
 private val DAYS = listOf("domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado")

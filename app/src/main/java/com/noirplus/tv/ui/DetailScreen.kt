@@ -595,7 +595,7 @@ private fun rememberTrailer(item: Item, tmdbId: () -> String?): () -> Unit {
     }
 }
 
-private fun openTrailer(ctx: android.content.Context, url: String?, title: String) {
+internal fun openTrailer(ctx: android.content.Context, url: String?, title: String) {
     fun start(i: android.content.Intent): Boolean = runCatching {
         ctx.startActivity(i.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)); true
     }.getOrDefault(false)

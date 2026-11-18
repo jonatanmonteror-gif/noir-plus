@@ -51,6 +51,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
@@ -86,8 +87,9 @@ fun MainScreen() {
 @Composable
 private fun BigScreenMain() {
     val d = LocalDims.current
-    var tab by rememberSaveable { mutableStateOf(Tab.HOME) }
-    var shown by rememberSaveable { mutableStateOf(Tab.HOME) }
+    // Se guarda fuera de la pantalla: al volver de una ficha sigues en la misma pestaña
+    var tab by TvTabs.tab
+    var shown by TvTabs.shown
     val requesters = remember { Tab.entries.associateWith { FocusRequester() } }
     val mem = LocalFocusMemory.current
     var hasFocus by remember { mutableStateOf(false) }
@@ -113,8 +115,8 @@ private fun BigScreenMain() {
                 Greeting(Modifier.padding(top = 2.dp))
             }
             Row(
-                Modifier.background(Col.Surface.copy(alpha = 0.85f), RoundedCornerShape(50)).padding(4.dp).focusRestorer(),
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                Modifier.focusRestorer(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Tab.entries.filter { it != Tab.RATINGS || Repo.prefs.ratingsEnabled }.forEach { t ->
                     TabItem(t.label, selected = t == tab, requester = requesters.getValue(t), onSelect = { tab = t })
@@ -140,35 +142,38 @@ private fun BigScreenMain() {
 
 @Composable
 private fun TabItem(label: String, selected: Boolean, requester: FocusRequester, onSelect: () -> Unit) {
+    // Solo texto; debajo de la pestaña en la que estás, una franja
     Focusable(
         key = "tab:$label",
         focusRequester = requester,
-        shape = RoundedCornerShape(50),
+        shape = RoundedCornerShape(8.dp),
         focusScale = 1f,
         onFocus = onSelect,
         onClick = onSelect,
     ) { focused ->
-        Text(
-            label,
-            Modifier
-                .background(
-                    when {
-                        focused -> Color.White
-                        selected -> Col.Surface2
-                        else -> Color.Transparent
-                    },
-                    RoundedCornerShape(50),
-                )
-                .padding(horizontal = 18.dp, vertical = 7.dp),
-            color = when {
-                focused -> Color.Black
-                selected -> Col.Text
-                else -> Col.Sub
-            },
-            fontWeight = FontWeight.Medium,
-            fontSize = 15.sp,
-        )
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                label,
+                color = when {
+                    focused || selected -> Col.Text
+                    else -> Col.Sub
+                },
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                fontSize = 16.sp,
+            )
+            Spacer(Modifier.height(6.dp))
+            Box(
+                Modifier.width(if (selected || focused) 22.dp else 0.dp).height(3.dp).clip(RoundedCornerShape(50))
+                    .background(if (focused) Color.White else Color.White.copy(alpha = 0.75f))
+            )
+        }
     }
+}
+
+/** Pestaña de la tele, guardada fuera de la pantalla principal. */
+internal object TvTabs {
+    val tab = androidx.compose.runtime.mutableStateOf(Tab.HOME)
+    val shown = androidx.compose.runtime.mutableStateOf(Tab.HOME)
 }
 
 // ───────────────────────────── Móvil ─────────────────────────────
@@ -434,7 +439,8 @@ fun BrowseContent(kind: Kind) {
             !Tmdb.configured() -> "folders"
             d.compact -> prefs.browseMode(kind).takeIf { it != "folders" } ?: "plat"
             // Tele: solo Plataformas o Géneros (Recién subido está en Ajustes; Carpetas, oculto)
-            else -> prefs.browseMode(kind).takeIf { it == "plat" || it == "genre" } ?: "plat"
+            // Tele: al entrar, siempre por plataformas
+            else -> "plat"
         })
     }
     val history = remember(changes, kind) {
@@ -496,6 +502,14 @@ fun BrowseContent(kind: Kind) {
 fun ContinueRow(history: List<com.noirplus.tv.data.Progress>, memPrefix: String, onHero: (Item) -> Unit) {
     val d = LocalDims.current
     val nav = LocalNav.current
+    var menuFor by remember { mutableStateOf<com.noirplus.tv.data.Progress?>(null) }
+    menuFor?.let { p ->
+        ContinueMenu(p, onClose = { menuFor = null }, onRestart = {
+            menuFor = null
+            Repo.prefs.removeProgress(p.key)
+            nav.push(Screen.Player(PlayRequest(url = p.url, title = p.title, key = p.key, image = p.image, isLive = false, startMs = 0, parent = p.parent)))
+        }, onRemove = { menuFor = null; Repo.prefs.removeProgress(p.key) })
+    }
     Column {
         SectionTitle("Continuar viendo")
         TvHorizontalScroll {
@@ -511,6 +525,8 @@ fun ContinueRow(history: List<com.noirplus.tv.data.Progress>, memPrefix: String,
                     progress = p.fraction,
                     memKey = "$memPrefix/${p.key}",
                     onFocus = { onHero(Item(id = p.key, name = p.title, image = p.image, kind = Kind.LIVE)) },
+                    // Mantener pulsado: quitar o volver a empezar
+                    onLongClick = { menuFor = p },
                     onClick = {
                         nav.push(
                             Screen.Player(
@@ -601,6 +617,29 @@ private fun HeroList(hero: @Composable () -> Unit, content: LazyListScope.() -> 
                 TvRowScroll {
                     LazyColumn(Modifier.fillMaxSize(), state = state, contentPadding = PaddingValues(bottom = d.bottomPad + 120.dp)) { content() }
                 }
+            }
+        }
+    }
+}
+
+
+/** Menú de «Continuar viendo» (mantener pulsado): volver a empezar o quitarlo de la fila. */
+@Composable
+private fun ContinueMenu(p: com.noirplus.tv.data.Progress, onClose: () -> Unit, onRestart: () -> Unit, onRemove: () -> Unit) {
+    val fr = remember { FocusRequester() }
+    androidx.activity.compose.BackHandler { onClose() }
+    LaunchedEffect(Unit) { delay(120); runCatching { fr.requestFocus() } }
+    androidx.compose.ui.window.Popup(onDismissRequest = onClose, properties = androidx.compose.ui.window.PopupProperties(focusable = true)) {
+        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.7f)), contentAlignment = Alignment.Center) {
+            Column(
+                Modifier.padding(20.dp).widthIn(max = 420.dp).clip(RoundedCornerShape(16.dp)).background(Col.Surface2).padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text(p.title, color = Col.Text, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, maxLines = 2)
+                Text("Continuar viendo", color = Col.Sub, fontSize = 12.sp)
+                ActionButton("Volver a empezar", primary = true, key = "cm-restart", focusRequester = fr, modifier = Modifier.fillMaxWidth()) { onRestart() }
+                ActionButton("Quitar de Continuar viendo", key = "cm-remove", modifier = Modifier.fillMaxWidth()) { onRemove() }
+                ActionButton("Cancelar", key = "cm-cancel", modifier = Modifier.fillMaxWidth()) { onClose() }
             }
         }
     }
