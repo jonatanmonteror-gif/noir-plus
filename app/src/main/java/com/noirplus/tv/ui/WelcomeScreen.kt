@@ -203,7 +203,7 @@ fun WelcomeScreen() {
         Crossfade(targetState = backdrops.getOrNull(bgIndex)?.image, animationSpec = tween(1400), label = "bg") { url ->
             if (url != null) {
                 AsyncImage(
-                    model = url, contentDescription = null, contentScale = ContentScale.Crop, alpha = if (d.compact) 0.88f else 0.44f,
+                    model = url, contentDescription = null, contentScale = ContentScale.Crop, alpha = if (d.compact) 0.72f else 0.44f,
                     modifier = Modifier.fillMaxSize().graphicsLayer { scaleX = zoom; scaleY = zoom },
                 )
             }
@@ -211,7 +211,7 @@ fun WelcomeScreen() {
         // Velo: lateral en TV, de abajo arriba en móvil
         Box(
             Modifier.fillMaxSize().background(
-                if (d.compact) Brush.verticalGradient(0f to Col.Bg.copy(alpha = 0.1f), 0.4f to Col.Bg.copy(alpha = 0.2f), 0.68f to Col.Bg.copy(alpha = 0.7f), 1f to Col.Bg)
+                if (d.compact) Brush.verticalGradient(0f to Col.Bg.copy(alpha = 0.22f), 0.4f to Col.Bg.copy(alpha = 0.38f), 0.68f to Col.Bg.copy(alpha = 0.75f), 1f to Col.Bg)
                 else Brush.horizontalGradient(0f to Col.Bg, 0.45f to Col.Bg.copy(alpha = 0.85f), 1f to Col.Bg.copy(alpha = 0.25f))
             )
         )
