@@ -104,7 +104,9 @@ fun UpcomingContent() {
         )
         if (shown.isEmpty()) return Message(if (l.isEmpty()) "No se pudieron cargar los próximos estrenos. Revisa la conexión." else "Nada con estos filtros")
         val firstFuture = remember(shown) { shown.indexOfFirst { it.up.date >= today } }
-        LazyColumn(Modifier.fillMaxSize(),
+        // Siempre se abre desde arriba (sin recordar dónde se quedó la última vez)
+        val listState = remember(shown) { androidx.compose.foundation.lazy.LazyListState() }
+        LazyColumn(Modifier.fillMaxSize(), state = listState,
             contentPadding = PaddingValues(start = d.edge, end = d.edge, top = 8.dp, bottom = d.bottomPad),
             verticalArrangement = Arrangement.spacedBy(14.dp)) {
             itemsIndexed(shown, key = { i, s -> "$i:${s.up.key}:${s.up.season}:${s.up.episode}:${s.up.date}" }) { i, s ->
@@ -141,10 +143,13 @@ private fun stateOf(s: Upcoming.Shown, reminded: Boolean, today: Int): UpState =
 private fun EntryButtons(s: Upcoming.Shown, st: UpState, onAction: () -> Unit) {
     val ctx = androidx.compose.ui.platform.LocalContext.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    val compact = LocalDims.current.compact
+    val action: @Composable () -> Unit = {
         Focusable(key = "upa/${Upcoming.remindKey(s.up)}", shape = RoundedCornerShape(50), focusScale = 1.08f, onClick = onAction) { f ->
-            ActionPill(st, focused = f)
+            ActionPill(st, focused = f, short = compact)
         }
+    }
+    val trailer: @Composable () -> Unit = {
         Focusable(key = "upt/${Upcoming.remindKey(s.up)}", shape = RoundedCornerShape(50), focusScale = 1.08f, onClick = {
             scope.launch {
                 val url = runCatching { com.noirplus.tv.data.Tmdb.trailerById(s.up.type, s.up.id) }.getOrNull()
@@ -152,6 +157,9 @@ private fun EntryButtons(s: Upcoming.Shown, st: UpState, onAction: () -> Unit) {
             }
         }) { f -> TrailerPill(f) }
     }
+    // Móvil: uno encima del otro (Tráiler arriba) para que nada se corte; tele: en fila
+    if (compact) Column(verticalArrangement = Arrangement.spacedBy(6.dp)) { trailer(); action() }
+    else Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { action(); trailer() }
 }
 
 @Composable
@@ -164,17 +172,18 @@ private fun TrailerPill(focused: Boolean) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         androidx.compose.material3.Icon(TrailerIcon, null, tint = fg, modifier = Modifier.size(15.dp))
-        Text("Tráiler", color = fg, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 5.dp))
+        Text("Tráiler", color = fg, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, softWrap = false,
+            modifier = Modifier.padding(start = 5.dp))
     }
 }
 
 /** Aspecto del botón de acción (como «Recordarme» de las plataformas). */
 @Composable
-private fun ActionPill(st: UpState, focused: Boolean, small: Boolean = false) {
+private fun ActionPill(st: UpState, focused: Boolean, small: Boolean = false, short: Boolean = false) {
     val (txt, filled) = when (st) {
         UpState.WATCH -> "Ver ahora" to true
         UpState.REMINDED -> "Te avisaré" to false
-        UpState.REMIND_UPLOAD -> (if (small) "Aún no subido" else "Avísame cuando lo suban") to false
+        UpState.REMIND_UPLOAD -> (if (small) "Aún no subido" else if (short) "Avísame al subirlo" else "Avísame cuando lo suban") to false
         UpState.REMIND -> "Avísame" to false
     }
     val fg = if (filled || focused) Color.Black else Col.Text
@@ -192,7 +201,7 @@ private fun ActionPill(st: UpState, focused: Boolean, small: Boolean = false) {
         }
         androidx.compose.material3.Icon(icon, null, tint = fg, modifier = Modifier.size(if (small) 13.dp else 15.dp))
         Text(txt, color = fg, fontSize = if (small) 11.sp else 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
-            modifier = Modifier.padding(start = 5.dp))
+            overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 5.dp))
     }
 }
 
@@ -216,7 +225,7 @@ private fun UpcomingEntry(s: Upcoming.Shown, reminded: Boolean, today: Int, show
         Box(Modifier.weight(1f).clip(RoundedCornerShape(14.dp)).background(Col.Surface)) {
             // Portada vertical completa (sin recortar) y, detrás del texto, la imagen ancha muy oscurecida
             val poster = up.poster ?: up.backdrop
-            val rowH = if (d.compact) 164.dp else 190.dp
+            val rowH = if (d.compact) 196.dp else 190.dp
             up.backdrop?.let {
                 AsyncImage(it, null, contentScale = ContentScale.Crop, alpha = 0.22f, modifier = Modifier.matchParentSize())
                 Box(Modifier.matchParentSize().background(
@@ -237,7 +246,7 @@ private fun UpcomingEntry(s: Upcoming.Shown, reminded: Boolean, today: Int, show
                     Text(Upcoming.label(up), color = Col.Text.copy(alpha = 0.8f), fontSize = if (d.compact) 12.sp else 14.sp,
                         maxLines = 1, overflow = TextOverflow.Ellipsis)
                     if (up.overview.isNotBlank()) Text(up.overview, color = Col.Sub, fontSize = if (d.compact) 11.sp else 13.sp,
-                        maxLines = if (d.compact) 2 else 3, overflow = TextOverflow.Ellipsis, lineHeight = if (d.compact) 15.sp else 18.sp)
+                        maxLines = if (d.compact) 1 else 3, overflow = TextOverflow.Ellipsis, lineHeight = if (d.compact) 15.sp else 18.sp)
                     Spacer(Modifier.weight(1f))
                     EntryButtons(s, st, onClick)
                 }
