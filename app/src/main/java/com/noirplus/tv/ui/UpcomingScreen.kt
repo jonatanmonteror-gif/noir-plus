@@ -203,37 +203,33 @@ private fun UpcomingEntry(s: Upcoming.Shown, reminded: Boolean, today: Int, show
                     fontWeight = FontWeight.Bold, fontFamily = InterDisplay)
             }
         }
-        Box(Modifier.weight(1f).clip(RoundedCornerShape(14.dp))) {
-            val img = up.backdrop ?: up.poster
-            val textCol = Col.Text
-            if (d.compact) {
-                Column(Modifier.fillMaxWidth().background(Col.Surface)) {
-                    Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(Col.Surface2)) {
-                        img?.let { AsyncImage(it, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
-                        if (up.platform.isNotBlank()) PlatformTag(up.platform, Modifier.align(Alignment.TopStart).padding(8.dp))
-                    }
-                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(up.name, color = Col.Text, fontSize = 16.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(Upcoming.label(up), color = Col.Sub, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        if (up.overview.isNotBlank()) Text(up.overview, color = Col.Sub, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
-                            lineHeight = 16.sp)
-                        Box(Modifier.padding(top = 6.dp)) { EntryButtons(s, st, onClick) }
-                    }
+        Box(Modifier.weight(1f).clip(RoundedCornerShape(14.dp)).background(Col.Surface)) {
+            // Portada vertical completa (sin recortar) y, detrás del texto, la imagen ancha muy oscurecida
+            val poster = up.poster ?: up.backdrop
+            val rowH = if (d.compact) 164.dp else 190.dp
+            up.backdrop?.let {
+                AsyncImage(it, null, contentScale = ContentScale.Crop, alpha = 0.22f, modifier = Modifier.matchParentSize())
+                Box(Modifier.matchParentSize().background(
+                    androidx.compose.ui.graphics.Brush.horizontalGradient(listOf(Col.Surface, Col.Surface.copy(alpha = 0.55f)))))
+            }
+            Row(Modifier.fillMaxWidth().height(rowH)) {
+                Box(Modifier.fillMaxHeight().aspectRatio(2f / 3f).background(Col.Surface2)) {
+                    poster?.let { AsyncImage(it, null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize()) }
                 }
-            } else {
-                Row(Modifier.fillMaxWidth().height(150.dp).background(Col.Surface)) {
-                    Box(Modifier.fillMaxHeight().aspectRatio(16f / 9f).background(Col.Surface2)) {
-                        img?.let { AsyncImage(it, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
-                        if (up.platform.isNotBlank()) PlatformTag(up.platform, Modifier.align(Alignment.TopStart).padding(8.dp))
-                    }
-                    Column(Modifier.weight(1f).fillMaxHeight().padding(horizontal = 18.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(up.name, color = textCol, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(Upcoming.label(up), color = Col.Sub, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        if (up.overview.isNotBlank()) Text(up.overview, color = Col.Sub, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
-                            lineHeight = 16.sp)
-                        Spacer(Modifier.weight(1f))
-                        EntryButtons(s, st, onClick)
-                    }
+                Column(
+                    Modifier.weight(1f).fillMaxHeight().padding(horizontal = if (d.compact) 12.dp else 20.dp, vertical = if (d.compact) 10.dp else 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(if (d.compact) 3.dp else 5.dp),
+                ) {
+                    if (up.platform.isNotBlank()) Text(up.platform.uppercase(), color = Col.Sub, fontSize = 10.sp,
+                        fontWeight = FontWeight.SemiBold, letterSpacing = 1.sp, maxLines = 1)
+                    Text(up.name, color = Col.Text, fontSize = if (d.compact) 15.sp else 20.sp, fontWeight = FontWeight.Bold,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(Upcoming.label(up), color = Col.Text.copy(alpha = 0.8f), fontSize = if (d.compact) 12.sp else 14.sp,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    if (up.overview.isNotBlank()) Text(up.overview, color = Col.Sub, fontSize = if (d.compact) 11.sp else 13.sp,
+                        maxLines = if (d.compact) 2 else 3, overflow = TextOverflow.Ellipsis, lineHeight = if (d.compact) 15.sp else 18.sp)
+                    Spacer(Modifier.weight(1f))
+                    EntryButtons(s, st, onClick)
                 }
             }
         }

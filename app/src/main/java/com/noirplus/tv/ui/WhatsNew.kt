@@ -2,6 +2,10 @@ package com.noirplus.tv.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -39,14 +43,28 @@ fun NotesDialog(title: String, notes: List<Updater.Notes>, onClose: () -> Unit) 
     val fr = remember { FocusRequester() }
     BackHandler { onClose() }
     LaunchedEffect(Unit) { delay(150); runCatching { fr.requestFocus() } }
-    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.72f)), contentAlignment = Alignment.Center) {
+    val scrimTap = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    // Tocar fuera de la ventana también la cierra (en el móvil); la ventana se come sus propios toques
+    Box(
+        Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.72f))
+            .clickable(interactionSource = scrimTap, indication = null) { onClose() }
+            .windowInsetsPadding(WindowInsets.safeDrawing),
+        contentAlignment = Alignment.Center,
+    ) {
         Column(
-            Modifier.padding(20.dp).widthIn(max = 560.dp).clip(RoundedCornerShape(16.dp)).background(Col.Surface2).padding(20.dp),
+            Modifier.padding(20.dp).widthIn(max = 560.dp).heightIn(max = 560.dp)
+                .clip(RoundedCornerShape(16.dp)).background(Col.Surface2)
+                .clickable(interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null) {}
+                .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(title, color = Col.Text, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(title, color = Col.Text, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                Text("✕", color = Col.Sub, fontSize = 18.sp,
+                    modifier = Modifier.clip(RoundedCornerShape(50)).clickable { onClose() }.padding(8.dp))
+            }
             if (notes.isEmpty()) Text("Aún no hay novedades publicadas.", color = Col.Sub, fontSize = 13.sp)
-            LazyColumn(Modifier.heightIn(max = 380.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            LazyColumn(Modifier.weight(1f, fill = false), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 items(notes, key = { it.version }) { n ->
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text("Versión ${n.version}" + (if (n.date.isNotBlank()) "  ·  " + prettyDate(n.date) else ""),

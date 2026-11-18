@@ -82,6 +82,7 @@ import com.noirplus.tv.data.PlayRequest
 import com.noirplus.tv.data.Progress
 import com.noirplus.tv.data.Repo
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -108,6 +109,8 @@ fun PlayerScreen(req: PlayRequest) {
     val channel = channels.getOrNull(index)
     var url by remember { mutableStateOf(req.url) }
     var triedAlt by remember { mutableStateOf(false) }
+    var retries by remember(url) { mutableIntStateOf(0) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
     // Directo: calidades del mismo canal (mejor primero). Si una falla se prueba la siguiente.
     val curKey = if (cur.isLive) (channel?.key ?: cur.key) else ""
     val qualities = remember(curKey) { if (cur.isLive) com.noirplus.tv.data.LiveIndex.alternatives(curKey) else emptyList() }
@@ -403,7 +406,12 @@ fun PlayerScreen(req: PlayRequest) {
                         triedAlt = false
                         url = src.streamUrl(qualities[qIdx])
                     }
-                    else -> error = "No se ha podido reproducir este contenido.\n(${e.errorCodeName})"
+                    // El servidor ha dicho que no (lleno, cuenta, conexiones): un reintento a los 3 s
+                    httpCode(e) != null && retries < 1 -> {
+                        retries += 1
+                        scope.launch { kotlinx.coroutines.delay(3000); exo.prepare(); exo.playWhenReady = true }
+                    }
+                    else -> error = playError(e)
                 }
             }
 
@@ -900,4 +908,28 @@ private fun qualityName(name: String): String {
         Regex("""(?<![a-z\d])(sd|576p|low)(?![a-z\d])|ˢᴰ""").containsMatchIn(n) -> "SD"
         else -> "HD"
     }
+}
+
+
+/** Código HTTP que devolvió el servidor, si el fallo es de ese tipo. */
+private fun httpCode(e: PlaybackException): Int? {
+    var c: Throwable? = e
+    while (c != null) {
+        if (c is androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException) return c.responseCode
+        c = c.cause
+    }
+    return null
+}
+
+/** Mensaje entendible para el error de reproducción. */
+private fun playError(e: PlaybackException): String {
+    val code = httpCode(e) ?: return "No se ha podido reproducir este contenido.\n(${e.errorCodeName})"
+    val why = when (code) {
+        401, 403 -> "El proveedor rechaza la cuenta (caducada, bloqueada o en uso en otro sitio)."
+        404, 410 -> "El proveedor ya no tiene este contenido."
+        429, 456, 458, 509 -> "Has llegado al máximo de conexiones a la vez. Cierra la app en otro aparato y vuelve a probar."
+        in 500..599 -> "El servidor del proveedor está fallando ahora mismo. Prueba en unos minutos."
+        else -> "El servidor del proveedor no deja reproducirlo."
+    }
+    return "$why\n(Error $code)"
 }
