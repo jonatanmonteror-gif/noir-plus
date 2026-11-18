@@ -116,7 +116,7 @@ object Upcoming {
         val movies = index(runCatching { src.all(Kind.MOVIE) }.getOrDefault(emptyList()))
         val follow = followedKeys()
         val t = today()
-        val since = day(System.currentTimeMillis() - 14L * 86400_000L)
+        val since = day(System.currentTimeMillis() - 7L * 86400_000L)
         // Películas: solo estrenos en plataformas (lo de cines no se sube a la lista)
         ups.filter { it.kind != "aired" && it.date >= since && !(it.type == "movie" && it.where == "cines") }.mapNotNull { up ->
             val local = if (up.type == "tv") find(up, series) else find(up, movies)

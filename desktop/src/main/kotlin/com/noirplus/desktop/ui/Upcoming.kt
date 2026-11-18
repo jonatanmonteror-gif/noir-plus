@@ -39,7 +39,7 @@ import com.noirplus.desktop.data.Imdb
 import androidx.compose.material.icons.filled.Movie
 import kotlinx.coroutines.launch
 
-private val TYPES = listOf("all" to "Todo", "past" to "Ya estrenados", "film" to "Películas", "new" to "Series nuevas", "season" to "Temporadas", "episode" to "Mis capítulos")
+private val TYPES = listOf("all" to "Todo", "past" to "Recién estrenados", "film" to "Películas", "new" to "Series nuevas", "season" to "Temporadas", "episode" to "Mis capítulos")
 
 /** Próximos estrenos (90 días), agrupados por día. */
 @Composable
@@ -59,10 +59,10 @@ fun UpcomingScreen() {
         LazyRow(contentPadding = PaddingValues(horizontal = 40.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(bottom = 14.dp)) {
             items(Tmdb.platforms, key = { "p:$it" }) { p -> UpChip(p, p in plats, small = true) { plats = if (p in plats) plats - p else plats + p } }
         }
-        Text("Lo estrenado en las 2 últimas semanas y lo de los próximos 3 meses. Haz clic en un estreno y te aviso cuando tu proveedor lo suba. «Mis capítulos»: de las series que sigues.", color = Col.Sub, fontSize = 12.sp,
+        Text((if (type == "past") "Lo estrenado en plataformas la última semana. " else "Lo que llega en los próximos 3 meses. ") + "Haz clic en un estreno y te aviso cuando tu proveedor lo suba. «Mis capítulos»: de las series que sigues.", color = Col.Sub, fontSize = 12.sp,
             modifier = Modifier.padding(start = 40.dp, bottom = 6.dp))
         val l = list
-        val shown = remember(l, type, plats) { l?.filter { (type == "all" || (type == "past" && it.up.date < Upcoming.today()) || it.up.kind == type) && (plats.isEmpty() || it.up.platform in plats) }?.sortedBy { it.up.date } }
+        val shown = remember(l, type, plats) { l?.filter { (if (type == "past") it.up.date < Upcoming.today() else it.up.date >= Upcoming.today() && (type == "all" || it.up.kind == type)) && (plats.isEmpty() || it.up.platform in plats) }?.sortedBy { it.up.date } }
         when {
             l == null -> Loading()
             shown.isNullOrEmpty() -> Message(if (l.isEmpty()) "No se pudieron cargar los próximos estrenos." else "Nada con estos filtros")
@@ -84,8 +84,6 @@ fun UpcomingScreen() {
                     verticalArrangement = Arrangement.spacedBy(22.dp)) {
                     itemsIndexed(days, key = { i, d -> "$i:${d.first}" }) { i, (date, entries) ->
                       Column {
-                        if (i == 0 && firstFuture != 0) UpSection("Ya estrenado · últimas 2 semanas")
-                        if (i == firstFuture) UpSection("Próximamente", top = i > 0)
                         Row(Modifier.fillMaxWidth()) {
                             DateBadge(date, today)
                             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(14.dp)) {

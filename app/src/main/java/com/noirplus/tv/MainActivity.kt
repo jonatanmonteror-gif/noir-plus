@@ -29,6 +29,8 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         Repo.resumeCount.intValue = Repo.resumeCount.intValue + 1
+        // La app no se cerró mientras estabas fuera: no hace falta el punto de vuelta
+        if (stoppedAt > 0) com.noirplus.tv.ui.ResumePoint.clear()
         com.noirplus.tv.data.Sync.request(300)
         // Si la app vuelve tras más de 4 horas en segundo plano, saludo de nuevo y listas frescas.
         if (stoppedAt > 0 && System.currentTimeMillis() - stoppedAt > 4 * 3600_000L) {

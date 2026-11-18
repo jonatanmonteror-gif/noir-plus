@@ -20,7 +20,7 @@
 
         <activity
             android:name=".MainActivity"
-            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenLayout|screenSize|smallestScreenSize|uiMode"
+            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenLayout|screenSize|smallestScreenSize|uiMode|density|fontScale|layoutDirection|colorMode|locale|touchscreen|mcc|mnc"
             android:exported="true"
             android:launchMode="singleTask"
             android:windowSoftInputMode="adjustPan">

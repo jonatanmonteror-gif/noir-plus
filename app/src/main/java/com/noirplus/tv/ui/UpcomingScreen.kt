@@ -51,7 +51,7 @@ import com.noirplus.tv.data.Upcoming
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-private val TYPES = listOf("all" to "Todo", "past" to "Ya estrenados", "film" to "Películas", "new" to "Series nuevas", "season" to "Temporadas", "episode" to "Mis capítulos")
+private val TYPES = listOf("all" to "Todo", "past" to "Recién estrenados", "film" to "Películas", "new" to "Series nuevas", "season" to "Temporadas", "episode" to "Mis capítulos")
 
 /** Próximos estrenos (90 días) y lo estrenado el último mes. */
 @Composable
@@ -68,7 +68,9 @@ fun UpcomingContent() {
     val shown = remember(l, type, platsRaw) {
         val t = Upcoming.today()
         val f = l.filter {
-            (type == "all" || (type == "past" && it.up.date < t) || it.up.kind == type) && (plats.isEmpty() || it.up.platform in plats)
+            // «Recién estrenados»: lo de la última semana; el resto de pestañas, solo lo que viene
+            (if (type == "past") it.up.date < t else it.up.date >= t && (type == "all" || it.up.kind == type)) &&
+                (plats.isEmpty() || it.up.platform in plats)
         }
         // Primero lo estrenado en las 2 últimas semanas (lo más reciente arriba) y luego lo que viene
         f.filter { it.up.date < t }.sortedByDescending { it.up.date } + f.filter { it.up.date >= t }.sortedBy { it.up.date }
@@ -103,7 +105,7 @@ fun UpcomingContent() {
         }
         Text(
             (if (plats.isNotEmpty()) Platforms.main.filter { it in plats }.joinToString(" + ") + "  ·  " else "") +
-                "Lo estrenado en las 2 últimas semanas y lo que llega en los próximos 3 meses. Toca un estreno y te aviso cuando tu proveedor lo suba.",
+                (if (type == "past") "Lo estrenado en plataformas la última semana." else "Lo que llega en los próximos 3 meses.") + " Toca un estreno y te aviso cuando tu proveedor lo suba.",
             color = Col.Sub, fontSize = 12.sp, modifier = Modifier.padding(start = d.edge, end = d.edge, top = 10.dp, bottom = 4.dp),
         )
         if (shown.isEmpty()) return Message(if (l.isEmpty()) "No se pudieron cargar los próximos estrenos. Revisa la conexión." else "Nada con estos filtros")
@@ -117,9 +119,7 @@ fun UpcomingContent() {
                 val firstOfDay = i == 0 || shown[i - 1].up.date != s.up.date
                 val reminded = remindedKeys.contains(Upcoming.remindKey(s.up))
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    if (i == 0 && firstFuture != 0) SectionHeader("Ya estrenado · últimas 2 semanas")
-                    if (i == firstFuture) SectionHeader("Próximamente", top = i > 0)
-                    UpcomingEntry(s, reminded, today, showDate = firstOfDay || i == firstFuture) { onPick(s) }
+                    UpcomingEntry(s, reminded, today, showDate = firstOfDay) { onPick(s) }
                 }
             }
         }

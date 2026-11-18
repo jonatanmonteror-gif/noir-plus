@@ -101,7 +101,14 @@ private fun keyOf(s: Screen): String = when (s) {
 
 @Composable
 fun App() {
-    val nav = remember { Nav(if (Repo.prefs.hasAccount()) Screen.Welcome else Screen.Setup) }
+    val nav = remember {
+        // Si veníamos de ver un tráiler y la tele cerró la app, se vuelve a donde estabas
+        val back = if (Repo.prefs.hasAccount()) ResumePoint.take() else null
+        Nav(back?.first() ?: if (Repo.prefs.hasAccount()) Screen.Welcome else Screen.Setup).also { n ->
+            back?.drop(1)?.forEach { n.push(it) }
+            ResumePoint.nav = n
+        }
+    }
     val mem = remember { FocusMemory() }
     val holder = rememberSaveableStateHolder()
     val ctx = LocalContext.current

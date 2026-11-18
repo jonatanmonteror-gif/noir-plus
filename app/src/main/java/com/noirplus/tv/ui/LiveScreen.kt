@@ -264,8 +264,16 @@ fun LiveContent() {
     }
 
     Row(Modifier.fillMaxSize().padding(start = d.edge, top = 12.dp)) {
+        // Al bajar desde el menú de arriba se entra en la temática que ya está elegida (antes saltaba a Favoritos)
+        val colState = androidx.compose.foundation.lazy.rememberLazyListState()
+        val selectedFr = remember { FocusRequester() }
+        val selIndex = folders.indexOfFirst { it.first == selected }
+        LaunchedEffect(selIndex >= 0) { if (selIndex > 0) runCatching { colState.scrollToItem(selIndex) } }
         LazyColumn(
-            Modifier.width(240.dp).fillMaxHeight().focusRestorer(),
+            Modifier.width(240.dp).fillMaxHeight().focusRestorer {
+                if (colState.layoutInfo.visibleItemsInfo.any { it.index == selIndex }) selectedFr else FocusRequester.Default
+            },
+            state = colState,
             contentPadding = PaddingValues(bottom = 32.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
@@ -273,6 +281,7 @@ fun LiveContent() {
                 CategoryItem(
                     c.second,
                     selected = c.first == selected,
+                    focusRequester = if (c.first == selected) selectedFr else null,
                     memKey = "livecat/${c.first}",
                     modifier = Modifier.focusProperties {
                         right = if (gridReady) gridFr else FocusRequester.Default
@@ -348,10 +357,12 @@ internal fun CategoryChip(name: String, selected: Boolean, onClick: () -> Unit) 
 }
 
 @Composable
-private fun CategoryItem(name: String, selected: Boolean, memKey: String, modifier: Modifier = Modifier, onFocus: () -> Unit) {
+private fun CategoryItem(name: String, selected: Boolean, memKey: String, modifier: Modifier = Modifier,
+                         focusRequester: FocusRequester? = null, onFocus: () -> Unit) {
     Focusable(
         modifier.fillMaxWidth(),
         key = memKey,
+        focusRequester = focusRequester,
         shape = RoundedCornerShape(8.dp),
         focusScale = 1f,
         border = false,
