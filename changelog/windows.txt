@@ -1,4 +1,5 @@
 Novedades de la próxima versión de Windows. Una línea por punto, empezando por «- ».
 - Próximos estrenos en 2 o 3 columnas (se elige en Ajustes → Próximos estrenos y se queda guardado), agrupados por día y con mejores márgenes.
 - En cada estreno, el botón «Tráiler» va encima del de «Avísame» / «Ver ahora».
+- Las cajas de Próximos son algo más altas para que los títulos largos quepan en dos líneas.
 - Se quita la búsqueda automática de otra versión cuando un contenido no se abría.

@@ -132,7 +132,7 @@ private fun UpEntry(s: Upcoming.Shown, reminded: Boolean, today: Int, compact: B
     val src = remember { MutableInteractionSource() }
     val hovered by src.collectIsHoveredAsState()
     Row(
-        Modifier.fillMaxWidth().height(if (compact) 176.dp else 192.dp).clip(RoundedCornerShape(14.dp))
+        Modifier.fillMaxWidth().height(if (compact) 210.dp else 222.dp).clip(RoundedCornerShape(14.dp))
             .background(if (hovered) Color(0xFF2A2A30) else Col.Surface)
             .hoverable(src).clickable(interactionSource = src, indication = null) { onClick() }.pointerHoverIcon(PointerIcon.Hand),
     ) {
@@ -144,7 +144,8 @@ private fun UpEntry(s: Upcoming.Shown, reminded: Boolean, today: Int, compact: B
             verticalArrangement = Arrangement.spacedBy(4.dp)) {
             if (up.platform.isNotBlank()) Text(up.platform.uppercase(), color = Col.Sub, fontSize = 10.sp, fontWeight = FontWeight.SemiBold,
                 letterSpacing = 1.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(up.name, color = Col.Text, fontSize = if (compact) 15.sp else 17.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(up.name, color = Col.Text, fontSize = if (compact) 15.sp else 17.sp, fontWeight = FontWeight.Bold, maxLines = 2,
+                overflow = TextOverflow.Ellipsis, lineHeight = if (compact) 19.sp else 21.sp)
             Text(Upcoming.label(up), color = Col.Text.copy(alpha = 0.8f), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (up.overview.isNotBlank()) Text(up.overview, color = Col.Sub, fontSize = 12.sp, maxLines = if (compact) 1 else 2, overflow = TextOverflow.Ellipsis, lineHeight = 16.sp)
             Spacer(Modifier.weight(1f))
