@@ -106,14 +106,14 @@ fun LiveScreen() {
                 Row(Modifier.fillMaxWidth().padding(start = 28.dp, end = 28.dp, top = 24.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(folders.firstOrNull { it.first == sel }?.second ?: "", color = Col.Text, fontSize = 22.sp, fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Chip(if (asList) "▦  Cajas" else "☰  Lista", false) { Store.liveView = if (asList) "grid" else "list" }
+                    LiveChip(if (asList) "▦  Cajas" else "☰  Lista", false) { Store.liveView = if (asList) "grid" else "list" }
                     Spacer(Modifier.width(10.dp))
                     SearchBox(query, "Buscar canal", Modifier.width(240.dp)) { query = it }
                 }
                 if (countries.size > 1) LazyRow(contentPadding = PaddingValues(horizontal = 28.dp), horizontalArrangement = Arrangement.spacedBy(6.dp),
                     modifier = Modifier.padding(bottom = 8.dp)) {
-                    item { Chip("Todos los países", country == null) { country = null } }
-                    items(countries) { c -> Chip(LiveIndex.COUNTRY_NAMES[c] ?: c, country == c) { country = c } }
+                    item { LiveChip("Todos los países", country == null) { country = null } }
+                    items(countries) { c -> LiveChip(LiveIndex.COUNTRY_NAMES[c] ?: c, country == c) { country = c } }
                 }
                 Text("Clic derecho en un canal: favoritos y cambiar de temática", color = Col.Sub, fontSize = 12.sp,
                     modifier = Modifier.padding(start = 28.dp, bottom = 6.dp))
@@ -155,7 +155,7 @@ fun LiveScreen() {
 }
 
 @Composable
-private fun Chip(label: String, on: Boolean, onClick: () -> Unit) {
+private fun LiveChip(label: String, on: Boolean, onClick: () -> Unit) {
     Text(label, color = if (on) Color.Black else Col.Text, fontSize = 13.sp, fontWeight = FontWeight.Medium,
         modifier = Modifier.clip(RoundedCornerShape(50)).background(if (on) Color.White else Color.White.copy(alpha = 0.08f))
             .clickable(onClick = onClick).pointerHoverIcon(PointerIcon.Hand).padding(horizontal = 14.dp, vertical = 7.dp))
