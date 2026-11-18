@@ -8,6 +8,7 @@ on:
       - '.github/workflows/windows.yml'
       - 'changelog/windows.txt'
       - 'tools/build_catalog.py'
+      - 'tools/build_upcoming.py'
       - '.github/workflows/catalog.yml'
   workflow_dispatch:
 

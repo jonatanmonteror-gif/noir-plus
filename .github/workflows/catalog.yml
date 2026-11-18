@@ -10,6 +10,7 @@ on:
     branches: [main]
     paths:
       - 'tools/build_catalog.py'
+      - 'tools/build_upcoming.py'
       - '.github/workflows/catalog.yml'
 
 permissions:
@@ -22,7 +23,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -32,6 +33,7 @@ jobs:
         run: |
           export TMDB_KEY=$(grep -o 'BUILT_IN_KEY = "[0-9a-f]*"' app/src/main/java/com/noirplus/tv/data/Tmdb.kt | cut -d'"' -f2)
           python3 tools/build_catalog.py
+          python3 tools/build_upcoming.py
 
       - name: Publicar (versión fija "catalog", no es la "latest")
         env:
@@ -40,4 +42,4 @@ jobs:
           gh release view catalog --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
             gh release create catalog --repo "$GITHUB_REPOSITORY" --title "Catálogo de plataformas" \
               --notes "Se actualiza solo cada día. Lo usa la app para las plataformas y géneros." --prerelease --latest=false
-          gh release upload catalog cat-*.tsv.gz logos.json --repo "$GITHUB_REPOSITORY" --clobber
+          gh release upload catalog cat-*.tsv.gz logos.json upcoming.json.gz --repo "$GITHUB_REPOSITORY" --clobber
