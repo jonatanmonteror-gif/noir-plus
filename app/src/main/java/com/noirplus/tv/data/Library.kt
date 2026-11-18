@@ -33,7 +33,7 @@ object Library {
                 val c = Tmdb.catalog(kind, catId.removePrefix(PLAT)) ?: return@withContext emptyList()
                 // Lo último estrenado primero (por fecha de estreno, no por cuándo lo añadió el proveedor)
                 visibleAll(kind).asSequence().map { Tmdb.prep(it) }
-                    .mapNotNull { p -> c.match(p)?.let { id -> p to (c.entries[id]?.date ?: 0) } }
+                    .mapNotNull { p -> c.match(p)?.let { _ -> p to Tmdb.releaseDate(p.item) } }
                     .distinctBy { it.first.key }
                     .sortedByDescending { it.second }
                     .map { it.first.item }.toList()

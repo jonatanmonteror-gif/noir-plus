@@ -5,7 +5,8 @@ para que la app lo descargue de una vez (un archivo pequeño) en lugar de hacer 
 
 Salida: un archivo pequeño por plataforma y tipo: cat-movie-netflix.tsv.gz, cat-tv-disney.tsv.gz…
 Formato (una línea por título, separado por tabuladores, ligero de leer en la tele):
-    id <TAB> aaaammdd <TAB> géneros separados por comas <TAB> títulos normalizados separados por |
+    id <TAB> aaaammdd <TAB> géneros separados por comas <TAB> títulos normalizados separados por | [<TAB> último capítulo aaaammdd]
+La 5.ª columna solo en series: fecha del último capítulo emitido (para que una temporada nueva cuente como estreno).
 """
 import gzip, json, os, re, sys, time, unicodedata, urllib.parse, urllib.request
 from concurrent.futures import ThreadPoolExecutor
@@ -89,9 +90,34 @@ def build(kind):
                     if tk and tk not in titles:
                         titles.append(tk)
             seen[tid] = [tid, date, o.get("genre_ids", []), titles]
+        if typ == "tv":
+            # Series con algún capítulo emitido en los 2 últimos años: fecha del último capítulo
+            today = time.strftime("%Y-%m-%d")
+            since = time.strftime("%Y-%m-%d", time.gmtime(time.time() - 730 * 86400))
+            rb = dict(base, **{"air_date.gte": since, "air_date.lte": today})
+            f2 = get(f"/discover/{typ}", dict(rb, page=1))
+            recent = set()
+            if f2:
+                p2 = max(1, min(500, f2.get("total_pages", 1)))
+                rr = list(f2.get("results", []))
+                with ThreadPoolExecutor(8) as ex:
+                    for r in ex.map(lambda pg: get(f"/discover/{typ}", dict(rb, page=pg)), range(2, p2 + 1)):
+                        if r:
+                            rr.extend(r.get("results", []))
+                recent = {o.get("id") for o in rr if o.get("id") in seen}
+            todo = [t for t in recent if t not in LAST]
+            with ThreadPoolExecutor(8) as ex:
+                for tid, d in zip(todo, ex.map(lambda t: get(f"/tv/{t}", {}), todo)):
+                    la = ((d or {}).get("last_episode_to_air") or {}).get("air_date") or (d or {}).get("last_air_date") or ""
+                    LAST[tid] = int(la.replace("-", "")[:8]) if re.fullmatch(r"\d{4}-\d{2}-\d{2}", la) else 0
+            for tid, row in seen.items():
+                row.append(LAST.get(tid, 0))
+            print(f"{typ} {g}: {len(recent)} series con capítulos recientes", flush=True)
         out[g] = list(seen.values())
         print(f"{typ} {g}: {pages} páginas, {len(seen)} títulos", flush=True)
     return out
+
+LAST = {}
 
 SLUG = {"Netflix": "netflix", "Disney+": "disney", "Max": "max", "Prime Video": "prime", "Apple TV+": "apple",
         "Movistar Plus+": "movistar", "SkyShowtime": "skyshowtime", "Filmin": "filmin"}
@@ -101,9 +127,13 @@ if __name__ == "__main__":
         for g, rows in build(kind).items():
             name = f"cat-{kind}-{SLUG[g]}.tsv.gz"
             lines = []
-            for tid, date, genres, titles in rows:
+            for row in rows:
+                tid, date, genres, titles = row[:4]
                 titles = [t.replace("|", " ").replace("\t", " ") for t in titles]
-                lines.append(f"{tid}\t{date}\t{','.join(str(x) for x in genres)}\t{'|'.join(titles)}")
+                line = f"{tid}\t{date}\t{','.join(str(x) for x in genres)}\t{'|'.join(titles)}"
+                if len(row) > 4 and row[4]:
+                    line += f"\t{row[4]}"
+                lines.append(line)
             raw = ("\n".join(lines) + "\n").encode("utf-8")
             with gzip.open(name, "wb", compresslevel=9) as f:
                 f.write(raw)

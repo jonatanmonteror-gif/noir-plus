@@ -80,7 +80,8 @@ object Tmdb {
     // la plataforma (unas decenas de páginas en paralelo) y se cruza con tu lista al instante.
 
     /** Una película o serie del catálogo de TMDB: año y géneros. */
-    class Entry(val year: Int, val genres: List<Int>, val date: Int = year * 10000)
+    /** [last]: fecha del último capítulo emitido (solo series; 0 si no se sabe). */
+    class Entry(val year: Int, val genres: List<Int>, val date: Int = year * 10000, val last: Int = 0)
 
     /** Lo que hay en una plataforma: fichas por id de TMDB y, por cada título normalizado, sus ids. */
     class Catalog(val entries: Map<String, Entry>, val titles: Map<String, List<String>>) {
@@ -118,6 +119,12 @@ object Tmdb {
      * Si no aparece en ninguno, se usa el año que da el proveedor (o 0).
      */
     fun releaseDate(item: Item): Int {
+        val first = firstReleaseDate(item)
+        return if (item.kind == Kind.SERIES) maxOf(first, lastEpisodeDate(item)) else first
+    }
+
+    /** Fecha del primer estreno (película, o primer capítulo de la serie). */
+    fun firstReleaseDate(item: Item): Int {
         val p = prep(item)
         val type = if (item.kind == Kind.SERIES) "tv:" else "movie:"
         var best = 0
@@ -132,18 +139,53 @@ object Tmdb {
     }
 
     /**
+     * Series: fecha del último capítulo emitido que tu proveedor ya tiene. Si el capítulo salió ayer pero el
+     * proveedor no ha actualizado la serie desde antes, se usa el día de esa última actualización. 0 si no se sabe.
+     */
+    fun lastEpisodeDate(item: Item): Int {
+        if (item.kind != Kind.SERIES) return 0
+        val p = prep(item)
+        var last = 0
+        for ((k, c) in catalogs) {
+            if (!k.startsWith("tv:")) continue
+            val d = c.match(p)?.let { c.entries[it]?.last } ?: continue
+            if (d > last) last = d
+        }
+        if (last == 0) return 0
+        val upd = providerDay(item.added)
+        return if (upd > 0) minOf(last, upd) else last
+    }
+
+    /** Fecha (aaaammdd) de una marca de tiempo del proveedor (segundos o milisegundos). */
+    private fun providerDay(t: Long): Int {
+        if (t <= 0) return 0
+        val ms = if (t > 100_000_000_000L) t else t * 1000
+        val c = java.util.Calendar.getInstance().apply { timeInMillis = ms }
+        return c.get(java.util.Calendar.YEAR) * 10000 + (c.get(java.util.Calendar.MONTH) + 1) * 100 + c.get(java.util.Calendar.DAY_OF_MONTH)
+    }
+
+    /**
      * Fecha de estreno para la ficha, p. ej. «14 mar 2024». Primero la de TMDB; si no, la del proveedor; si no, el año.
      */
     fun releaseLabel(item: Item, details: Details?): String? {
-        val months = listOf("ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic")
-        fun fmt(y: Int, m: Int, d: Int): String? = when {
-            y < 1900 -> null
-            m !in 1..12 -> "$y"
-            d !in 1..31 -> "${months[m - 1]} $y"
-            else -> "$d ${months[m - 1]} $y"
-        }
-        val t = runCatching { releaseDate(item) }.getOrDefault(0)
-        if (t % 10000 != 0) fmt(t / 10000, t / 100 % 100, t % 100)?.let { return it }
+        val first = firstLabel(item, details) ?: return null
+        val last = lastEpisodeDate(item)
+        val lastTxt = if (last > 0 && last > firstReleaseDate(item)) fmtDate(last) else null
+        return if (lastTxt != null) "$first · Último capítulo: $lastTxt" else first
+    }
+
+    private val MONTHS = listOf("ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic")
+    private fun fmt(y: Int, m: Int, d: Int): String? = when {
+        y < 1900 -> null
+        m !in 1..12 -> "$y"
+        d !in 1..31 -> "${MONTHS[m - 1]} $y"
+        else -> "$d ${MONTHS[m - 1]} $y"
+    }
+    private fun fmtDate(t: Int): String? = fmt(t / 10000, t / 100 % 100, t % 100)
+
+    private fun firstLabel(item: Item, details: Details?): String? {
+        val t = runCatching { firstReleaseDate(item) }.getOrDefault(0)
+        if (t % 10000 != 0) fmtDate(t)?.let { return it }
         details?.release?.let { r ->
             Regex("""(\d{4})-(\d{1,2})-(\d{1,2})""").find(r)?.let { m ->
                 val (y, mo, d) = m.destructured
@@ -202,7 +244,8 @@ object Tmdb {
                     val id = p[0]
                     val date = p[1].toIntOrNull() ?: 0
                     val genres = if (p[2].isEmpty()) emptyList() else p[2].split(',').mapNotNull { it.toIntOrNull() }
-                    entries[id] = Entry(date / 10000, genres, date)
+                    val last = p.getOrNull(4)?.toIntOrNull() ?: 0
+                    entries[id] = Entry(date / 10000, genres, date, last)
                     if (p[3].isNotEmpty()) for (t in p[3].split('|')) titles.getOrPut(t) { ArrayList(1) }.add(id)
                 }
             }

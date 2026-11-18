@@ -270,7 +270,7 @@ fun CategoryScreen(kind: Kind, cat: Category) {
         value = runCatching { Library.items(kind, if (cat.id == ALL_ID) Library.ALL else cat.id) }.getOrDefault(emptyList())
     }
     var query by remember { mutableStateOf("") }
-    var sort by remember { mutableStateOf(0) } // 0 recientes, 1 A-Z, 2 valoración, 3 original
+    var sort by remember { mutableStateOf(0) } // 0 últimos estrenos, 2 valoración, 3 original
     // Filtros: varias plataformas y varios géneros a la vez (p. ej. Netflix + Max)
     val canPlat = kind != Kind.LIVE && !Library.isPlatform(cat.id)
     val canGenre = kind != Kind.LIVE && !cat.id.startsWith(Library.GENRE)
@@ -289,7 +289,6 @@ fun CategoryScreen(kind: Kind, cat: Category) {
             ?.let { l ->
             when (sort) {
                 0 -> if (kind == Kind.LIVE) l else Tmdb.byRelease(l)
-                1 -> l.sortedBy { normText(it.name) }
                 2 -> l.sortedByDescending { Imdb.cached(it)?.rating ?: 0f }
                 else -> l
             }
@@ -303,7 +302,7 @@ fun CategoryScreen(kind: Kind, cat: Category) {
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
             SearchBox(query, "Buscar aquí", Modifier.width(280.dp)) { query = it }
             Spacer(Modifier.width(12.dp))
-            listOf("Recientes", "A–Z", "Valoradas", "Original").forEachIndexed { i, l ->
+            listOf(0 to "Últimos estrenos", 2 to "Valoradas", 3 to "Original").forEach { (i, l) ->
                 Text(l, color = if (sort == i) Color.Black else Col.Sub, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.padding(start = 4.dp).clip(RoundedCornerShape(50)).background(if (sort == i) Color.White else Color.Transparent)
                         .clickable { sort = i }.pointerHoverIcon(PointerIcon.Hand).padding(horizontal = 12.dp, vertical = 7.dp))

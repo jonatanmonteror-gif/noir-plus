@@ -38,10 +38,8 @@ import java.text.Normalizer
 
 enum class SortMode(val label: String) {
     DEFAULT("Orden original"),
-    RECENT("Más recientes"),
+    RECENT("Últimos estrenos"),
     RATING("Mejor valoradas"),
-    AZ("Título A → Z"),
-    ZA("Título Z → A"),
 }
 
 private val marks = Regex("\\p{Mn}+")
@@ -52,8 +50,6 @@ fun List<Item>.sortedFor(mode: SortMode): List<Item> = when (mode) {
     // Por fecha de estreno de TMDB (si no se conoce, el año del proveedor); a igualdad, lo último añadido
     SortMode.RECENT -> com.noirplus.tv.data.Tmdb.byRelease(this)
     SortMode.RATING -> sortedByDescending { parseRating(it.rating) ?: 0f }
-    SortMode.AZ -> sortedBy { normText(it.name) }
-    SortMode.ZA -> sortedByDescending { normText(it.name) }
 }
 
 /** Icono "ordenar" (tres líneas decrecientes). */

@@ -38,7 +38,8 @@ object Tmdb {
     )
     fun genreNames(kind: Kind) = if (kind == Kind.SERIES) tvGenres else movieGenres
 
-    class Entry(val date: Int, val genres: List<Int>) { val year get() = date / 10000 }
+    /** [last]: fecha del último capítulo emitido (solo series; 0 si no se sabe). */
+    class Entry(val date: Int, val genres: List<Int>, val last: Int = 0) { val year get() = date / 10000 }
 
     class Catalog(val entries: Map<String, Entry>, val titles: Map<String, List<String>>) {
         fun match(p: Prep): String? {
@@ -116,7 +117,7 @@ object Tmdb {
                     if (p.size < 4) continue
                     val date = p[1].toIntOrNull() ?: 0
                     val genres = if (p[2].isEmpty()) emptyList() else p[2].split(',').mapNotNull { it.toIntOrNull() }
-                    entries[p[0]] = Entry(date, genres)
+                    entries[p[0]] = Entry(date, genres, p.getOrNull(4)?.toIntOrNull() ?: 0)
                     if (p[3].isNotEmpty()) for (t in p[3].split('|')) titles.getOrPut(t) { ArrayList(1) }.add(p[0])
                 }
             }
@@ -174,8 +175,14 @@ object Tmdb {
         return null
     }
 
-    /** Fecha de estreno de TMDB (aaaammdd); si no se conoce, el año del proveedor. */
+    /** Fecha para «Últimos estrenos»: películas por su estreno; series por su último capítulo ya disponible. */
     fun releaseDate(item: Item): Int {
+        val first = firstReleaseDate(item)
+        return if (item.kind == Kind.SERIES) maxOf(first, lastEpisodeDate(item)) else first
+    }
+
+    /** Fecha de estreno de TMDB (aaaammdd); si no se conoce, el año del proveedor. */
+    fun firstReleaseDate(item: Item): Int {
         val p = prep(item)
         var best = 0
         for ((_, c) in loaded(item.kind)) {
@@ -185,24 +192,50 @@ object Tmdb {
         return if (best > 0) best else (p.year ?: 0) * 10000
     }
 
-    /** Fecha de estreno para la ficha, p. ej. «14 mar 2024»: la de TMDB, si no la del proveedor, si no el año. */
+    /**
+     * Series: fecha del último capítulo emitido que tu proveedor ya tiene (si salió ayer pero el proveedor no ha
+     * actualizado la serie desde antes, cuenta el día de esa última actualización). 0 si no se sabe.
+     */
+    fun lastEpisodeDate(item: Item): Int {
+        if (item.kind != Kind.SERIES) return 0
+        val p = prep(item)
+        var last = 0
+        for ((_, c) in loaded(item.kind)) {
+            val d = c.match(p)?.let { c.entries[it]?.last } ?: continue
+            if (d > last) last = d
+        }
+        if (last == 0) return 0
+        val t = item.added
+        if (t <= 0) return last
+        val ms = if (t > 100_000_000_000L) t else t * 1000
+        val c = java.util.Calendar.getInstance().apply { timeInMillis = ms }
+        val upd = c.get(java.util.Calendar.YEAR) * 10000 + (c.get(java.util.Calendar.MONTH) + 1) * 100 + c.get(java.util.Calendar.DAY_OF_MONTH)
+        return minOf(last, upd)
+    }
+
+    private val MONTHS = listOf("ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic")
+    private fun fmt(y: Int, m: Int, d: Int): String? = when {
+        y < 1900 -> null
+        m !in 1..12 -> "$y"
+        d !in 1..31 -> "${MONTHS[m - 1]} $y"
+        else -> "$d ${MONTHS[m - 1]} $y"
+    }
+
+    /** Para la ficha: «14 mar 2024», y en series con capítulos nuevos «2024 · Último capítulo: 12 nov 2026». */
     fun releaseLabel(item: Item, details: Details?): String? {
-        val months = listOf("ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic")
-        fun fmt(y: Int, m: Int, d: Int): String? = when {
-            y < 1900 -> null
-            m !in 1..12 -> "$y"
-            d !in 1..31 -> "${months[m - 1]} $y"
-            else -> "$d ${months[m - 1]} $y"
-        }
-        val t = runCatching { releaseDate(item) }.getOrDefault(0)
-        if (t % 10000 != 0) fmt(t / 10000, t / 100 % 100, t % 100)?.let { return it }
-        details?.release?.let { r ->
-            Regex("""(\d{4})-(\d{1,2})-(\d{1,2})""").find(r)?.let { m ->
-                val (y, mo, d) = m.destructured
-                fmt(y.toInt(), mo.toInt(), d.toInt())?.let { return it }
+        val first = run {
+            val t = runCatching { firstReleaseDate(item) }.getOrDefault(0)
+            if (t % 10000 != 0) fmt(t / 10000, t / 100 % 100, t % 100)?.let { return@run it }
+            details?.release?.let { r ->
+                Regex("""(\d{4})-(\d{1,2})-(\d{1,2})""").find(r)?.let { m ->
+                    val (y, mo, d) = m.destructured
+                    fmt(y.toInt(), mo.toInt(), d.toInt())?.let { return@run it }
+                }
             }
-        }
-        return (details?.year ?: item.year)?.takeIf { it.isNotBlank() }
+            (details?.year ?: item.year)?.takeIf { it.isNotBlank() }
+        } ?: return null
+        val last = lastEpisodeDate(item)
+        return if (last > 0 && last > firstReleaseDate(item)) "$first · Último capítulo: " + (fmt(last / 10000, last / 100 % 100, last % 100) ?: "") else first
     }
 
     /** Lo más reciente primero (por fecha de estreno); a igualdad, lo último añadido. */
@@ -231,7 +264,7 @@ object Library {
             catId.startsWith(PLAT) -> {
                 val c = Tmdb.catalog(kind, catId.removePrefix(PLAT)) ?: return@withContext emptyList()
                 src.all(kind).asSequence().map { Tmdb.prep(it) }
-                    .mapNotNull { p -> c.match(p)?.let { id -> p to (c.entries[id]?.date ?: 0) } }
+                    .mapNotNull { p -> c.match(p)?.let { _ -> p to Tmdb.releaseDate(p.item) } }
                     .distinctBy { it.first.key }.sortedByDescending { it.second }.map { it.first.item }.toList()
             }
             catId.startsWith(NEW) -> {

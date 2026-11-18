@@ -301,10 +301,10 @@ fun SettingsContent() {
             Section("Aspecto") {
                 ChoiceRow("Valoraciones", listOf("Mostrar", "Ocultar"), if (prefs.ratingsEnabled) 0 else 1, "rt",
                     note = "Pestaña de valoraciones y opción «Valorar» en las fichas.") { prefs.ratingsEnabled = it == 0 }
-                val sortOpts = listOf(SortMode.RECENT, SortMode.RATING, SortMode.AZ, SortMode.DEFAULT)
-                ChoiceRow("Orden de las carpetas", listOf("Recientes", "Valoradas", "A–Z", "Original"),
+                val sortOpts = listOf(SortMode.RECENT, SortMode.RATING, SortMode.DEFAULT)
+                ChoiceRow("Orden de las carpetas", listOf("Últimos estrenos", "Valoradas", "Original"),
                     sortOpts.indexOf(prefs.defaultSort).coerceAtLeast(0), "ds",
-                    note = "Cómo se ordenan «Ver todo» y «Todas».") {
+                    note = "«Últimos estrenos»: películas por su estreno y series por su último capítulo emitido que ya tiene tu proveedor.") {
                     prefs.defaultSort = sortOpts[it]
                 }
                 ChoiceRow("Columnas en las carpetas", listOf("2", "3", "4"), prefs.gridCols - 2, "gc",
