@@ -141,6 +141,10 @@ object Store {
     fun startMode(kind: Kind): String = s("start_${kind.name}").takeIf { it == "plat" || it == "genre" || it == "new" } ?: "new"
     fun setStartMode(kind: Kind, v: String) { o.put("start_${kind.name}", v); save() }
 
+    /** Columnas de Próximos estrenos: 2 (por defecto) o 3. Se guarda para las siguientes veces. */
+    fun upcomingColumns(): Int = o.optInt("upColumns", 2).let { if (it == 3) 3 else 2 }
+    fun setUpcomingColumns(v: Int) { o.put("upColumns", v); save() }
+
     /** Última vez que se actualizaron todas las listas. */
     var lastListRefresh: Long
         get() = o.optLong("lastListRefresh", 0L)

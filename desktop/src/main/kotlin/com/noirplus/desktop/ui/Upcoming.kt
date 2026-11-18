@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Notifications
 import com.noirplus.desktop.data.Item
 import com.noirplus.desktop.data.Repo
+import com.noirplus.desktop.data.Store
 import com.noirplus.desktop.data.Tmdb
 import com.noirplus.desktop.data.Upcoming
 import kotlinx.coroutines.delay
@@ -70,19 +71,47 @@ fun UpcomingScreen() {
                 var remindVer by remember { mutableStateOf(0) }
                 val reminded = remember(remindVer) { Upcoming.reminders().map { Upcoming.remindKey(it) }.toSet() }
                 val state = androidx.compose.foundation.lazy.rememberLazyListState()
-                val todayIndex = remember(shown) { shown.indexOfFirst { it.up.date >= today }.coerceAtLeast(0) }
-                LaunchedEffect(shown) { runCatching { state.scrollToItem(todayIndex) } }
+                Store.changes.intValue
+                val cols = Store.upcomingColumns()
+                // Un bloque por día: fecha a la izquierda y los estrenos de ese día en 2 o 3 columnas
+                val days = remember(shown) { shown.groupBy { it.up.date }.toList() }
+                val todayIndex = remember(days) { days.indexOfFirst { it.first >= today }.coerceAtLeast(0) }
+                LaunchedEffect(days) { runCatching { state.scrollToItem(todayIndex) } }
                 LazyColumn(state = state, contentPadding = PaddingValues(start = 40.dp, end = 40.dp, top = 6.dp, bottom = 40.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    itemsIndexed(shown, key = { i, s -> "$i:${s.up.key}:${s.up.season}:${s.up.episode}:${s.up.date}" }) { i, s ->
-                        val first = i == 0 || shown[i - 1].up.date != s.up.date
-                        UpEntry(s, Upcoming.remindKey(s.up) in reminded, today, first) {
-                            if (s.available && s.local != null) nav.push(Screen.Detail(s.local)) else { Upcoming.toggleReminder(s.up); remindVer++ }
+                    verticalArrangement = Arrangement.spacedBy(22.dp)) {
+                    itemsIndexed(days, key = { i, d -> "$i:${d.first}" }) { _, (date, entries) ->
+                        Row(Modifier.fillMaxWidth()) {
+                            DateBadge(date, today)
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                                entries.chunked(cols).forEach { row ->
+                                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                                        row.forEach { s ->
+                                            Box(Modifier.weight(1f)) {
+                                                UpEntry(s, Upcoming.remindKey(s.up) in reminded, today, compact = cols >= 3) {
+                                                    if (s.available && s.local != null) nav.push(Screen.Detail(s.local)) else { Upcoming.toggleReminder(s.up); remindVer++ }
+                                                }
+                                            }
+                                        }
+                                        // Huecos vacíos para que la última fila no se estire
+                                        repeat(cols - row.size) { Spacer(Modifier.weight(1f)) }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
             }
         }
+    }
+}
+
+/** Fecha del bloque: mes (u HOY) y día. */
+@Composable
+private fun DateBadge(date: Int, today: Int) {
+    Column(Modifier.width(70.dp).padding(top = 6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(if (date == today) "HOY" else MONTHS[date / 100 % 100 - 1].uppercase(), color = if (date == today) Col.Text else Col.Sub,
+            fontSize = 12.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.8.sp)
+        Text("${date % 100}", color = if (date < today) Col.Sub else Col.Text, fontSize = 30.sp, fontWeight = FontWeight.Bold, fontFamily = InterDisplay)
     }
 }
 
@@ -98,52 +127,44 @@ private fun UpChip(label: String, on: Boolean, small: Boolean = false, onClick: 
 
 /** Estreno: fecha a la izquierda y tarjeta con imagen, título, qué es, resumen y botón de acción. */
 @Composable
-private fun UpEntry(s: Upcoming.Shown, reminded: Boolean, today: Int, showDate: Boolean, onClick: () -> Unit) {
+private fun UpEntry(s: Upcoming.Shown, reminded: Boolean, today: Int, compact: Boolean, onClick: () -> Unit) {
     val up = s.up
     val src = remember { MutableInteractionSource() }
     val hovered by src.collectIsHoveredAsState()
-    Row(Modifier.fillMaxWidth().widthIn(max = 1100.dp)) {
-        Column(Modifier.width(70.dp).padding(top = 6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            if (showDate) {
-                Text(if (up.date == today) "HOY" else MONTHS[up.date / 100 % 100 - 1].uppercase(), color = if (up.date == today) Col.Text else Col.Sub,
-                    fontSize = 12.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.8.sp)
-                Text("${up.date % 100}", color = if (up.date < today) Col.Sub else Col.Text, fontSize = 30.sp, fontWeight = FontWeight.Bold, fontFamily = InterDisplay)
-            }
+    Row(
+        Modifier.fillMaxWidth().height(if (compact) 176.dp else 192.dp).clip(RoundedCornerShape(14.dp))
+            .background(if (hovered) Color(0xFF2A2A30) else Col.Surface)
+            .hoverable(src).clickable(interactionSource = src, indication = null) { onClick() }.pointerHoverIcon(PointerIcon.Hand),
+    ) {
+        // Portada completa (vertical), sin recortar
+        Box(Modifier.fillMaxHeight().aspectRatio(2f / 3f).background(Color(0xFF2A2A2E))) {
+            (up.poster ?: up.backdrop)?.let { AsyncImage(it, null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize()) }
         }
-        Row(
-            Modifier.weight(1f).height(180.dp).clip(RoundedCornerShape(14.dp)).background(if (hovered) Color(0xFF2A2A30) else Col.Surface)
-                .hoverable(src).clickable(interactionSource = src, indication = null) { onClick() }.pointerHoverIcon(PointerIcon.Hand),
-        ) {
-            // Portada completa (vertical), sin recortar
-            Box(Modifier.fillMaxHeight().aspectRatio(2f / 3f).background(Color(0xFF2A2A2E))) {
-                (up.poster ?: up.backdrop)?.let { AsyncImage(it, null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize()) }
-                if (up.platform.isNotBlank()) Text(up.platform, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.align(Alignment.TopStart).padding(8.dp).clip(RoundedCornerShape(6.dp)).background(Color.Black.copy(alpha = 0.7f))
-                        .padding(horizontal = 7.dp, vertical = 3.dp))
-            }
-            Column(Modifier.weight(1f).fillMaxHeight().padding(horizontal = 20.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                Text(up.name, color = Col.Text, fontSize = 19.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(Upcoming.label(up), color = Col.Sub, fontSize = 13.sp, maxLines = 1)
-                if (up.overview.isNotBlank()) Text(up.overview, color = Col.Sub, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 17.sp)
-                Spacer(Modifier.weight(1f))
-                val scope = rememberCoroutineScope()
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    ActionPill(s, reminded, today)
-                    // Tráiler en español (se abre en el navegador)
-                    Row(
-                        Modifier.clip(RoundedCornerShape(50)).border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(50))
-                            .clickable {
-                                scope.launch {
-                                    val url = Imdb.trailerUrl(up.type, up.id, up.name)
-                                    runCatching { java.awt.Desktop.getDesktop().browse(java.net.URI(url)) }
-                                }
-                            }.pointerHoverIcon(PointerIcon.Hand).padding(horizontal = 12.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Filled.Movie, null, tint = Col.Text, modifier = Modifier.size(15.dp))
-                        Text("Tráiler", color = Col.Text, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 5.dp))
-                    }
+        Column(Modifier.weight(1f).fillMaxHeight().padding(horizontal = if (compact) 14.dp else 18.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            if (up.platform.isNotBlank()) Text(up.platform.uppercase(), color = Col.Sub, fontSize = 10.sp, fontWeight = FontWeight.SemiBold,
+                letterSpacing = 1.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(up.name, color = Col.Text, fontSize = if (compact) 15.sp else 17.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(Upcoming.label(up), color = Col.Text.copy(alpha = 0.8f), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (up.overview.isNotBlank()) Text(up.overview, color = Col.Sub, fontSize = 12.sp, maxLines = if (compact) 1 else 2, overflow = TextOverflow.Ellipsis, lineHeight = 16.sp)
+            Spacer(Modifier.weight(1f))
+            val scope = rememberCoroutineScope()
+            // Tráiler encima del botón de aviso
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(
+                    Modifier.clip(RoundedCornerShape(50)).border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(50))
+                        .clickable {
+                            scope.launch {
+                                val url = Imdb.trailerUrl(up.type, up.id, up.name)
+                                runCatching { java.awt.Desktop.getDesktop().browse(java.net.URI(url)) }
+                            }
+                        }.pointerHoverIcon(PointerIcon.Hand).padding(horizontal = 12.dp, vertical = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Filled.Movie, null, tint = Col.Text, modifier = Modifier.size(14.dp))
+                    Text("Tráiler", color = Col.Text, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 5.dp))
                 }
+                ActionPill(s, reminded, today)
             }
         }
     }
@@ -162,10 +183,10 @@ private fun ActionPill(s: Upcoming.Shown, reminded: Boolean, today: Int) {
     Row(
         Modifier.clip(RoundedCornerShape(50)).background(if (filled) Color.White else Color.Transparent)
             .then(if (filled) Modifier else Modifier.border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(50)))
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            .padding(horizontal = 12.dp, vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        androidx.compose.material3.Icon(icon, null, tint = fg, modifier = Modifier.size(15.dp))
+        androidx.compose.material3.Icon(icon, null, tint = fg, modifier = Modifier.size(14.dp))
         Text(txt, color = fg, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 5.dp))
     }
 }

@@ -139,6 +139,15 @@ fun SettingsScreen() {
                 }
             }
         }
+        Card("Próximos estrenos") {
+            Text("Cuántas columnas de estrenos se ven a la vez. Se queda guardado.", color = Col.Sub, fontSize = 12.sp, lineHeight = 17.sp)
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("Columnas", color = Col.Text, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                Seg(listOf("2 columnas" to "2", "3 columnas" to "3"), { Store.upcomingColumns().toString() }) {
+                    Store.setUpcomingColumns(it.toInt())
+                }
+            }
+        }
         Card("Plataformas") {
             Text("Las plataformas (Netflix, Disney+…), los géneros y las fechas de estreno vienen de TMDB. " +
                 "Este producto usa la API de TMDB pero no está respaldado ni certificado por TMDB.", color = Col.Sub, fontSize = 12.sp, lineHeight = 17.sp)
