@@ -64,7 +64,10 @@ fun UpcomingContent() {
     val plats = remember(platsRaw) { platsRaw.split('|').filter { it.isNotEmpty() }.toSet() }
     val l = list ?: return Loading()
     val shown = remember(l, type, platsRaw) {
-        l.filter { (type == "all" || it.up.kind == type) && (plats.isEmpty() || it.up.platform in plats) }.sortedBy { it.up.date }
+        val f = l.filter { (type == "all" || it.up.kind == type) && (plats.isEmpty() || it.up.platform in plats) }
+        val t = Upcoming.today()
+        // Primero lo estrenado en las 2 últimas semanas (lo más reciente arriba) y luego lo que viene
+        f.filter { it.up.date < t }.sortedByDescending { it.up.date } + f.filter { it.up.date >= t }.sortedBy { it.up.date }
     }
     var remindVer by remember { mutableStateOf(0) }
     val remindedKeys = remember(remindVer, changes) { Upcoming.reminders().map { Upcoming.remindKey(it) }.toSet() }
@@ -96,24 +99,31 @@ fun UpcomingContent() {
         }
         Text(
             (if (plats.isNotEmpty()) Platforms.main.filter { it in plats }.joinToString(" + ") + "  ·  " else "") +
-                "Del último mes a los próximos 3. Toca un estreno y te aviso cuando tu proveedor lo suba.",
+                "Lo estrenado en las 2 últimas semanas y lo que llega en los próximos 3 meses. Toca un estreno y te aviso cuando tu proveedor lo suba.",
             color = Col.Sub, fontSize = 12.sp, modifier = Modifier.padding(start = d.edge, end = d.edge, top = 10.dp, bottom = 4.dp),
         )
         if (shown.isEmpty()) return Message(if (l.isEmpty()) "No se pudieron cargar los próximos estrenos. Revisa la conexión." else "Nada con estos filtros")
-        // Se abre en «hoy» (lo del último mes queda encima)
-        val state = androidx.compose.foundation.lazy.rememberLazyListState()
-        val todayIndex = remember(shown) { shown.indexOfFirst { it.up.date >= today }.coerceAtLeast(0) }
-        LaunchedEffect(shown) { runCatching { state.scrollToItem(todayIndex) } }
-        LazyColumn(Modifier.fillMaxSize(), state = state,
+        val firstFuture = remember(shown) { shown.indexOfFirst { it.up.date >= today } }
+        LazyColumn(Modifier.fillMaxSize(),
             contentPadding = PaddingValues(start = d.edge, end = d.edge, top = 8.dp, bottom = d.bottomPad),
             verticalArrangement = Arrangement.spacedBy(14.dp)) {
             itemsIndexed(shown, key = { i, s -> "$i:${s.up.key}:${s.up.season}:${s.up.episode}:${s.up.date}" }) { i, s ->
                 val firstOfDay = i == 0 || shown[i - 1].up.date != s.up.date
                 val reminded = remindedKeys.contains(Upcoming.remindKey(s.up))
-                UpcomingEntry(s, reminded, today, showDate = firstOfDay) { onPick(s) }
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    if (i == 0 && firstFuture != 0) SectionHeader("Ya estrenado · últimas 2 semanas")
+                    if (i == firstFuture) SectionHeader("Próximamente", top = i > 0)
+                    UpcomingEntry(s, reminded, today, showDate = firstOfDay || i == firstFuture) { onPick(s) }
+                }
             }
         }
     }
+}
+
+@Composable
+private fun SectionHeader(text: String, top: Boolean = false) {
+    Text(text, color = Col.Text, fontSize = 17.sp, fontWeight = FontWeight.SemiBold,
+        modifier = Modifier.padding(top = if (top) 14.dp else 0.dp, bottom = 2.dp))
 }
 
 /** Qué se puede hacer con un estreno: verlo, o que te avisemos cuando tu proveedor lo suba. */

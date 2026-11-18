@@ -59,7 +59,7 @@ fun UpcomingScreen() {
         LazyRow(contentPadding = PaddingValues(horizontal = 40.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(bottom = 14.dp)) {
             items(Tmdb.platforms, key = { "p:$it" }) { p -> UpChip(p, p in plats, small = true) { plats = if (p in plats) plats - p else plats + p } }
         }
-        Text("Del último mes a los próximos 3. Haz clic en un estreno y te aviso cuando tu proveedor lo suba. «Mis capítulos»: de las series que sigues.", color = Col.Sub, fontSize = 12.sp,
+        Text("Lo estrenado en las 2 últimas semanas y lo de los próximos 3 meses. Haz clic en un estreno y te aviso cuando tu proveedor lo suba. «Mis capítulos»: de las series que sigues.", color = Col.Sub, fontSize = 12.sp,
             modifier = Modifier.padding(start = 40.dp, bottom = 6.dp))
         val l = list
         val shown = remember(l, type, plats) { l?.filter { (type == "all" || it.up.kind == type) && (plats.isEmpty() || it.up.platform in plats) }?.sortedBy { it.up.date } }
@@ -74,12 +74,18 @@ fun UpcomingScreen() {
                 Store.changes.intValue
                 val cols = Store.upcomingColumns()
                 // Un bloque por día: fecha a la izquierda y los estrenos de ese día en 2 o 3 columnas
-                val days = remember(shown) { shown.groupBy { it.up.date }.toList() }
-                val todayIndex = remember(days) { days.indexOfFirst { it.first >= today }.coerceAtLeast(0) }
-                LaunchedEffect(days) { runCatching { state.scrollToItem(todayIndex) } }
+                // Primero lo estrenado en las 2 últimas semanas (lo más reciente arriba) y luego lo que viene
+                val days = remember(shown) {
+                    val g = shown.groupBy { it.up.date }.toList()
+                    g.filter { it.first < today }.sortedByDescending { it.first } + g.filter { it.first >= today }.sortedBy { it.first }
+                }
+                val firstFuture = remember(days) { days.indexOfFirst { it.first >= today } }
                 LazyColumn(state = state, contentPadding = PaddingValues(start = 40.dp, end = 40.dp, top = 6.dp, bottom = 40.dp),
                     verticalArrangement = Arrangement.spacedBy(22.dp)) {
-                    itemsIndexed(days, key = { i, d -> "$i:${d.first}" }) { _, (date, entries) ->
+                    itemsIndexed(days, key = { i, d -> "$i:${d.first}" }) { i, (date, entries) ->
+                      Column {
+                        if (i == 0 && firstFuture != 0) UpSection("Ya estrenado · últimas 2 semanas")
+                        if (i == firstFuture) UpSection("Próximamente", top = i > 0)
                         Row(Modifier.fillMaxWidth()) {
                             DateBadge(date, today)
                             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -98,11 +104,18 @@ fun UpcomingScreen() {
                                 }
                             }
                         }
+                      }
                     }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun UpSection(text: String, top: Boolean = false) {
+    Text(text, color = Col.Text, fontSize = 18.sp, fontWeight = FontWeight.SemiBold,
+        modifier = Modifier.padding(top = if (top) 18.dp else 0.dp, bottom = 12.dp))
 }
 
 /** Fecha del bloque: mes (u HOY) y día. */

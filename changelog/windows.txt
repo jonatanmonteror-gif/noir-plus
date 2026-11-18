@@ -5,3 +5,4 @@ Novedades de la próxima versión de Windows. Una línea por punto, empezando po
 - Se quita la búsqueda automática de otra versión cuando un contenido no se abría.
 - Al abrir Noir+ ya no se descargan las listas (antes caducaban a las 12 horas): solo se renuevan a las horas fijas con Noir+ abierto o con «Actualizar listas»; si el servidor falla, se sigue con la lista anterior.
 - Próximos: las películas solo salen por su estreno en plataformas (ya no las de cines). La fecha de cines sigue en la ficha.
+- Próximos: arriba sale lo ya estrenado en las 2 últimas semanas (lo más reciente primero) y debajo «Próximamente».
