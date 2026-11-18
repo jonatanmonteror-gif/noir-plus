@@ -111,29 +111,39 @@ class VlcVideo {
 
     @Volatile private var bitmap: Bitmap? = null
     @Volatile private var bytes: ByteArray? = null
+    /** VLC escribe el fotograma en un hilo y la pantalla lo pinta en otro: nunca a la vez. */
+    val lock = Any()
+    @Volatile var released = false
 
     init {
         val format = object : BufferFormatCallbackAdapter() {
             override fun getBufferFormat(sourceWidth: Int, sourceHeight: Int): BufferFormat {
                 height.value = sourceHeight
-                bytes = ByteArray(sourceWidth * sourceHeight * 4)
-                bitmap = Bitmap().apply { allocPixels(ImageInfo(sourceWidth, sourceHeight, ColorType.BGRA_8888, ColorAlphaType.OPAQUE)) }
+                synchronized(lock) {
+                    frame.value = null
+                    bytes = ByteArray(sourceWidth * sourceHeight * 4)
+                    bitmap = Bitmap().apply { allocPixels(ImageInfo(sourceWidth, sourceHeight, ColorType.BGRA_8888, ColorAlphaType.OPAQUE)) }
+                }
                 return RV32BufferFormat(sourceWidth, sourceHeight)
             }
         }
         val render = RenderCallback { _, buffers, fmt ->
-            val bb = bytes ?: return@RenderCallback
-            val bmp = bitmap ?: return@RenderCallback
-            val src = buffers[0]
-            src.rewind()
-            src.get(bb, 0, minOf(bb.size, src.remaining()))
-            bmp.installPixels(bmp.imageInfo, bb, fmt.width * 4)
-            frame.value = bmp.asComposeImageBitmap()
+            if (released) return@RenderCallback
+            synchronized(lock) {
+                val bb = bytes ?: return@RenderCallback
+                val bmp = bitmap ?: return@RenderCallback
+                val src = buffers[0]
+                src.rewind()
+                src.get(bb, 0, minOf(bb.size, src.remaining()))
+                if (bmp.installPixels(bmp.imageInfo, bb, fmt.width * 4)) frame.value = bmp.asComposeImageBitmap()
+            }
         }
         mp.videoSurface().set(factory.videoSurfaces().newVideoSurface(format, render, true))
     }
 
     fun release() {
+        released = true
+        synchronized(lock) { frame.value = null }
         runCatching { mp.controls().stop() }
         runCatching { mp.release() }
         runCatching { factory.release() }
@@ -370,7 +380,7 @@ fun PlayerScreen(start: PlayRequest, mini: Boolean = false) {
                 .createCustomCursor(java.awt.image.BufferedImage(1, 1, java.awt.image.BufferedImage.TYPE_INT_ARGB), java.awt.Point(0, 0), "none"))),
     ) {
         video.frame.value?.let { img ->
-            Image(img, null, contentScale = when (format) { 1 -> ContentScale.Crop; 2 -> ContentScale.FillBounds; else -> ContentScale.Fit }, modifier = Modifier.fillMaxSize()
+            VideoFrame(video, img, format, Modifier.fillMaxSize()
                 .clickable(indication = null, interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }) {
                     when {
                         mini -> PlayerHost.mini = false
@@ -811,4 +821,35 @@ internal fun trackLabel(raw: String, id: Int): String {
     if (forced) parts += "Forzados"
     if (sdh) parts += "Para sordos"
     return parts.joinToString(" · ")
+}
+
+
+/**
+ * Pinta el fotograma de VLC. Se hace bajo el mismo cerrojo con el que VLC lo escribe, y si Skia no puede
+ * pintarlo en ese instante (fotograma a medio cambiar de tamaño) se salta ese fotograma en vez de cerrar la app.
+ */
+@Composable
+private fun VideoFrame(video: VlcVideo, img: ImageBitmap, format: Int, modifier: Modifier) {
+    androidx.compose.foundation.Canvas(modifier) {
+        synchronized(video.lock) {
+            if (video.released) return@Canvas
+            val cur = video.frame.value ?: img
+            val iw = cur.width.toFloat(); val ih = cur.height.toFloat()
+            if (iw <= 0f || ih <= 0f) return@Canvas
+            val sw = size.width; val sh = size.height
+            val (dw, dh) = when (format) {
+                2 -> sw to sh
+                1 -> maxOf(sw / iw, sh / ih).let { k -> iw * k to ih * k }
+                else -> minOf(sw / iw, sh / ih).let { k -> iw * k to ih * k }
+            }
+            runCatching {
+                drawImage(
+                    cur,
+                    dstOffset = androidx.compose.ui.unit.IntOffset(((sw - dw) / 2).toInt(), ((sh - dh) / 2).toInt()),
+                    dstSize = androidx.compose.ui.unit.IntSize(dw.toInt(), dh.toInt()),
+                    filterQuality = androidx.compose.ui.graphics.FilterQuality.Low,
+                )
+            }
+        }
+    }
 }
