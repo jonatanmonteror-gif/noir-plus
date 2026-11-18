@@ -143,7 +143,7 @@ object LiveIndex {
 
     // Palabras clave por temática. «x*» = empieza por x; el resto, palabra o frase completa. El orden importa: gana la primera.
     private val RULES: List<Pair<String, List<String>>> = listOf(
-        "adult" to listOf("xxx", "adult*", "adultos", "18", "porn*", "hustler", "playboy", "brazzers", "erotic*", "redlight", "dorcel"),
+        "adult" to listOf("xxx", "adult*", "adultos", "porn*", "hustler", "playboy", "brazzers", "erotic*", "redlight", "dorcel"),
         "sports" to listOf(
             "sport*", "deport*", "dazn*", "danz", "laliga*", "la liga", "liga*", "lcampeones", "campeones", "champions", "europa league",
             "conference league", "federacion", "rfef", "hypermotion", "smartbank", "copa", "supercopa", "mundial*", "eurocopa", "futbol*",
@@ -169,7 +169,7 @@ object LiveIndex {
         ),
         "docs" to listOf(
             "discovery*", "national geographic", "nationalgeo*", "nat geo*", "natgeo*", "history*", "historia", "odisea", "documental*",
-            "docu*", "animal planet", "bbc earth", "viajar", "viaje*", "dviaje", "buenviaje", "escapa*", "cocina", "canalcocina", "decasa",
+            "docu*", "animal planet", "bbc earth", "bbc earht", "earht", "viajar", "viaje*", "dviaje", "buenviaje", "escapa*", "cocina", "canalcocina", "decasa",
             "canaldecasa", "dcasa", "dmax", "crimen", "crime*", "investigation", "id", "love nature", "curiosity*", "arte", "xplora",
             "iberalia", "science", "ciencia", "planet*", "travel*", "food*", "nature", "wild", "blaze", "naturaleza", "misterio",
             "ancient", "lifestyle", "estilo de vida", "top gear", "topgear", "cultura",
@@ -187,7 +187,7 @@ object LiveIndex {
             "studio universal", "universal*", "enfamilia", "somos", "dizi", "novelas", "telenovela*", "atreseries", "a3series", "fdf",
             "factoria de ficcion", "factoriadeficcion", "acontra*", "max", "netflix", "prime video", "filmin", "estrenos*", "clasico*",
             "western", "suspense", "thriller", "terror", "humor", "romance", "hits", "oscars", "autor", "independiente", "indie",
-            "originales", "pops", "ciclo", "los 2000", "los 90", "los 80", "flix ole", "flixole", "bom cine", "cineman",
+            "originales", "pops", "ciclo", "comic*", "los 2000", "los 90", "los 80", "flix ole", "flixole", "bom cine", "cineman",
         ),
         "general" to listOf(
             "la 1", "la1", "la 2", "la2", "tve*", "antena 3", "antena3", "a3", "telecinco", "t5", "cuatro", "la sexta", "lasexta",
