@@ -1,0 +1,7 @@
+Novedades de la próxima versión de Android (tele y móvil). Una línea por punto, empezando por «- ».
+- «Últimos estrenos» sustituye a «Recientes»: las series suben cuando estrenan temporada o capítulo nuevo (si tu proveedor ya lo tiene).
+- La ficha de una serie muestra la fecha de estreno y la del último capítulo.
+- Se quita el orden A–Z.
+- Directo: temáticas revisadas con tu lista, lista por defecto, deslizar a los lados para cambiar de temática (móvil).
+- Ocultar y proteger carpetas: rediseñado con Visible / Oculta / Con PIN.
+- Novedades de cada versión: al actualizar y en Ajustes → Actualizaciones.

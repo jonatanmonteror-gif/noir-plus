@@ -23,6 +23,21 @@ object Updater {
 
     val currentCode: Int get() = BuildConfig.VERSION_CODE
 
+    /** Novedades de una versión. */
+    data class Notes(val version: String, val date: String, val items: List<String>) {
+        val code: Int get() = version.substringAfterLast('.').toIntOrNull() ?: 0
+    }
+
+    /** Historial de novedades de Android (se publica con cada versión; descarga directa, sin límite de consultas). */
+    suspend fun changelog(): List<Notes> = runCatching {
+        val arr = org.json.JSONArray(Http.get("https://github.com/$REPO/releases/latest/download/changelog.json"))
+        (0 until arr.length()).mapNotNull { i ->
+            val o = arr.optJSONObject(i) ?: return@mapNotNull null
+            val it = o.optJSONArray("items") ?: return@mapNotNull null
+            Notes(o.optString("v"), o.optString("date"), (0 until it.length()).map { k -> it.optString(k) })
+        }
+    }.getOrDefault(emptyList())
+
     /**
      * Última versión publicada. Primero por la web de GitHub (sin límite de consultas: se lee a dónde
      * redirige «releases/latest»); si falla, por la API (máx. 60 consultas por hora y casa).

@@ -49,10 +49,9 @@ private fun Header(item: Item, d: Details?, extra: String?) {
     val imdb by produceState(Imdb.cached(item), item.key, d?.tmdbId) { value = Imdb.score(item, d?.tmdbId) ?: value }
     imdb?.let { s ->
         Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("IMDb", color = Color.Black, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold,
-                modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(Color(0xFFF5C518)).padding(horizontal = 6.dp, vertical = 1.dp))
+            Text("★", color = Color(0xFFF5C518), fontSize = 17.sp)
             Text(String.format("%.1f", s.rating), color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(start = 10.dp))
+                modifier = Modifier.padding(start = 6.dp))
             Text("/10  ·  " + s.votesText, color = Col.Sub, fontSize = 13.sp, modifier = Modifier.padding(start = 4.dp))
         }
     }

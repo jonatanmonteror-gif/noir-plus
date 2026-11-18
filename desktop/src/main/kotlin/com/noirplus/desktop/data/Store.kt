@@ -137,6 +137,15 @@ object Store {
     fun browseMode(kind: Kind): String = s("browse_${kind.name}").takeIf { it == "genre" || it == "new" } ?: "plat"
     fun setBrowseMode(kind: Kind, v: String) { o.put("browse_${kind.name}", v); save() }
 
+    /** Vista con la que se abren Películas / Series: "new" (Recién subido, por defecto), "plat" o "genre". */
+    fun startMode(kind: Kind): String = s("start_${kind.name}").takeIf { it == "plat" || it == "genre" || it == "new" } ?: "new"
+    fun setStartMode(kind: Kind, v: String) { o.put("start_${kind.name}", v); save() }
+
+    /** Última versión cuyas novedades ya se han enseñado. */
+    var notesSeen: Int
+        get() = o.optInt("notesSeen", 0)
+        set(v) { o.put("notesSeen", v); save() }
+
     var lastCrashSeen: Long
         get() = o.optLong("lastCrashSeen", 0L)
         set(v) { o.put("lastCrashSeen", v); save() }

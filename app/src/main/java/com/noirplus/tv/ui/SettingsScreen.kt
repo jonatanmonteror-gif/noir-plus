@@ -113,6 +113,7 @@ fun SettingsContent() {
     var pinDialog by remember { mutableStateOf<String?>(null) } // "set", "unlock", "remove"
     var nameDialog by remember { mutableStateOf(false) }
     var syncDialog by remember { mutableStateOf<String?>(null) } // "url", "name"
+    var notesList by remember { mutableStateOf<List<com.noirplus.tv.data.Updater.Notes>?>(null) }
     LaunchedEffect(Unit) { Sync.request(0) }
     var updStatus by remember { mutableStateOf<String?>(null) }
     var updRelease by remember { mutableStateOf<Updater.Release?>(null) }
@@ -378,6 +379,9 @@ fun SettingsContent() {
                     // Una sola fila que cambia de texto: así el foco de la tele no salta a otra parte
                     LinkRow(if (rel == null) "Buscar actualizaciones" else "Descargar e instalar", rel?.name ?: BuildConfig.VERSION_NAME,
                         key = "set-upd") { if (rel == null) checkUpdates() else installUpdate(rel) }
+                    LinkRow("Novedades de cada versión", key = "set-notes") {
+                        scope.launch { notesList = Updater.changelog() }
+                    }
                 }
                 updStatus?.let { Note(it) }
                 updProgress?.let {
@@ -391,6 +395,7 @@ fun SettingsContent() {
             Text("Noir+  ·  ${BuildConfig.VERSION_NAME}", color = Col.Sub, fontSize = 12.sp, modifier = Modifier.padding(start = 4.dp))
         }
 
+        notesList?.let { NotesDialog("Novedades de Noir+ (tele y móvil)", it) { notesList = null } }
         syncDialog?.let { which ->
             if (which == "url") NameDialog(Sync.url.removePrefix("https://"), title = "Dirección del servidor (tu dominio)", maxLen = 200, url = true,
                 onCancel = { syncDialog = null }) { Sync.setUrl(it); syncDialog = null }

@@ -1,0 +1,5 @@
+Novedades de la próxima versión de Windows. Una línea por punto, empezando por «- ».
+- La nota ya no lleva la etiqueta «IMDb» (el origen se indica en Ajustes → Valoraciones).
+- Películas y Series se abren en «Recién subido»; en Ajustes eliges qué vista sale primero en cada una.
+- «Últimos estrenos» sustituye a «Recientes»: las series suben cuando estrenan temporada o capítulo nuevo (si tu proveedor ya lo tiene). Se quita el orden A–Z.
+- Novedades de cada versión: al actualizar y en Ajustes → Actualizaciones.

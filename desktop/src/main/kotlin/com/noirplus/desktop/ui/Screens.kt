@@ -202,7 +202,7 @@ fun BrowseScreen(kind: Kind) {
         value = try { src.categories(kind).newestFirst() } catch (t: Throwable) { error = friendlyError(t); emptyList() }
     }
     val nav = LocalNav.current
-    var mode by remember(kind) { mutableStateOf(Store.browseMode(kind)) }
+    var mode by remember(kind) { mutableStateOf(Store.startMode(kind)) }
     val c = cats
     when {
         c == null -> Loading()
@@ -220,7 +220,7 @@ fun BrowseScreen(kind: Kind) {
             item(key = "modes") {
                 Row(Modifier.padding(start = 40.dp, top = 4.dp, bottom = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf("plat" to "Plataformas", "genre" to "Géneros", "new" to "Recién subido").forEach { (k, l) ->
-                        Chip(l, mode == k) { mode = k; Store.setBrowseMode(kind, k) }
+                        Chip(l, mode == k) { mode = k }
                     }
                 }
             }

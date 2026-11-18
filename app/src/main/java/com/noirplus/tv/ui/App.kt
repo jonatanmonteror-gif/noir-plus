@@ -170,6 +170,7 @@ fun App() {
                 mem.restore = false
             }
             if (top == Screen.Main) UpdateNotice()
+            if (top == Screen.Main) WhatsNewAfterUpdate()
             CrashNotice()
             // Vuelta a la app tras varias horas: saludo de nuevo (salvo si se está viendo algo)
             val wr = Repo.welcomeRequest.intValue
@@ -227,9 +228,15 @@ private fun UpdateNotice() {
                 .clip(RoundedCornerShape(14.dp)).background(Col.Surface2.copy(alpha = 0.97f)).padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column(Modifier.padding(end = 14.dp)) {
+            Column(Modifier.padding(end = 14.dp).widthIn(max = 340.dp)) {
                 Text("Nueva versión lista", color = Col.Text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                 Text(status ?: "${r.name} · ya descargada", color = Col.Sub, fontSize = 12.sp)
+                // Novedades de lo que vas a instalar
+                val pending by androidx.compose.runtime.produceState<List<String>>(emptyList(), r.versionCode) {
+                    value = Updater.changelog().filter { it.code in (Updater.currentCode + 1)..r.versionCode }.flatMap { it.items }
+                }
+                pending.take(3).forEach { Text("• $it", color = Col.Text, fontSize = 12.sp, maxLines = 2, modifier = Modifier.padding(top = 3.dp)) }
+                if (pending.size > 3) Text("y ${pending.size - 3} más (Ajustes → Actualizaciones → Novedades)", color = Col.Sub, fontSize = 11.sp)
             }
             ActionButton("Instalar", primary = true, key = "upd-install", focusRequester = installFr) {
                 status = if (Updater.install(ctx, f)) "Abriendo el instalador…" else "Permite «Instalar apps desconocidas» y vuelve a pulsar"

@@ -111,6 +111,22 @@ fun SettingsScreen() {
                 Stepper(String.format("%+.1f s", Store.subDelayMs / 1000f), { Store.subDelayMs -= 100 }, { Store.subDelayMs += 100 })
             }
         }
+        Card("Valoraciones") {
+            Text("La nota de cada película y serie (★ 7,8) es la de IMDb: sus datos públicos se descargan a este PC una vez por semana. " +
+                "Para saber qué título de IMDb es cada uno se usa TMDB.", color = Col.Sub, fontSize = 12.sp, lineHeight = 17.sp)
+        }
+        Card("Al abrir Películas y Series") {
+            Text("Qué vista sale primero. Mientras navegas puedes cambiarla arriba; al volver a entrar se usa esta.",
+                color = Col.Sub, fontSize = 12.sp, lineHeight = 17.sp)
+            listOf(Kind.MOVIE to "Películas", Kind.SERIES to "Series").forEach { (k, label) ->
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(label, color = Col.Text, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                    Seg(listOf("Recién subido" to "new", "Plataformas" to "plat", "Géneros" to "genre"), { Store.startMode(k) }) {
+                        Store.setStartMode(k, it)
+                    }
+                }
+            }
+        }
         Card("Plataformas") {
             Text("Las plataformas (Netflix, Disney+…), los géneros y las fechas de estreno vienen de TMDB. " +
                 "Este producto usa la API de TMDB pero no está respaldado ni certificado por TMDB.", color = Col.Sub, fontSize = 12.sp, lineHeight = 17.sp)
@@ -159,6 +175,7 @@ fun SettingsScreen() {
                 }
             }
             updStatus?.let { Text(it, color = Col.Sub, fontSize = 13.sp) }
+            NButton("Novedades de cada versión") { scope.launch { NotesHost.show("Novedades de Noir+ para Windows", Updater.changelog()) } }
             Text("Cada versión se comprueba con su huella SHA-256 antes de instalarse.", color = Col.Sub, fontSize = 12.sp)
         }
         Card("Acerca de") {

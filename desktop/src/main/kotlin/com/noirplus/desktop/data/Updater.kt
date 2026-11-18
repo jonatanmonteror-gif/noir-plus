@@ -19,6 +19,27 @@ object Updater {
 
     private fun num(v: String) = v.substringAfterLast('.').toIntOrNull() ?: 0
 
+    data class Notes(val version: String, val date: String, val items: List<String>) {
+        val code: Int get() = version.substringAfterLast('.').toIntOrNull() ?: 0
+    }
+
+    val currentCode: Int get() = num(BuildInfo.VERSION)
+
+    /** Historial de novedades de Windows (descarga directa de la versión fija "windows"). */
+    suspend fun changelog(): List<Notes> = runCatching {
+        withContext(Dispatchers.IO) {
+            val req = Request.Builder().url("https://github.com/$REPO/releases/download/windows/changelog-windows.json")
+                .header("User-Agent", "NoirPlus-Desktop").build()
+            val txt = Http.client.newCall(req).execute().use { r -> if (r.isSuccessful) r.body?.string() else null } ?: "[]"
+            val arr = JSONArray(txt)
+            (0 until arr.length()).mapNotNull { i ->
+                val o = arr.optJSONObject(i) ?: return@mapNotNull null
+                val it = o.optJSONArray("items") ?: return@mapNotNull null
+                Notes(o.optString("v"), o.optString("date"), (0 until it.length()).map { k -> it.optString(k) })
+            }
+        }
+    }.getOrDefault(emptyList())
+
     /** Primero la versión fija "windows" (descarga directa, sin límite de consultas); si no existe, la API. */
     suspend fun check(): Release? {
         val fixed = runCatching { checkFixed() }

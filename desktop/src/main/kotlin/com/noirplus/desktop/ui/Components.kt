@@ -136,7 +136,7 @@ fun PosterCard(item: Item, width: Dp = 168.dp, onClick: () -> Unit) {
             val iv = Imdb.version.intValue
             LaunchedEffect(item.key) { kotlinx.coroutines.delay(500); Imdb.score(item) }
             remember(item.key, iv) { Imdb.cached(item) }?.let { s ->
-                Text("IMDb " + String.format("%.1f", s.rating), color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
+                Text("★ " + String.format("%.1f", s.rating), color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.align(Alignment.TopEnd).padding(6.dp).clip(RoundedCornerShape(6.dp))
                         .background(Color.Black.copy(alpha = 0.6f)).padding(horizontal = 6.dp, vertical = 2.dp))
             }

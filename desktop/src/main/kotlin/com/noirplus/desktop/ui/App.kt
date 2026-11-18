@@ -66,6 +66,8 @@ fun App() {
     Box(Modifier.fillMaxSize().background(Col.Bg)) {
         if (!hasAccount) SetupScreen() else Shell()
         CrashNotice()
+        WhatsNewAfterUpdate()
+        NotesHost.Render()
     }
 }
 

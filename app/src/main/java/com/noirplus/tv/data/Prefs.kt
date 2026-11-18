@@ -79,6 +79,11 @@ class Prefs(ctx: Context) {
     }.getOrDefault(false)
 
     /** Último cierre inesperado ya mostrado al usuario (para no repetir el aviso). */
+    /** Última versión cuyas novedades ya se han enseñado. */
+    var notesSeen: Int
+        get() = sp.getInt("notesSeen", 0)
+        set(v) { sp.edit().putInt("notesSeen", v).apply() }
+
     var lastCrashSeen: Long
         get() = sp.getLong("lastCrashSeen", 0L)
         set(v) { sp.edit().putLong("lastCrashSeen", v).apply() }

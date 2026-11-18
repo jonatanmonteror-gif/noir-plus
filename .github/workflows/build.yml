@@ -6,6 +6,9 @@ on:
     paths-ignore:
       - 'desktop/**'
       - '.github/workflows/windows.yml'
+      - 'changelog/windows.txt'
+      - 'tools/build_catalog.py'
+      - '.github/workflows/catalog.yml'
   workflow_dispatch:
 
 # Permisos mínimos: solo publicar versiones.
@@ -62,6 +65,11 @@ jobs:
           sha256sum NoirPlus.apk | cut -d' ' -f1 > NoirPlus.apk.sha256
           echo "SHA-256: $(cat NoirPlus.apk.sha256)"
 
+      - name: Novedades de la versión
+        run: |
+          python3 tools/changelog.py android "1.0.${{ github.run_number }}" \
+            "https://github.com/${{ github.repository }}/releases/latest/download/changelog.json" changelog.json
+
       - name: Publicar versión
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
@@ -72,4 +80,5 @@ jobs:
           files: |
             NoirPlus.apk
             NoirPlus.apk.sha256
+            changelog.json
           make_latest: true

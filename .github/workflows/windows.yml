@@ -6,6 +6,7 @@ on:
     paths:
       - 'desktop/**'
       - '.github/workflows/windows.yml'
+      - 'changelog/windows.txt'
   workflow_dispatch:
 
 permissions:
@@ -66,7 +67,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           printf '1.0.%s' "${{ github.run_number }}" > windows-version.txt
+          python tools/changelog.py windows "1.0.${{ github.run_number }}" \
+            "https://github.com/$GITHUB_REPOSITORY/releases/download/windows/changelog-windows.json" changelog-windows.json
           gh release view windows --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
             gh release create windows --repo "$GITHUB_REPOSITORY" --title "Noir+ para Windows (última)" \
               --notes "Siempre la última versión para Windows. La usa el actualizador del programa." --prerelease --latest=false
-          gh release upload windows NoirPlus-Setup.exe NoirPlus-Setup.exe.sha256 windows-version.txt --repo "$GITHUB_REPOSITORY" --clobber
+          gh release upload windows NoirPlus-Setup.exe NoirPlus-Setup.exe.sha256 windows-version.txt changelog-windows.json --repo "$GITHUB_REPOSITORY" --clobber
