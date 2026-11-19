@@ -123,7 +123,7 @@ object LiveIndex {
      * «M. LIGA DE CAMPEONES 2», «M+ Liga de Campeones 2», «LIGA DE CAMPEONES 2 ORANGE», «mligadecampeones2»…
      */
     private val DROP = setOf("tv", "channel", "chanel", "canal", "orange", "sat", "op", "the")
-    private fun groupKey(name: String): String {
+    fun groupKey(name: String): String {
         var toks = norm(name).split(' ').filter { it.isNotEmpty() }
         toks = when {
             toks.size > 2 && toks[0] == "m" && toks[1] == "plus" -> toks.drop(2)

@@ -37,6 +37,7 @@ import coil3.compose.AsyncImage
 import com.noirplus.desktop.data.*
 
 private const val FAV = "__fav"
+private const val MPLUS = "__mplus"
 
 /** Directo: Favoritos y temáticas a la izquierda; canales (cajas o lista) a la derecha. */
 @OptIn(ExperimentalFoundationApi::class)
@@ -59,15 +60,26 @@ fun LiveScreen() {
     val favs = remember(changes) { Store.favorites().filter { it.kind == Kind.LIVE } }
     val favKeys = remember(favs) { favs.map { it.key }.toSet() }
     val idx = index
-    val folders = remember(idx) { listOf(FAV to "★  Favoritos") + (idx?.themes ?: emptyList()).map { it.id to it.label } }
+    val folders = remember(idx) { listOf(FAV to "★  Favoritos", MPLUS to "Movistar+") + (idx?.themes ?: emptyList()).map { it.id to it.label } }
     var sel by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(idx) { if (idx != null && folders.none { it.first == sel }) sel = if (favs.isNotEmpty()) FAV else folders.getOrNull(1)?.first ?: FAV }
+    LaunchedEffect(idx) { if (idx != null && folders.none { it.first == sel }) sel = if (favs.isNotEmpty()) FAV else folders.getOrNull(2)?.first ?: FAV }
     var country by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(sel) { country = null }
     var query by remember { mutableStateOf("") }
-    val inFolder = remember(idx, sel, favs) {
+    // Movistar+: el dial de Movistar con la versión más rápida de cada canal (se mide de una en una, una vez por semana)
+    var speedVer by remember { mutableIntStateOf(0) }
+    val mplus = remember(idx, speedVer) { idx?.let { MovistarDial.build(it) } ?: emptyList() }
+    val dialOf = remember(mplus) { mplus.associate { it.second.key to it.first } }
+    LaunchedEffect(idx, sel == MPLUS) {
+        val i = idx ?: return@LaunchedEffect
+        if (sel != MPLUS) return@LaunchedEffect
+        val cands = MovistarDial.candidates(i)
+        if (LiveSpeed.needsProbe(cands) && LiveSpeed.probe(src, cands)) speedVer++
+    }
+    val inFolder = remember(idx, sel, favs, mplus) {
         when {
             idx == null -> emptyList()
+            sel == MPLUS -> mplus.map { it.second }
             sel == FAV -> favs.map { f -> idx.channelOf(f.key) ?: LiveIndex.Channel("-|${f.key}", f.name, null, "other", listOf(f)) }
             else -> idx.byTheme(sel ?: "")
         }
@@ -136,7 +148,7 @@ fun LiveScreen() {
                     asList -> LazyColumn(contentPadding = PaddingValues(start = 28.dp, end = 28.dp, top = 6.dp, bottom = 30.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         itemsIndexed(shown, key = { i, it -> "$i:${it.key}" }) { i, ch ->
-                            withMenu(ch) { ChannelCard(ch, i + 1, ch.alts.any { it.key in favKeys }) { open(i) } }
+                            withMenu(ch) { ChannelCard(ch, if (sel == MPLUS) dialOf[ch.key] ?: (i + 1) else i + 1, ch.alts.any { it.key in favKeys }) { open(i) } }
                         }
                     }
                     else -> LazyVerticalGrid(
@@ -145,7 +157,7 @@ fun LiveScreen() {
                         horizontalArrangement = Arrangement.spacedBy(14.dp), verticalArrangement = Arrangement.spacedBy(14.dp),
                     ) {
                         itemsIndexed(shown, key = { i, it -> "$i:${it.key}" }) { i, ch ->
-                            withMenu(ch) { ChannelBox(ch, i + 1, ch.alts.any { it.key in favKeys }) { open(i) } }
+                            withMenu(ch) { ChannelBox(ch, if (sel == MPLUS) dialOf[ch.key] ?: (i + 1) else i + 1, ch.alts.any { it.key in favKeys }) { open(i) } }
                         }
                     }
                 }

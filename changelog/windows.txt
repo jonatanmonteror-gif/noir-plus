@@ -11,3 +11,4 @@ Novedades de la próxima versión de Windows. Una línea por punto, empezando po
 - Próximos: lo ya estrenado va en su propia pestaña, «Recién estrenados», con lo de la última semana; «Todo» enseña solo lo que viene.
 - Próximos: se abre en «Próximamente», solo con el próximo mes; lo de la última semana está en la pestaña «Recién estrenados».
 - Directo: salen todas las versiones de cada canal (HD, FHD, 4K, bajas conexiones…) seguidas, por si alguna no funciona.
+- Directo: carpeta nueva «Movistar+» junto a Favoritos, con los canales ordenados como el dial de Movistar (La 1 en el 1…) y, de cada uno, la versión que arranca más rápido (se mide sola una vez por semana).
