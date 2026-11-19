@@ -72,8 +72,8 @@ fun CategoryScreen(kind: Kind, cat: Category, startSearch: Boolean = false) {
     val virtual = com.noirplus.tv.data.Library.isVirtual(cat.id)
     var cols by remember { androidx.compose.runtime.mutableIntStateOf(prefs.gridCols) }
     val genreV = if (cat.id.startsWith(com.noirplus.tv.data.Library.GENRE)) Tmdb.genreVersion.intValue else 0
-    val items by produceState<List<Item>?>(null, kind, cat.id, Repo.dataVersion.intValue, genreV) {
-        value = runCatching { com.noirplus.tv.data.Library.items(kind, cat.id) }.getOrDefault(emptyList())
+    val items by produceMemo<List<Item>?>("items-$kind-${cat.id}", null, kind, cat.id, Repo.dataVersion.intValue, genreV) {
+        runCatching { com.noirplus.tv.data.Library.items(kind, cat.id) }.getOrDefault(emptyList())
     }
     val pretty = remember(cat.name) { if (virtual) PrettyName(cat.name, null) else prettyCategory(cat.name, kind) }
     var searching by rememberSaveable { mutableStateOf(startSearch) }
@@ -86,10 +86,13 @@ fun CategoryScreen(kind: Kind, cat: Category, startSearch: Boolean = false) {
     // Varias plataformas a la vez (p. ej. Netflix + Max): se guardan como "Netflix|Max"
     var platformsRaw by rememberSaveable { mutableStateOf("") }
     val platforms = remember(platformsRaw) { platformsRaw.split('|').filter { it.isNotEmpty() }.toSet() }
-    var catalogs by remember { mutableStateOf<List<Tmdb.Catalog>?>(null) }
+    // Al volver atrás, los catálogos ya cargados salen al momento (así no se pierde la posición)
+    var catalogs by remember { mutableStateOf<List<Tmdb.Catalog>?>(Memo.get("plat-$kind-$platformsRaw")) }
     var progress by remember { mutableStateOf<String?>(null) }
     var failed by remember { mutableStateOf<List<String>>(emptyList()) }
     LaunchedEffect(platformsRaw) {
+        val memoKey = "plat-$kind-$platformsRaw"
+        Memo.get<List<Tmdb.Catalog>>(memoKey)?.let { catalogs = it; return@LaunchedEffect }
         catalogs = null
         failed = emptyList()
         if (platforms.isEmpty()) return@LaunchedEffect
@@ -104,6 +107,7 @@ fun CategoryScreen(kind: Kind, cat: Category, startSearch: Boolean = false) {
                 if (c != null) got += c else bad += p
             }
             catalogs = got
+            if (bad.isEmpty()) Memo.put("plat-$kind-$platformsRaw", got)
             failed = bad
         } finally {
             progress = null
@@ -113,12 +117,12 @@ fun CategoryScreen(kind: Kind, cat: Category, startSearch: Boolean = false) {
     val canGenre = kind != Kind.LIVE && Tmdb.configured() && !cat.id.startsWith(com.noirplus.tv.data.Library.GENRE)
     var genresRaw by rememberSaveable { mutableStateOf("") }
     val genres = remember(genresRaw) { genresRaw.split(',').mapNotNull { it.toIntOrNull() }.toSet() }
-    var genreCats by remember { mutableStateOf<Collection<Tmdb.Catalog>?>(null) }
+    var genreCats by remember { mutableStateOf<Collection<Tmdb.Catalog>?>(Memo.get("genres-$kind")) }
     val genreV2 = if (genres.isNotEmpty()) Tmdb.genreVersion.intValue else 0
     LaunchedEffect(genres.isNotEmpty()) {
         if (genres.isEmpty()) return@LaunchedEffect
         Tmdb.indexGenres(kind)
-        genreCats = Tmdb.allCatalogs(kind).values
+        genreCats = Tmdb.allCatalogs(kind).values.also { Memo.put("genres-$kind", it) }
     }
     val fieldFr = remember { FocusRequester() }
     LaunchedEffect(searching) {

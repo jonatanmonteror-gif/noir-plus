@@ -344,6 +344,18 @@ class Prefs(ctx: Context) {
         sp.edit().putString("liveThemes", o.toString()).apply(); bump()
     }
 
+    /** Carpeta Movistar+: versión elegida a mano para cada número del dial (dial → clave del canal). */
+    fun mplusPicks(): Map<Int, String> = runCatching {
+        val o = JSONObject(sp.getString("mplusPicks", "{}") ?: "{}")
+        o.keys().asSequence().associate { it.toInt() to o.getString(it) }
+    }.getOrDefault(emptyMap())
+
+    fun setMplusPick(dial: Int, channelKey: String) {
+        val o = runCatching { JSONObject(sp.getString("mplusPicks", "{}") ?: "{}") }.getOrDefault(JSONObject())
+        o.put(dial.toString(), channelKey)
+        sp.edit().putString("mplusPicks", o.toString()).apply(); bump()
+    }
+
     /** Canales en lista ("list", de entrada) o en cajas ("grid"). */
     var liveView: String
         get() = sp.getString("liveViewMode", "list") ?: "list"

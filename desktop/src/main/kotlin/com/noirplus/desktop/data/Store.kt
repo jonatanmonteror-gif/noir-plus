@@ -207,6 +207,13 @@ object Store {
         val j = o.optJSONObject("liveThemes") ?: JSONObject().also { o.put("liveThemes", it) }
         j.put(channelKey, theme); save()
     }
+    /** Carpeta Movistar+: versión elegida a mano para cada número del dial. */
+    fun mplusPicks(): Map<Int, String> = o.optJSONObject("mplusPicks")?.let { j ->
+        j.keys().asSequence().associate { it.toInt() to j.getString(it) } } ?: emptyMap()
+    fun setMplusPick(dial: Int, channelKey: String) {
+        val j = o.optJSONObject("mplusPicks") ?: JSONObject().also { o.put("mplusPicks", it) }
+        j.put(dial.toString(), channelKey); save()
+    }
     var liveView: String
         get() = o.optString("liveViewMode", "list")
         set(v) { o.put("liveViewMode", v); save() }

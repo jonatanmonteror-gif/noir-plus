@@ -351,16 +351,16 @@ fun HomeContent() {
     val history = remember(changes) { prefs.history() }
     val favs = remember(changes) { prefs.favorites().filter { it.kind != Kind.LIVE } }
     var hero by remember { mutableStateOf<Item?>(null) }
-    val movieCats by produceState(emptyList<Category>(), changes, Repo.dataVersion.intValue) {
-        value = runCatching { src.categories(Kind.MOVIE).filter { prefs.visible(Kind.MOVIE, it.id) }.newestFirst().take(4) }.getOrDefault(emptyList())
+    val movieCats by produceMemo("home-mcats", emptyList<Category>(), changes, Repo.dataVersion.intValue) {
+        runCatching { src.categories(Kind.MOVIE).filter { prefs.visible(Kind.MOVIE, it.id) }.newestFirst().take(4) }.getOrDefault(emptyList())
     }
-    val seriesCats by produceState(emptyList<Category>(), changes, Repo.dataVersion.intValue) {
-        value = runCatching { src.categories(Kind.SERIES).filter { prefs.visible(Kind.SERIES, it.id) }.newestFirst().take(4) }.getOrDefault(emptyList())
+    val seriesCats by produceMemo("home-scats", emptyList<Category>(), changes, Repo.dataVersion.intValue) {
+        runCatching { src.categories(Kind.SERIES).filter { prefs.visible(Kind.SERIES, it.id) }.newestFirst().take(4) }.getOrDefault(emptyList())
     }
-    val featured by produceState(emptyList<Item>(), changes, Repo.dataVersion.intValue) {
+    val featured by produceMemo("home-featured", emptyList<Item>(), changes, Repo.dataVersion.intValue) {
         val m = recentOf(Kind.MOVIE, 6)
         val sr = recentOf(Kind.SERIES, 4)
-        value = (m.zip(sr).flatMap { listOf(it.first, it.second) } + m.drop(sr.size) + sr.drop(m.size)).take(10)
+        (m.zip(sr).flatMap { listOf(it.first, it.second) } + m.drop(sr.size) + sr.drop(m.size)).take(10)
     }
 
     HeroList({
@@ -423,18 +423,18 @@ fun BrowseContent(kind: Kind) {
     val changes = prefs.changes.intValue
     var hero by remember(kind) { mutableStateOf<Item?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
-    val cats by produceState<List<Category>?>(null, kind, changes, Repo.dataVersion.intValue) {
-        value = try {
+    val cats by produceMemo<List<Category>?>("cats-$kind", null, kind, changes, Repo.dataVersion.intValue) {
+        try {
             src.categories(kind).filter { prefs.visible(kind, it.id) }.newestFirst()
         } catch (t: Throwable) {
             error = t.message
             emptyList()
         }
     }
-    val featured by produceState(emptyList<Item>(), kind, changes, Repo.dataVersion.intValue) { value = recentOf(kind, 10) }
+    val featured by produceMemo("featured-$kind", emptyList<Item>(), kind, changes, Repo.dataVersion.intValue) { recentOf(kind, 10) }
     val title = if (kind == Kind.MOVIE) "Películas" else "Series"
     // Móvil: siempre por plataforma o por género (por defecto, plataforma). Tele: también carpetas (por defecto).
-    var mode by remember(kind) {
+    var mode by rememberSaveable(kind) {
         mutableStateOf(when {
             !Tmdb.configured() -> "folders"
             d.compact -> prefs.browseMode(kind).takeIf { it != "folders" } ?: "plat"

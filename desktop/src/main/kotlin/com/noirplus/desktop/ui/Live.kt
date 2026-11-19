@@ -61,15 +61,18 @@ fun LiveScreen() {
     val favKeys = remember(favs) { favs.map { it.key }.toSet() }
     val idx = index
     val folders = remember(idx) { listOf(FAV to "★  Favoritos", MPLUS to "Movistar+") + (idx?.themes ?: emptyList()).map { it.id to it.label } }
-    var sel by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(idx) { if (idx != null && folders.none { it.first == sel }) sel = if (favs.isNotEmpty()) FAV else folders.getOrNull(2)?.first ?: FAV }
+    // Al entrar en Directo se abre siempre la carpeta Movistar+
+    var sel by remember { mutableStateOf<String?>(MPLUS) }
+    LaunchedEffect(idx) { if (idx != null && folders.none { it.first == sel }) sel = MPLUS }
     var country by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(sel) { country = null }
     var query by remember { mutableStateOf("") }
     // Movistar+: el dial de Movistar con la versión más rápida de cada canal (se mide de una en una, una vez por semana)
     var speedVer by remember { mutableIntStateOf(0) }
-    val mplus = remember(idx, speedVer) { idx?.let { MovistarDial.build(it) } ?: emptyList() }
-    val dialOf = remember(mplus) { mplus.associate { it.second.key to it.first } }
+    val picks = remember(changes) { Store.mplusPicks() }
+    val mplus = remember(idx, speedVer, picks) { idx?.let { MovistarDial.build(it, picks) } ?: emptyList() }
+    val dialOf = remember(mplus) { mplus.associate { it.channel.key to it.dial } }
+    val entryOf = remember(mplus) { mplus.associateBy { it.channel.key } }
     LaunchedEffect(idx, sel == MPLUS) {
         val i = idx ?: return@LaunchedEffect
         if (sel != MPLUS) return@LaunchedEffect
@@ -79,7 +82,7 @@ fun LiveScreen() {
     val inFolder = remember(idx, sel, favs, mplus) {
         when {
             idx == null -> emptyList()
-            sel == MPLUS -> mplus.map { it.second }
+            sel == MPLUS -> mplus.map { it.channel }
             sel == FAV -> favs.map { f -> idx.channelOf(f.key) ?: LiveIndex.Channel("-|${f.key}", f.name, null, "other", listOf(f)) }
             else -> idx.byTheme(sel ?: "")
         }
@@ -138,7 +141,10 @@ fun LiveScreen() {
                         listOf(ContextMenuItem(if (fav) "Quitar de Favoritos" else "Añadir a Favoritos") {
                             val f = favs.firstOrNull { x -> ch.alts.any { it.key == x.key } }
                             Store.toggleFavorite(f ?: ch.item)
-                        }) + if (ch.key.startsWith("-|")) emptyList() else LiveIndex.THEMES.filter { it.id != ch.theme }.map { t ->
+                        }) + (if (sel == MPLUS) entryOf[ch.key]?.let { e ->
+                            // En Movistar+: cambiar esta versión por otra del mismo canal si una falla
+                            e.variants.filter { it.key != ch.key }.map { v -> ContextMenuItem("Cambiar por «${v.name}»") { Store.setMplusPick(e.dial, v.key) } }
+                        } ?: emptyList() else emptyList()) + if (sel == MPLUS || ch.key.startsWith("-|")) emptyList() else LiveIndex.THEMES.filter { it.id != ch.theme }.map { t ->
                             ContextMenuItem("Mover a ${t.label}") { Store.setLiveTheme(ch.key.substringBefore('#'), t.id) }
                         }
                     }) { content() }

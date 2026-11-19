@@ -15,3 +15,6 @@ Novedades de la próxima versión de Android (tele y móvil). Una línea por pun
 - Móvil, Próximos: los géneros van pegados al tipo de estreno y «Serie nueva» pasa a «Nueva serie».
 - Directo: salen todas las versiones de cada canal (HD, FHD, 4K, bajas conexiones…) seguidas, por si alguna no funciona.
 - Directo: carpeta nueva «Movistar+» junto a Favoritos, con los canales ordenados como el dial de Movistar (La 1 en el 1…) y, de cada uno, la versión que arranca más rápido (se mide sola una vez por semana).
+- Directo se abre siempre en la carpeta Movistar+. Ahí, manteniendo pulsado un canal puedes cambiarlo por otra versión del mismo (HD, FHD, 4K…), por si una falla; se queda guardado.
+- Al volver atrás vuelves a donde estabas (la misma fila, la misma película y los mismos filtros), sin volver al principio.
+- Móvil en horizontal: ya no queda una franja negra arriba ni se corta la pantalla.

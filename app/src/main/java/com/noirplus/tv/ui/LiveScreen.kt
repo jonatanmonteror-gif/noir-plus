@@ -78,8 +78,8 @@ fun LiveContent() {
 
     // Todos los canales, ordenados por temática y con las calidades juntas
     val overrides = remember(changes) { prefs.liveThemes() }
-    val index by produceState<LiveIndex.Index?>(null, Repo.dataVersion.intValue, overrides) {
-        value = try {
+    val index by produceMemo<LiveIndex.Index?>("live-index", null, Repo.dataVersion.intValue, overrides) {
+        try {
             withContext(Dispatchers.Default) {
                 val cats = src.categories(Kind.LIVE)
                 val visible = cats.filter { prefs.visible(Kind.LIVE, it.id) }
@@ -98,7 +98,8 @@ fun LiveContent() {
     val folders = remember(idx) {
         listOf(FAV to "★  Favoritos", MPLUS to "Movistar+") + (idx?.themes ?: emptyList()).map { it.id to it.label }
     }
-    var selected by rememberSaveable { mutableStateOf<String?>(null) }
+    // Al entrar en Directo se abre siempre la carpeta Movistar+
+    var selected by rememberSaveable { mutableStateOf<String?>(MPLUS) }
     LaunchedEffect(idx, favs.isEmpty()) {
         if (idx != null && folders.none { it.first == selected }) {
             selected = if (favs.isNotEmpty()) FAV else folders.getOrNull(2)?.first ?: FAV
@@ -109,8 +110,10 @@ fun LiveContent() {
 
     // Movistar+: el dial de Movistar con la versión más rápida de cada canal (se mide de una en una, una vez por semana)
     var speedVer by remember { mutableIntStateOf(0) }
-    val mplus = remember(idx, speedVer) { idx?.let { com.noirplus.tv.data.MovistarDial.build(it) } ?: emptyList() }
-    val dialOf = remember(mplus) { mplus.associate { it.second.key to it.first } }
+    val picks = remember(changes) { prefs.mplusPicks() }
+    val mplus = remember(idx, speedVer, picks) { idx?.let { com.noirplus.tv.data.MovistarDial.build(it, picks) } ?: emptyList() }
+    val dialOf = remember(mplus) { mplus.associate { it.channel.key to it.dial } }
+    val entryOf = remember(mplus) { mplus.associateBy { it.channel.key } }
     LaunchedEffect(idx, selected == MPLUS) {
         val i = idx ?: return@LaunchedEffect
         if (selected != MPLUS) return@LaunchedEffect
@@ -120,7 +123,7 @@ fun LiveContent() {
     val inFolder: List<LiveIndex.Channel> = remember(idx, selected, favs, mplus) {
         when {
             idx == null -> emptyList()
-            selected == MPLUS -> mplus.map { it.second }
+            selected == MPLUS -> mplus.map { it.channel }
             selected == FAV -> favs.map { f ->
                 idx.channelOf(f.key) ?: LiveIndex.Channel("-|${f.key}", f.name, null, "other", listOf(f))
             }
@@ -152,11 +155,17 @@ fun LiveContent() {
         )
     }
     val longPress: (LiveIndex.Channel) -> Unit = { ch ->
+        // En Movistar+: cambiar esta versión por otra del mismo canal (HD, FHD, 4K…) si una falla
+        val entry = if (selected == MPLUS) entryOf[ch.key] else null
+        val swaps = entry?.variants?.filter { it.key != ch.key }?.map { v ->
+            "Cambiar por «${v.name}»" to { prefs.setMplusPick(entry.dial, v.key) }
+        } ?: emptyList()
         menu(
             ch.item.menuTarget().copy(
-                label = "Canal" + (ch.country?.let { " · " + (LiveIndex.COUNTRY_NAMES[it] ?: it) } ?: ""),
-                theme = ch.theme,
-                onTheme = if (ch.key.startsWith("-|")) null else ({ t -> prefs.setLiveTheme(ch.key.substringBefore('#'), t) }),
+                label = if (entry != null) "Dial ${entry.dial} · ${ch.name}" else "Canal" + (ch.country?.let { " · " + (LiveIndex.COUNTRY_NAMES[it] ?: it) } ?: ""),
+                theme = if (entry != null) null else ch.theme,
+                onTheme = if (entry != null || ch.key.startsWith("-|")) null else ({ t -> prefs.setLiveTheme(ch.key.substringBefore('#'), t) }),
+                actions = swaps,
             )
         )
     }

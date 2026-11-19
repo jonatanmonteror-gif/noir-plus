@@ -138,8 +138,14 @@ object MovistarDial {
         Triple(166, "Beteve", emptyList()),
     )
 
-    /** Canales del dial que hay en tu lista: (dial, canal con la versión más rápida). */
-    fun build(idx: LiveIndex.Index): List<Pair<Int, LiveIndex.Channel>> {
+    /** Un canal del dial: la versión que se usa y todas las que hay (para poder cambiarla a mano). */
+    class Entry(val dial: Int, val channel: LiveIndex.Channel, val variants: List<LiveIndex.Channel>)
+
+    /**
+     * Canales del dial que hay en tu lista. [picks] son las versiones elegidas a mano (dial → clave del canal);
+     * si no hay elección, la versión más rápida.
+     */
+    fun build(idx: LiveIndex.Index, picks: Map<Int, String> = emptyMap()): List<Entry> {
         // Versiones de cada canal, por la clave de grupo (sin país)
         val byBase = HashMap<String, MutableList<LiveIndex.Channel>>()
         for (c in idx.channels) {
@@ -153,9 +159,9 @@ object MovistarDial {
                 .mapNotNull { byBase[it] }.firstOrNull() ?: return@mapNotNull null
             val base = variants.first().key.substringBefore('#')
             if (!used.add(base)) return@mapNotNull null
-            val best = LiveSpeed.best(variants)
-            dial to LiveIndex.Channel(best.key, name.replace("M+ ", "M+ ").let { pretty(it) }, best.country, best.theme,
-                listOf(best.item) + variants.filter { it !== best }.map { it.item }, best.bestQ)
+            val best = picks[dial]?.let { k -> variants.firstOrNull { it.key == k } } ?: LiveSpeed.best(variants)
+            Entry(dial, LiveIndex.Channel(best.key, pretty(name), best.country, best.theme,
+                listOf(best.item) + variants.filter { it !== best }.map { it.item }, best.bestQ), variants)
         }
     }
 

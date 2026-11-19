@@ -116,7 +116,8 @@ fun App() {
     val conf = LocalConfiguration.current
     val dims = when {
         isTv -> TvDims
-        conf.screenWidthDp < 600 -> PhoneDims
+        // Móvil también en horizontal (antes en horizontal pasaba al diseño de tableta y se cortaba)
+        conf.smallestScreenWidthDp < 600 -> PhoneDims
         else -> TabletDims
     }
     val base = LocalDensity.current
