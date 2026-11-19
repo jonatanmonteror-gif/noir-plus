@@ -33,6 +33,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -63,6 +64,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.ui.draw.clip
 
 private const val FAV = "__fav"
+private const val MPLUS = "__mplus"
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
@@ -94,20 +96,31 @@ fun LiveContent() {
     val favKeys = remember(favs) { favs.map { it.key }.toSet() }
     val idx = index
     val folders = remember(idx) {
-        listOf(FAV to "★  Favoritos") + (idx?.themes ?: emptyList()).map { it.id to it.label }
+        listOf(FAV to "★  Favoritos", MPLUS to "Movistar+") + (idx?.themes ?: emptyList()).map { it.id to it.label }
     }
     var selected by rememberSaveable { mutableStateOf<String?>(null) }
     LaunchedEffect(idx, favs.isEmpty()) {
         if (idx != null && folders.none { it.first == selected }) {
-            selected = if (favs.isNotEmpty()) FAV else folders.getOrNull(1)?.first ?: FAV
+            selected = if (favs.isNotEmpty()) FAV else folders.getOrNull(2)?.first ?: FAV
         }
     }
     var country by rememberSaveable { mutableStateOf<String?>(null) }
     LaunchedEffect(selected) { country = null }
 
-    val inFolder: List<LiveIndex.Channel> = remember(idx, selected, favs) {
+    // Movistar+: el dial de Movistar con la versión más rápida de cada canal (se mide de una en una, una vez por semana)
+    var speedVer by remember { mutableIntStateOf(0) }
+    val mplus = remember(idx, speedVer) { idx?.let { com.noirplus.tv.data.MovistarDial.build(it) } ?: emptyList() }
+    val dialOf = remember(mplus) { mplus.associate { it.second.key to it.first } }
+    LaunchedEffect(idx, selected == MPLUS) {
+        val i = idx ?: return@LaunchedEffect
+        if (selected != MPLUS) return@LaunchedEffect
+        val cands = com.noirplus.tv.data.MovistarDial.candidates(i)
+        if (com.noirplus.tv.data.LiveSpeed.needsProbe(cands) && com.noirplus.tv.data.LiveSpeed.probe(src, cands)) speedVer++
+    }
+    val inFolder: List<LiveIndex.Channel> = remember(idx, selected, favs, mplus) {
         when {
             idx == null -> emptyList()
+            selected == MPLUS -> mplus.map { it.second }
             selected == FAV -> favs.map { f ->
                 idx.channelOf(f.key) ?: LiveIndex.Channel("-|${f.key}", f.name, null, "other", listOf(f))
             }
@@ -158,7 +171,7 @@ fun LiveContent() {
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     itemsIndexed(channels, key = { i, ch -> "$i:${ch.key}" }) { i, ch ->
-                        ChannelRow(ch, i + 1, ch.main.key in favKeys || ch.alts.any { it.key in favKeys }, "live/$selected/${ch.key}",
+                        ChannelRow(ch, if (selected == MPLUS) dialOf[ch.key] ?: (i + 1) else i + 1, ch.main.key in favKeys || ch.alts.any { it.key in favKeys }, "live/$selected/${ch.key}",
                             onLongClick = { longPress(ch) }) { play(i) }
                     }
                 }
@@ -176,7 +189,7 @@ fun LiveContent() {
                     itemsIndexed(channels, key = { i, ch -> "$i:${ch.key}" }) { i, ch ->
                         ChannelCard(
                             ch.item,
-                            number = i + 1,
+                            number = if (selected == MPLUS) dialOf[ch.key] ?: (i + 1) else i + 1,
                             isFav = ch.main.key in favKeys || ch.alts.any { it.key in favKeys },
                             memKey = "live/${selected}/${ch.key}",
                             onLongClick = { longPress(ch) },
