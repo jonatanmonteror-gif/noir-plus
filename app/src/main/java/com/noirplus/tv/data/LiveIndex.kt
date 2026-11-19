@@ -246,7 +246,7 @@ object LiveIndex {
      * [overrides] son las temáticas elegidas a mano (clave del canal → temática).
      */
     fun build(items: List<Item>, catName: (String) -> String?, overrides: Map<String, String>): Index {
-        data class Parsed(val item: Item, val country: String?, val name: String, val base: String, val q: Int, val cat: String, val order: Int)
+        data class Parsed(val item: Item, val country: String?, val name: String, val base: String, val q: Int, val cat: String, val order: Int, val raw: String)
 
         val parsed = ArrayList<Parsed>(items.size)
         items.forEachIndexed { i, it ->
@@ -265,7 +265,9 @@ object LiveIndex {
                 .replace(Regex("""\s{2,}"""), " ").trim(' ', '-', ':', '.', '–')
             val name = clean.ifBlank { it.name.trim() }
             val base = groupKey(name)
-            parsed += Parsed(it, country, name, base, q, cat, i)
+            val raw = rest.replace(JUNK, " ").replace(Regex("""\(\s*\)|\[\s*]"""), " ")
+                .replace(Regex("""\s{2,}"""), " ").trim(' ', '-', ':', '.', '–').ifBlank { name }
+            parsed += Parsed(it, country, name, base, q, cat, i, raw)
         }
 
         val groups = LinkedHashMap<String, MutableList<Parsed>>()
@@ -290,8 +292,17 @@ object LiveIndex {
                 ?: ps.firstNotNullOfOrNull { classify(it.name) }
                 ?: ps.firstNotNullOfOrNull { categoryTheme(it.cat) }
                 ?: "other"
-            Channel(key, shown.name, shown.country, theme, sorted.map { it.item }, sorted.first().q) to first.order
-        }
+            // Todas las versiones del canal (HD, FHD, 4K, bajas conexiones…) por separado y seguidas,
+            // por si alguna no funciona; la mejor conserva la clave de siempre (favoritos y temática elegida a mano)
+            val seen = HashMap<String, Int>()
+            sorted.mapIndexed { j, p ->
+                var label = if (sorted.size == 1) shown.name else p.raw + (if (p.q == 5) " (bajas conexiones)" else "")
+                val n = (seen[label.lowercase()] ?: 0) + 1
+                seen[label.lowercase()] = n
+                if (n > 1) label = "$label · $n"
+                Channel(if (j == 0) key else "$key#${p.item.id}", label, shown.country, theme, listOf(p.item), p.q) to (first.order * 1000 + j)
+            }
+        }.flatten()
         // España primero; después por país con más canales; dentro, el orden del proveedor
         val countryRank = channels.groupingBy { it.first.country }.eachCount()
         val ordered = channels.sortedWith(

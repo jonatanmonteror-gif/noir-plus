@@ -10,3 +10,4 @@ Novedades de la próxima versión de Windows. Una línea por punto, empezando po
 - Aviso de capítulo nuevo o de estreno ya disponible: con 20 de margen por cada lado, casi negro, borde blanco fino y esquinas más redondeadas.
 - Próximos: lo ya estrenado va en su propia pestaña, «Recién estrenados», con lo de la última semana; «Todo» enseña solo lo que viene.
 - Próximos: se abre en «Próximamente», solo con el próximo mes; lo de la última semana está en la pestaña «Recién estrenados».
+- Directo: salen todas las versiones de cada canal (HD, FHD, 4K, bajas conexiones…) seguidas, por si alguna no funciona.

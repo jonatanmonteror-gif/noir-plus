@@ -127,7 +127,7 @@ fun LiveScreen() {
                             val f = favs.firstOrNull { x -> ch.alts.any { it.key == x.key } }
                             Store.toggleFavorite(f ?: ch.item)
                         }) + if (ch.key.startsWith("-|")) emptyList() else LiveIndex.THEMES.filter { it.id != ch.theme }.map { t ->
-                            ContextMenuItem("Mover a ${t.label}") { Store.setLiveTheme(ch.key, t.id) }
+                            ContextMenuItem("Mover a ${t.label}") { Store.setLiveTheme(ch.key.substringBefore('#'), t.id) }
                         }
                     }) { content() }
                 }

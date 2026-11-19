@@ -143,7 +143,7 @@ fun LiveContent() {
             ch.item.menuTarget().copy(
                 label = "Canal" + (ch.country?.let { " · " + (LiveIndex.COUNTRY_NAMES[it] ?: it) } ?: ""),
                 theme = ch.theme,
-                onTheme = if (ch.key.startsWith("-|")) null else ({ t -> prefs.setLiveTheme(ch.key, t) }),
+                onTheme = if (ch.key.startsWith("-|")) null else ({ t -> prefs.setLiveTheme(ch.key.substringBefore('#'), t) }),
             )
         )
     }
