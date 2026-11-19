@@ -225,6 +225,11 @@ fun PlayerScreen(start: PlayRequest, mini: Boolean = false) {
         PlayerHost.close()
     }
 
+    // Mientras se ve algo no se mide la velocidad de los canales (no se abre una segunda conexión)
+    DisposableEffect(Unit) {
+        LiveSpeed.paused = true
+        onDispose { LiveSpeed.paused = false }
+    }
     DisposableEffect(video) {
         var firstPlay = true
         video.mp.events().addMediaPlayerEventListener(object : MediaPlayerEventAdapter() {

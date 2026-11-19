@@ -18,7 +18,10 @@ object Memo {
 @Composable
 fun <T> produceMemo(key: String, initial: T, vararg keys: Any?, load: suspend () -> T): State<T> =
     produceState(Memo.get<T>(key) ?: initial, key, *keys) {
-        val v = load()
+        // Si la carga falla, se queda lo que había (no se cierra la app)
+        val v = try { load() } catch (c: kotlinx.coroutines.CancellationException) { throw c } catch (t: Throwable) {
+            com.noirplus.tv.data.ErrorLog.note("Carga de pantalla", t); return@produceState
+        }
         Memo.put(key, v)
         value = v
     }

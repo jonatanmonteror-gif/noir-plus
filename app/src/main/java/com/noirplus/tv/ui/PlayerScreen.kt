@@ -156,6 +156,11 @@ fun PlayerScreen(req: PlayRequest) {
     SubtitleClock.delayUs = sessionDelay * 1000L
 
     // Móvil: horizontal mientras se reproduce; al salir, se restaura orientación y brillo.
+    // Mientras se ve algo no se mide la velocidad de los canales (no se abre una segunda conexión)
+    DisposableEffect(Unit) {
+        com.noirplus.tv.data.LiveSpeed.paused = true
+        onDispose { com.noirplus.tv.data.LiveSpeed.paused = false }
+    }
     DisposableEffect(Unit) {
         val prev = activity?.requestedOrientation
         if (!dims.tv) activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE

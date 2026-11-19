@@ -145,7 +145,10 @@ object MovistarDial {
      * Canales del dial que hay en tu lista. [picks] son las versiones elegidas a mano (dial → clave del canal);
      * si no hay elección, la versión más rápida.
      */
-    fun build(idx: LiveIndex.Index, picks: Map<Int, String> = emptyMap()): List<Entry> {
+    fun build(idx: LiveIndex.Index, picks: Map<Int, String> = emptyMap()): List<Entry> =
+        runCatching { buildUnsafe(idx, picks) }.getOrDefault(emptyList())
+
+    private fun buildUnsafe(idx: LiveIndex.Index, picks: Map<Int, String>): List<Entry> {
         // Versiones de cada canal, por la clave de grupo (sin país)
         val byBase = HashMap<String, MutableList<LiveIndex.Channel>>()
         for (c in idx.channels) {
@@ -169,11 +172,9 @@ object MovistarDial {
         .replace("Federacion", "Federación").replace("Aragon", "Aragón").replace("Beteve", "Betevé")
 
     /** Todas las versiones de los canales del dial (para medir cuál va mejor). */
-    fun candidates(idx: LiveIndex.Index): List<Item> {
-        val keys = DIAL.flatMap { (_, n, a) -> (listOf(n) + a).map { LiveIndex.groupKey(it) } }.toSet()
-        return idx.channels.filter { (it.country == null || it.country == "ES") &&
-            it.key.substringBefore('#').substringAfter('|') in keys }.map { it.item }
-    }
+    fun candidates(idx: LiveIndex.Index): List<Item> =
+        // En orden de dial (primero La 1, La 2…) para que lo más usado quede medido antes
+        runCatching { buildUnsafe(idx, emptyMap()).flatMap { e -> e.variants.map { it.item } } }.getOrDefault(emptyList())
 }
 
 /**
@@ -184,12 +185,16 @@ object LiveSpeed {
     private const val WEEK = 7L * 86400_000L
     private var cache: JSONObject? = null
     @Volatile var running = false
+    /** Mientras se está viendo algo no se mide nada (el proveedor puede no dejar dos conexiones a la vez). */
+    @Volatile var paused = false
 
     private fun file(): File? = ListDisk.root?.parentFile?.let { File(it, "velocidad-canales.json") }
 
+    @Synchronized
     private fun load(): JSONObject = cache ?: runCatching { JSONObject(file()!!.readText()) }.getOrDefault(JSONObject()).also { cache = it }
 
     /** Milisegundos medidos (o null si no se ha medido o hace más de una semana). Un fallo cuenta como muy lento. */
+    @Synchronized
     fun ms(key: String): Long? {
         val o = load().optJSONObject(key) ?: return null
         val age = System.currentTimeMillis() - o.optLong("at")
@@ -216,7 +221,10 @@ object LiveSpeed {
         try {
             val client = Http.client.newBuilder().connectTimeout(6, TimeUnit.SECONDS).readTimeout(6, TimeUnit.SECONDS)
                 .callTimeout(8, TimeUnit.SECONDS).build()
+            var done = 0
             for (it in items) {
+                // Como mucho 60 por vez: la próxima vez que entres sigue por donde iba
+                if (paused || done >= 60) break
                 if (ms(it.key) != null) continue
                 val url = src.streamUrl(it)
                 if (url.isBlank()) continue
@@ -239,6 +247,7 @@ object LiveSpeed {
                     runCatching { file()?.writeText(o.toString()) }
                 }
                 any = true
+                done++
                 delay(400) // de una en una y con calma
             }
         } finally { running = false }
