@@ -171,7 +171,7 @@ fun SettingsScreen() {
                 color = Col.Sub, fontSize = 12.sp, lineHeight = 17.sp)
         }
         Card("Actualizaciones") {
-            Row2("Versión instalada", BuildInfo.VERSION)
+            Row2("Versión instalada", BuildInfo.DISPLAY)
             val p = progress
             if (p != null) {
                 Box(Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(50)).background(Color.White.copy(alpha = 0.2f))) {
@@ -187,10 +187,10 @@ fun SettingsScreen() {
                         updStatus = when {
                             found.isFailure -> "No se pudo comprobar: " + friendlyError(found.exceptionOrNull()!!)
                             release == null -> "Ya tienes la última versión."
-                            else -> "Hay una versión nueva: ${release!!.version}"
+                            else -> "Hay una versión nueva: ${Updater.display(release!!.version)}"
                         }
                     }
-                } else NButton("Descargar e instalar ${r.version}", primary = true) {
+                } else NButton("Descargar e instalar ${Updater.display(r.version)}", primary = true) {
                     progress = 0f
                     scope.launchCatching({ updStatus = it; progress = null }) { Updater.install(r) { progress = it } }
                 }

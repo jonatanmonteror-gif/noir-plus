@@ -65,11 +65,15 @@ jobs:
           (Get-FileHash NoirPlus-Setup.exe -Algorithm SHA256).Hash.ToLower() | Out-File -Encoding ascii -NoNewline NoirPlus-Setup.exe.sha256
           Get-Content NoirPlus-Setup.exe.sha256
 
+      - name: Número de versión a la vista (2.0.0 desde la compilación 58)
+        shell: bash
+        run: echo "DISPLAY=2.0.$(( ${{ github.run_number }} - 58 ))" >> "$GITHUB_ENV"
+
       - name: Publicar versión
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           tag_name: windows-v2.0.${{ github.run_number }}
-          name: Noir+ para Windows 2.0.${{ github.run_number }}
+          name: Noir+ para Windows ${{ env.DISPLAY }}
           body: |
             Instalador de Noir+ para Windows. Necesita VLC (64 bits) instalado.
             Huella SHA-256 en NoirPlus-Setup.exe.sha256.

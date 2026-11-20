@@ -25,6 +25,13 @@ object Updater {
 
     val currentCode: Int get() = num(BuildInfo.VERSION)
 
+    /** Número interno 2.0.<compilación> → el que se enseña: 2.0.0 desde la compilación 58. */
+    fun display(v: String): String {
+        val n = v.substringAfterLast('.').toIntOrNull() ?: return v
+        val head = v.substringBeforeLast('.', "")
+        return if (head.endsWith("2.0") && n >= 58) head + "." + (n - 58) else v
+    }
+
     /** Historial de novedades de Windows (descarga directa de la versión fija "windows"). */
     suspend fun changelog(): List<Notes> = runCatching {
         withContext(Dispatchers.IO) {

@@ -15,7 +15,8 @@ android {
         minSdk = 21
         targetSdk = 35
         versionCode = buildNumber
-        versionName = "2.0.$buildNumber"
+        // Versión a la vista: 2.0.0 desde la compilación 105 (2.0.1, 2.0.2…); el número interno sigue siendo versionCode
+        versionName = "2.0." + (buildNumber - 105).coerceAtLeast(0)
     }
 
     // Firma:

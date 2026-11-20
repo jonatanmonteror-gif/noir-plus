@@ -23,6 +23,13 @@ object Updater {
 
     val currentCode: Int get() = BuildConfig.VERSION_CODE
 
+    /** Número interno 2.0.<compilación> → el que se enseña: 2.0.0 desde la compilación 105. */
+    fun display(v: String): String {
+        val n = v.substringAfterLast('.').toIntOrNull() ?: return v
+        val head = v.substringBeforeLast('.', "")
+        return if (head.endsWith("2.0") && n >= 105) head + "." + (n - 105) else v
+    }
+
     /** Novedades de una versión. */
     data class Notes(val version: String, val date: String, val items: List<String>) {
         val code: Int get() = version.substringAfterLast('.').toIntOrNull() ?: 0
@@ -53,7 +60,7 @@ object Updater {
                 if (!tag.startsWith("v")) return@withContext null
                 val code = tag.substringAfterLast('.').toIntOrNull() ?: return@withContext null
                 val base = "https://github.com/$REPO/releases/download/$tag"
-                Release(code, "Noir+ ${tag.removePrefix("v")}", "$base/NoirPlus.apk", "$base/NoirPlus.apk.sha256")
+                Release(code, "Noir+ ${display(tag.removePrefix("v"))}", "$base/NoirPlus.apk", "$base/NoirPlus.apk.sha256")
             }
         }
     }.getOrNull()

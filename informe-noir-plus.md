@@ -13,6 +13,7 @@
   - **Windows** (programa propio, no emulador).
 - **Primer nombre provisional:** Nexo TV. Pasó a **Noir+** el 17/11.
 - **Versiones a 19/11:** Android **v1.0.92**, Windows **1.0.52**.
+- **20/11/2026: lanzada la versión estable Noir+ 2.0** (Android **2.0.104**, Windows **2.0.57**), con una bienvenida a la 2.0 que sale una vez al actualizar.
 - **Repositorio:** https://github.com/jonatanmonteror-gif/noir-plus (público).
 - **Descarga directa del APK:** https://github.com/jonatanmonteror-gif/noir-plus/releases/latest/download/NoirPlus.apk
 - **Código de Downloader:** **1220987** (aftv.news/1220987). Siempre apunta a la última versión.

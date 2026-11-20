@@ -73,7 +73,7 @@ fun NotesDialog(title: String, allNotes: List<Updater.Notes>, onClose: () -> Uni
             LazyColumn(Modifier.weight(1f, fill = false), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 itemsIndexed(notes, key = { i, it -> "$i:${it.version}" }) { _, n ->
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text("Versión ${n.version}" + (if (n.date.isNotBlank()) "  ·  " + prettyDate(n.date) else ""),
+                        Text(if (n.version == "2.0") "Noir+ 2.0" else "Versión ${Updater.display(n.version)}" + (if (n.date.isNotBlank()) "  ·  " + prettyDate(n.date) else ""),
                             color = Col.Sub, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                         n.items.forEach { line ->
                             Row {

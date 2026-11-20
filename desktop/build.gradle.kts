@@ -8,6 +8,8 @@ plugins {
 
 // Versión: 1.0.<número de compilación de GitHub>
 val appVersion = "2.0." + (System.getenv("RUN_NUMBER") ?: "0")
+// Versión a la vista: 2.0.0 desde la compilación 58 (2.0.1, 2.0.2…); appVersion sigue siendo el número interno
+val displayVersion = "2.0." + ((System.getenv("RUN_NUMBER")?.toIntOrNull() ?: 58) - 58).coerceAtLeast(0)
 version = appVersion
 
 dependencies {
@@ -32,7 +34,7 @@ val genBuildInfo by tasks.registering {
     doLast {
         val f = genDir.get().file("com/noirplus/desktop/BuildInfo.kt").asFile
         f.parentFile.mkdirs()
-        f.writeText("package com.noirplus.desktop\n\nobject BuildInfo { const val VERSION = \"$appVersion\" }\n")
+        f.writeText("package com.noirplus.desktop\n\nobject BuildInfo { const val VERSION = \"$appVersion\"; const val DISPLAY = \"$displayVersion\" }\n")
     }
 }
 sourceSets["main"].kotlin.srcDir(genDir)

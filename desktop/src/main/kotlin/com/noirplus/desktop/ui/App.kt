@@ -173,7 +173,7 @@ private fun Sidebar(nav: Nav) {
                 NavMini(Icons.Filled.Close, "Salir") { kotlin.system.exitProcess(0) }
             }
         }
-        Text("v${BuildInfo.VERSION}", color = Col.Sub.copy(alpha = 0.5f), fontSize = 11.sp, modifier = Modifier.padding(start = 12.dp, top = 10.dp))
+        Text("v${BuildInfo.DISPLAY}", color = Col.Sub.copy(alpha = 0.5f), fontSize = 11.sp, modifier = Modifier.padding(start = 12.dp, top = 10.dp))
     }
 }
 
@@ -203,7 +203,7 @@ private fun UpdateBanner(r: Updater.Release, modifier: Modifier, onClose: () -> 
     Column(
         modifier.width(340.dp).clip(RoundedCornerShape(14.dp)).background(Col.Surface2).padding(18.dp),
     ) {
-        Text("Nueva versión ${r.version}", color = Col.Text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+        Text("Nueva versión ${Updater.display(r.version)}", color = Col.Text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
         Text(error ?: "Se descarga, se comprueba y se instala encima. La app se cerrará un momento.", color = if (error != null) Col.Error else Col.Sub,
             fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp, bottom = 12.dp))
         val p = progress

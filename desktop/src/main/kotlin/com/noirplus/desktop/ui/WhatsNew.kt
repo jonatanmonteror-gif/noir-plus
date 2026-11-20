@@ -39,7 +39,7 @@ object NotesHost {
                 LazyColumn(Modifier.heightIn(max = 460.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     items(notes, key = { it.version }) { n ->
                         Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                            Text("Versión ${n.version}" + (if (n.date.isNotBlank()) "  ·  " + prettyDate(n.date) else ""),
+                            Text(if (n.version == "2.0") "Noir+ 2.0" else "Versión ${Updater.display(n.version)}" + (if (n.date.isNotBlank()) "  ·  " + prettyDate(n.date) else ""),
                                 color = Col.Sub, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                             n.items.forEach { line ->
                                 Row {
