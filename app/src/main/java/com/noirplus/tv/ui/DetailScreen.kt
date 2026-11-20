@@ -222,7 +222,7 @@ private fun IconLabel(icon: ImageVector, label: String, onClick: () -> Unit) {
     }
 }
 
-/** Mi lista · botón grande de reproducir · Info */
+/** Mi lista · botón grande de reproducir · Tráiler (la información se ve siempre entera) */
 @Composable
 private fun PhoneActions(fav: Boolean, onFav: () -> Unit, onPlay: () -> Unit, onInfo: () -> Unit, playHint: String?, onTrailer: () -> Unit) {
     Row(
@@ -236,7 +236,6 @@ private fun PhoneActions(fav: Boolean, onFav: () -> Unit, onPlay: () -> Unit, on
             contentAlignment = Alignment.Center,
         ) { Icon(Icons.Filled.PlayArrow, "Reproducir", tint = Color.Black, modifier = Modifier.size(40.dp)) }
         IconLabel(TrailerIcon, "Tráiler", onTrailer)
-        IconLabel(Icons.Filled.Info, "Info", onInfo)
     }
     if (playHint != null) {
         Text(playHint, color = Col.Sub, fontSize = 12.sp, textAlign = TextAlign.Center,
@@ -331,14 +330,14 @@ private fun MovieDetail(item: Item) {
     }
 
     if (d.compact) {
-        var expanded by remember { mutableStateOf(false) }
+        val expanded = true
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 32.dp)) {
             PhoneHeader(item, details, extra = "Película")
             PhoneActions(
                 fav = fav,
                 onFav = { prefs.toggleFavorite(item) },
                 onPlay = { play(progress?.position ?: 0L) },
-                onInfo = { expanded = !expanded },
+                onInfo = {},
                 playHint = progress?.let { "Continuar desde ${fmt(it.position)}" },
                 onTrailer = trailer,
             )
@@ -464,14 +463,14 @@ private fun SeriesDetail(item: Item) {
     }
 
     if (d.compact) {
-        var expanded by remember { mutableStateOf(false) }
+        val expanded = true
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 32.dp)) {
             PhoneHeader(item, sd?.details, extra = if (seasons.isNotEmpty()) "${seasons.size} temporada" + (if (seasons.size > 1) "s" else "") else "Serie")
             PhoneActions(
                 fav = fav,
                 onFav = { prefs.toggleFavorite(item) },
                 onPlay = { playMain() },
-                onInfo = { expanded = !expanded },
+                onInfo = {},
                 playHint = when {
                     last != null -> "Continuar · " + last.title.substringAfterLast("· ")
                     first != null -> "Empezar · T${first.season} E${first.number}"
