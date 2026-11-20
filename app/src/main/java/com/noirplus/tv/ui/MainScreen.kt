@@ -72,8 +72,8 @@ import com.noirplus.tv.data.Repo
 import kotlinx.coroutines.delay
 
 enum class Tab(val label: String) {
-    HOME("Inicio"), LIVE("Directo"), MOVIES("Películas"), SERIES("Series"), UPCOMING("Próximos"), MYLIST("Mi lista"), RATINGS("Valoraciones"),
-    SEARCH("Buscar"), SETTINGS("Ajustes")
+    HOME("Inicio"), SEARCH("Buscar"), LIVE("Directo"), MOVIES("Películas"), SERIES("Series"), UPCOMING("Próximos"), MYLIST("Mi lista"),
+    RATINGS("Valoraciones"), SETTINGS("Ajustes")
 }
 
 @Composable
@@ -118,7 +118,7 @@ private fun BigScreenMain() {
                 Modifier.focusRestorer(),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                Tab.entries.filter { it != Tab.RATINGS || Repo.prefs.ratingsEnabled }.forEach { t ->
+                Tab.entries.filter { it != Tab.RATINGS || (!d.tv && Repo.prefs.ratingsEnabled) }.forEach { t ->
                     TabItem(t.label, selected = t == tab, requester = requesters.getValue(t), onSelect = { tab = t })
                 }
             }

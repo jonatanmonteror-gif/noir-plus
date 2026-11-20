@@ -121,6 +121,9 @@ fun PlayerScreen(req: PlayRequest) {
     // Avance rápido con el mando: 10 s, y si se vuelve a pulsar seguido 20, 50 y 100 s
     val seek = remember { LongArray(3) } // [última pulsación, paso, 1 = modo avance]
     val firstBarBtn = remember { arrayOfNulls<View>(1) } // primer botón de opciones (Audio…) de la barra
+    // Avance/retroceso continuo de la tele: 0 = parado, 1 = adelante, -1 = atrás; scanIdx = velocidad (SCAN_STEPS)
+    var scanDir by remember { mutableIntStateOf(0) }
+    var scanIdx by remember { mutableIntStateOf(0) }
     var seekLabel by remember { mutableStateOf<String?>(null) }
     var seekTick by remember { mutableIntStateOf(0) }
     var panelOpen by remember { mutableStateOf(false) }
@@ -282,6 +285,11 @@ fun PlayerScreen(req: PlayRequest) {
         }
         val view = viewRef[0] ?: return false
         if (ev.keyCode == KeyEvent.KEYCODE_BACK) {
+            if (down && scanDir != 0) {
+                scanDir = 0
+                backConsumed[0] = true
+                return true
+            }
             if (down && view.isControllerFullyVisible) {
                 view.hideController()
                 backConsumed[0] = true
@@ -296,28 +304,19 @@ fun PlayerScreen(req: PlayRequest) {
         fun seekBtn(fwd: Boolean): View? = view.findViewById<View>(
             if (fwd) androidx.media3.ui.R.id.exo_ffwd_with_amount else androidx.media3.ui.R.id.exo_rew_with_amount
         ) ?: view.findViewById(if (fwd) androidx.media3.ui.R.id.exo_ffwd else androidx.media3.ui.R.id.exo_rew)
-        fun doSeek(fwd: Boolean, i: Int) {
-            val steps = longArrayOf(10, 20, 50, 100)
-            val k = i.coerceIn(0, steps.size - 1)
-            seek[0] = System.currentTimeMillis(); seek[1] = if (fwd) k + 1L else -(k + 1L); seek[2] = 1L
-            val ms = steps[k] * 1000
-            val dur = exo.duration.takeIf { it > 0 } ?: Long.MAX_VALUE
-            exo.seekTo(if (fwd) (exo.currentPosition + ms).coerceAtMost(dur - 1000) else (exo.currentPosition - ms).coerceAtLeast(0))
-            seekLabel = (if (fwd) "» +" else "« −") + "${steps[k]} s"
-            seekTick++
-            view.showController()
-        }
         if (dims.tv) {
-            // Controles ocultos + izquierda/derecha: retrocede/avanza 10 s y deja el foco en la rueda de 10 (atrás/adelante)
+            // Izquierda/derecha (controles ocultos): empieza a retroceder/avanzar sin parar, 5 s cada segundo,
+            // con el foco en la rueda de 10. Cada OK sobre la rueda va más rápido (10, 20, 50, 100 s). Se para con la pausa.
             if (!view.isControllerFullyVisible && (ev.keyCode == KeyEvent.KEYCODE_DPAD_LEFT || ev.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT)) {
                 if (down && ev.repeatCount == 0) {
                     val fwd = ev.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
-                    doSeek(fwd, 0)
+                    scanDir = if (fwd) 1 else -1
+                    scanIdx = 0
+                    view.showController()
                     view.post { seekBtn(fwd)?.requestFocus() }
                 }
                 return true
             }
-            // OK sobre la rueda de 10: cada pulsación salta más (10 → 20 → 50 → 100 s)
             if (view.isControllerFullyVisible && (ev.keyCode == KeyEvent.KEYCODE_DPAD_CENTER || ev.keyCode == KeyEvent.KEYCODE_ENTER)) {
                 val f = view.findFocus()
                 val fwd = when {
@@ -327,8 +326,10 @@ fun PlayerScreen(req: PlayRequest) {
                 }
                 if (fwd != null) {
                     if (down && ev.repeatCount == 0) {
-                        val same = seek[2] == 1L && System.currentTimeMillis() - seek[0] < 4000 && (seek[1] > 0) == fwd
-                        doSeek(fwd, if (same) kotlin.math.abs(seek[1]).toInt() else 0)
+                        val dir = if (fwd) 1 else -1
+                        if (scanDir == dir) scanIdx = (scanIdx + 1).coerceAtMost(SCAN_STEPS.size - 1)
+                        else { scanDir = dir; scanIdx = 0 }
+                        view.showController()
                     }
                     return true
                 }
@@ -416,6 +417,26 @@ fun PlayerScreen(req: PlayRequest) {
 
     LaunchedEffect(speed) { exo.setPlaybackSpeed(speed) }
 
+    // Bucle del avance continuo: cada segundo salta los segundos de la velocidad elegida, hasta pausar
+    LaunchedEffect(scanDir, scanIdx) {
+        if (scanDir == 0) return@LaunchedEffect
+        while (scanDir != 0) {
+            val stepS = SCAN_STEPS[scanIdx.coerceIn(0, SCAN_STEPS.size - 1)]
+            seekLabel = (if (scanDir > 0) "» " else "« ") + "$stepS s"
+            val dur = exo.duration.takeIf { it > 0 } ?: Long.MAX_VALUE
+            val to = exo.currentPosition + scanDir * stepS * 1000L
+            if (to <= 0 || to >= dur - 1000) {
+                exo.seekTo(to.coerceIn(0, (dur - 1000).coerceAtLeast(0)))
+                scanDir = 0
+                break
+            }
+            exo.seekTo(to)
+            viewRef[0]?.showController()
+            delay(1000)
+        }
+        seekLabel = null
+    }
+
     LaunchedEffect(seekTick) {
         if (seekTick > 0) { delay(1400); seekLabel = null }
     }
@@ -479,6 +500,11 @@ fun PlayerScreen(req: PlayRequest) {
                     }
                     else -> error = playError(e)
                 }
+            }
+
+            // La pausa para el avance continuo
+            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                if (!playWhenReady) scanDir = 0
             }
 
             override fun onTracksChanged(tracks: androidx.media3.common.Tracks) {
@@ -1017,3 +1043,7 @@ private fun playError(e: PlaybackException): String {
     }
     return "$why\n(Error $code)"
 }
+
+
+/** Velocidades del avance continuo de la tele (segundos por cada segundo). */
+private val SCAN_STEPS = longArrayOf(5, 10, 20, 50, 100)

@@ -8,3 +8,5 @@ Novedades de la próxima versión de Android (tele y móvil). Una línea por pun
 - Los subtítulos empiezan siempre desactivados; se activan desde Subtítulos.
 - Tele, reproductor: izquierda o derecha retroceden o avanzan 10 s y dejan seleccionada la rueda de 10 de los controles; cada OK sobre ella salta más (20, 50 y 100 s). Para parar, ve a la izquierda hasta la pausa.
 - Tele, reproductor: la flecha abajo abre los controles directamente en Audio / Subtítulos / opciones.
+- Tele: sin la pestaña Valoraciones, y Buscar va justo después de Inicio.
+- Tele, reproductor: izquierda o derecha empiezan a retroceder o avanzar sin parar (5 s cada segundo); cada OK sobre la rueda va más rápido (10, 20, 50 y 100 s). Se para con la pausa o con Atrás.
