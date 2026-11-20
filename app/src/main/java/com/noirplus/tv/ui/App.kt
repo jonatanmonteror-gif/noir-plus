@@ -104,7 +104,9 @@ fun App() {
     val nav = remember {
         // Si veníamos de ver un tráiler y la tele cerró la app, se vuelve a donde estabas
         val back = if (Repo.prefs.hasAccount()) ResumePoint.take() else null
-        Nav(back?.first() ?: if (Repo.prefs.hasAccount()) Screen.Welcome else Screen.Setup).also { n ->
+        // Sin pantalla de saludo: se entra directo al inicio
+        if (Repo.prefs.hasAccount()) Repo.prefs.lastVisit = System.currentTimeMillis()
+        Nav(back?.first() ?: if (Repo.prefs.hasAccount()) Screen.Main else Screen.Setup).also { n ->
             back?.drop(1)?.forEach { n.push(it) }
             ResumePoint.nav = n
         }
@@ -193,11 +195,6 @@ fun App() {
             if (top == Screen.Main) WhatsNewAfterUpdate()
             if (top == Screen.Main) NewEpisodeNotice()
             CrashNotice()
-            // Vuelta a la app tras varias horas: saludo de nuevo (salvo si se está viendo algo)
-            val wr = Repo.welcomeRequest.intValue
-            LaunchedEffect(wr) {
-                if (wr > 0 && Repo.prefs.hasAccount() && nav.top !is Screen.Player) nav.reset(Screen.Welcome)
-            }
         }
     }
 }
