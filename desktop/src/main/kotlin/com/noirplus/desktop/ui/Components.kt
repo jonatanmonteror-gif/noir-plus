@@ -66,14 +66,23 @@ val LocalNav = staticCompositionLocalOf<Nav> { error("sin Nav") }
 
 // ───────────────────────── Piezas ─────────────────────────
 
-/** Logo "Noir" con el "+" plateado en superíndice. */
+/** Logo de Noir+ (misma familia que Noir Books): «Noir» en Playfair y «PLUS» en mayúsculas espaciadas. */
 @Composable
 fun Logo(size: Int = 26) {
-    Row(verticalAlignment = Alignment.Top) {
-        Text("Noir", color = Col.Text, fontFamily = InterDisplay, fontWeight = FontWeight.Bold, fontSize = size.sp,
-            letterSpacing = (-0.8).sp)
-        Text("+", color = Color(0xFFC9CCD3), fontFamily = Inter, fontWeight = FontWeight.Medium, fontSize = (size * 0.55f).sp,
-            modifier = Modifier.padding(start = 1.dp))
+    val silver = Color(0xFFAAAAAF)
+    if (size >= 40) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("Noir", color = Col.Text, fontFamily = Playfair, fontSize = (size * 1.2f).sp)
+            Box(Modifier.padding(top = (size * 0.08f).dp).width((size * 1.6f).dp).height(1.dp).background(Color(0xFF6E6E73)))
+            Text("PLUS", color = silver, fontFamily = Inter, fontWeight = FontWeight.Medium, fontSize = (size * 0.26f).sp,
+                letterSpacing = (size * 0.12f).sp, modifier = Modifier.padding(top = (size * 0.14f).dp))
+        }
+    } else {
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text("Noir", color = Col.Text, fontFamily = Playfair, fontSize = (size * 1.2f).sp)
+            Text("PLUS", color = silver, fontFamily = Inter, fontWeight = FontWeight.Medium, fontSize = (size * 0.4f).sp,
+                letterSpacing = (size * 0.12f).sp, modifier = Modifier.padding(start = (size * 0.3f).dp, bottom = (size * 0.3f).dp))
+        }
     }
 }
 

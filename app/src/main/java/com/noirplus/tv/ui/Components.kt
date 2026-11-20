@@ -224,12 +224,27 @@ fun Focusable(
     }
 }
 
+/**
+ * Logo de Noir+ (misma familia que Noir Books): «Noir» en Playfair y «PLUS» en mayúsculas espaciadas.
+ * En tamaño grande va en dos líneas con una raya fina; en cabeceras, en una línea.
+ */
 @Composable
 fun Logo(size: Int = 24) {
-    Row(verticalAlignment = Alignment.Top) {
-        Text("Noir", color = Col.Text, fontFamily = InterDisplay, fontWeight = FontWeight.SemiBold, fontSize = size.sp,
-            letterSpacing = (-0.5).sp, lineHeight = size.sp)
-        PlusMark(Modifier.padding(start = (size * 0.06f).dp, top = (size * 0.08f).dp).size((size * 0.34f).dp))
+    val playfair = androidx.compose.ui.text.font.FontFamily(androidx.compose.ui.text.font.Font(com.noirplus.tv.R.font.playfair_regular))
+    val silver = Color(0xFFAAAAAF)
+    if (size >= 34) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("Noir", color = Col.Text, fontFamily = playfair, fontSize = (size * 1.2f).sp, lineHeight = (size * 1.3f).sp)
+            Box(Modifier.padding(top = (size * 0.12f).dp).width((size * 1.6f).dp).height(1.dp).background(Color(0xFF6E6E73)))
+            Text("PLUS", color = silver, fontFamily = Inter, fontWeight = FontWeight.Medium, fontSize = (size * 0.26f).sp,
+                letterSpacing = (size * 0.12f).sp, modifier = Modifier.padding(top = (size * 0.14f).dp))
+        }
+    } else {
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text("Noir", color = Col.Text, fontFamily = playfair, fontSize = (size * 1.25f).sp, lineHeight = (size * 1.3f).sp)
+            Text("PLUS", color = silver, fontFamily = Inter, fontWeight = FontWeight.Medium, fontSize = (size * 0.42f).sp,
+                letterSpacing = (size * 0.12f).sp, modifier = Modifier.padding(start = (size * 0.3f).dp, bottom = (size * 0.24f).dp))
+        }
     }
 }
 
