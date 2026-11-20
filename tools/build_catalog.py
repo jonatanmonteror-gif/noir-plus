@@ -119,6 +119,30 @@ def build(kind):
 
 LAST = {}
 
+def trending(kind):
+    """Lo más visto ahora en plataformas en España (popularidad), en orden: para «Tendencias» en el inicio."""
+    typ = "tv" if kind == "tv" else "movie"
+    base = {"watch_region": "ES", "with_watch_monetization_types": "flatrate|free|ads", "sort_by": "popularity.desc"}
+    rows, seen = [], set()
+    for pg in range(1, 6):
+        r = get(f"/discover/{typ}", dict(base, page=pg)) or {}
+        for o in r.get("results", []):
+            tid = o.get("id")
+            if tid is None or tid in seen:
+                continue
+            seen.add(tid)
+            rd = (o.get("first_air_date") if typ == "tv" else o.get("release_date")) or ""
+            date = int(rd.replace("-", "")[:8]) if re.fullmatch(r"\d{4}-\d{2}-\d{2}", rd) else 0
+            titles = []
+            for k in ("title", "original_title", "name", "original_name"):
+                t = o.get(k)
+                if t:
+                    tk = title_key(t)
+                    if tk and tk not in titles:
+                        titles.append(tk)
+            rows.append([tid, date, o.get("genre_ids", []), titles, 0, len(rows) + 1])
+    return rows
+
 SLUG = {"Netflix": "netflix", "Disney+": "disney", "Max": "max", "Prime Video": "prime", "Apple TV+": "apple",
         "Movistar Plus+": "movistar", "SkyShowtime": "skyshowtime", "Filmin": "filmin"}
 
@@ -138,6 +162,17 @@ if __name__ == "__main__":
             with gzip.open(name, "wb", compresslevel=9) as f:
                 f.write(raw)
             print(f"{name}: {len(rows)} títulos, {len(raw)//1024} KB sin comprimir", flush=True)
+    # Tendencias: 6.ª columna = puesto (1 = lo más visto)
+    for kind in ("movie", "tv"):
+        rows = trending(kind)
+        lines = []
+        for tid, date, genres, titles, last, rank in rows:
+            titles = [t.replace("|", " ").replace("\t", " ") for t in titles]
+            lines.append(f"{tid}\t{date}\t{','.join(str(x) for x in genres)}\t{'|'.join(titles)}\t{last or 0}\t{rank}")
+        name = f"cat-{kind}-tendencias.tsv.gz"
+        with gzip.open(name, "wb", compresslevel=9) as f:
+            f.write(("\n".join(lines) + "\n").encode("utf-8"))
+        print(f"{name}: {len(rows)} títulos", flush=True)
     with open("logos.json", "w", encoding="utf-8") as f:
         json.dump(LOGOS, f, ensure_ascii=False)
     print("logos.json:", len(LOGOS), "logos", flush=True)

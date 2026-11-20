@@ -83,7 +83,7 @@ object Tmdb {
 
     /** Una película o serie del catálogo de TMDB: año y géneros. */
     /** [last]: fecha del último capítulo emitido (solo series; 0 si no se sabe). */
-    class Entry(val year: Int, val genres: List<Int>, val date: Int = year * 10000, val last: Int = 0)
+    class Entry(val year: Int, val genres: List<Int>, val date: Int = year * 10000, val last: Int = 0, val rank: Int = 0)
 
     /** Lo que hay en una plataforma: fichas por id de TMDB y, por cada título normalizado, sus ids. */
     class Catalog(val entries: Map<String, Entry>, val titles: Map<String, List<String>>) {
@@ -101,6 +101,8 @@ object Tmdb {
         fun genresOf(item: Item): List<Int>? = match(item)?.let { entries[it]?.genres }
         /** Fecha de estreno (aaaammdd) de un título de tu lista, o 0. */
         fun dateOf(item: Item): Int = match(item)?.let { entries[it]?.date } ?: 0
+        /** Puesto en Tendencias (1 = lo más visto), o 0. */
+        fun rankOf(p: Prep): Int = match(p)?.let { entries[it]?.rank } ?: 0
     }
 
     /** Título de tu lista ya preparado para cruzarlo con los catálogos (se calcula una vez). */
@@ -262,7 +264,10 @@ object Tmdb {
     private val SLUGS = mapOf(
         "Netflix" to "netflix", "Disney+" to "disney", "Max" to "max", "Prime Video" to "prime", "Apple TV+" to "apple",
         "Movistar Plus+" to "movistar", "SkyShowtime" to "skyshowtime", "Filmin" to "filmin",
+        TRENDING to "tendencias",
     )
+    /** Lista especial: lo más visto ahora en plataformas en España (no es una plataforma). */
+    const val TRENDING = "Tendencias"
     /** Se carga una plataforma cada vez (así la tele nunca se queda sin memoria). */
     private val loadLock = kotlinx.coroutines.sync.Mutex()
 
@@ -298,7 +303,8 @@ object Tmdb {
                     val date = p[1].toIntOrNull() ?: 0
                     val genres = if (p[2].isEmpty()) emptyList() else p[2].split(',').mapNotNull { it.toIntOrNull() }
                     val last = p.getOrNull(4)?.toIntOrNull() ?: 0
-                    entries[id] = Entry(date / 10000, genres, date, last)
+                    val rank = p.getOrNull(5)?.toIntOrNull() ?: 0
+                    entries[id] = Entry(date / 10000, genres, date, last, rank)
                     if (p[3].isNotEmpty()) for (t in p[3].split('|')) titles.getOrPut(t) { ArrayList(1) }.add(id)
                 }
             }

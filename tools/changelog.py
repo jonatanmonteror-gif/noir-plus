@@ -4,7 +4,8 @@ Novedades por versión (una lista para Android y otra para Windows).
 
 Uso: changelog.py <android|windows> <versión> <url del changelog anterior> <salida>
 Lee changelog/<plataforma>.txt (líneas «- punto»), descarga el historial anterior y, si los puntos son
-nuevos, añade la versión al principio. Si no hay puntos nuevos, el historial queda igual.
+nuevos, añade la versión al principio solo con los puntos que no salieron en versiones anteriores.
+Si no hay puntos nuevos, el historial queda igual.
 """
 import json, sys, time, urllib.request
 
@@ -23,8 +24,11 @@ try:
             hist = []
 except Exception:
     hist = []
-already = any(h.get("items") == items for h in hist[:3])
-if items and not already:
+# Solo los puntos que no salieron ya en una versión anterior (el archivo se va acumulando)
+seen = {i for h in hist for i in h.get("items", [])}
+items = [i for i in items if i not in seen]
+already = not items
+if items:
     hist.insert(0, {"v": version, "date": time.strftime("%Y-%m-%d"), "items": items})
 hist = hist[:60]
 with open(out, "w", encoding="utf-8") as f:

@@ -351,11 +351,27 @@ fun HomeContent() {
     val history = remember(changes) { prefs.history() }
     val favs = remember(changes) { prefs.favorites().filter { it.kind != Kind.LIVE } }
     var hero by remember { mutableStateOf<Item?>(null) }
-    val movieCats by produceMemo("home-mcats", emptyList<Category>(), changes, Repo.dataVersion.intValue) {
-        runCatching { src.categories(Kind.MOVIE).filter { prefs.visible(Kind.MOVIE, it.id) }.newestFirst().take(4) }.getOrDefault(emptyList())
-    }
-    val seriesCats by produceMemo("home-scats", emptyList<Category>(), changes, Repo.dataVersion.intValue) {
-        runCatching { src.categories(Kind.SERIES).filter { prefs.visible(Kind.SERIES, it.id) }.newestFirst().take(4) }.getOrDefault(emptyList())
+    // Inicio al estilo de las plataformas (sin carpetas del proveedor): tendencias, lo recién llegado,
+    // capítulos nuevos y lo de cada plataforma. Las filas vacías no se muestran.
+    val L = com.noirplus.tv.data.Library
+    val homeRows: List<Triple<Kind, Category, String>> = remember {
+        listOf(
+            Triple(Kind.MOVIE, Category(L.TREND, "Películas en tendencia"), "Película"),
+            Triple(Kind.SERIES, Category(L.NEW + "0-14", "Series con capítulos nuevos"), "Serie"),
+            Triple(Kind.MOVIE, Category(L.NEW + "0-14", "Películas recién llegadas"), "Película"),
+            Triple(Kind.SERIES, Category(L.TREND, "Series en tendencia"), "Serie"),
+            Triple(Kind.SERIES, Category(L.PLAT + "Netflix", "Series de Netflix"), "Serie"),
+            Triple(Kind.MOVIE, Category(L.PLAT + "Netflix", "Películas de Netflix"), "Película"),
+            Triple(Kind.SERIES, Category(L.PLAT + "Max", "Series de Max"), "Serie"),
+            Triple(Kind.MOVIE, Category(L.PLAT + "Prime Video", "Películas de Prime Video"), "Película"),
+            Triple(Kind.SERIES, Category(L.PLAT + "Prime Video", "Series de Prime Video"), "Serie"),
+            Triple(Kind.MOVIE, Category(L.PLAT + "Disney+", "Películas de Disney+"), "Película"),
+            Triple(Kind.SERIES, Category(L.PLAT + "Apple TV+", "Series de Apple TV+"), "Serie"),
+            Triple(Kind.SERIES, Category(L.PLAT + "Movistar Plus+", "Series de Movistar Plus+"), "Serie"),
+            Triple(Kind.MOVIE, Category(L.PLAT + "Movistar Plus+", "Películas de Movistar Plus+"), "Película"),
+            Triple(Kind.MOVIE, Category(L.PLAT + "SkyShowtime", "Películas de SkyShowtime"), "Película"),
+            Triple(Kind.MOVIE, Category(L.PLAT + "Filmin", "Películas de Filmin"), "Película"),
+        )
     }
     val featured by produceMemo("home-featured", emptyList<Item>(), changes, Repo.dataVersion.intValue) {
         val m = recentOf(Kind.MOVIE, 6)
@@ -378,11 +394,8 @@ fun HomeContent() {
                 }
             }
         }
-        itemsIndexed(movieCats, key = { i, c -> "m$i:${c.id}" }) { _, c ->
-            CategoryRow(Kind.MOVIE, c, tag = "Película") { hero = it }
-        }
-        itemsIndexed(seriesCats, key = { i, c -> "s$i:${c.id}" }) { _, c ->
-            CategoryRow(Kind.SERIES, c, tag = "Serie") { hero = it }
+        itemsIndexed(homeRows, key = { i, r -> "h$i:${r.first}:${r.second.id}" }) { _, (kind, c, tag) ->
+            CategoryRow(kind, c, tag = tag) { hero = it }
         }
     }
 }

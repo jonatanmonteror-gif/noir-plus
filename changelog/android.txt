@@ -1,21 +1,3 @@
 Novedades de la próxima versión de Android (tele y móvil). Una línea por punto, empezando por «- ». Empieza con «Tele:» o «Móvil:» lo que es solo de uno.
-- Móvil: el aviso de «Nueva versión lista» ya se puede cerrar (✕ o «Luego»); antes el botón se salía de la pantalla.
-- Las novedades solo enseñan lo de tu aparato: en la tele lo de la tele y en el móvil lo del móvil.
-- Aviso de capítulo nuevo o de estreno ya disponible: con 20 de margen por cada lado, casi negro, borde blanco fino y esquinas más redondeadas.
-- Móvil: en la pantalla de inicio las portadas del fondo se ven algo más suaves.
-- Tele: al volver de ver un tráiler en YouTube vuelves a la misma pantalla y ficha en la que estabas, aunque la tele haya cerrado la app.
-- Tele, Directo: al bajar desde el menú de arriba entras en la temática que tienes elegida (antes saltaba a Favoritos).
-- Próximos: lo ya estrenado va en su propia pestaña, «Recién estrenados», con lo de la última semana; «Todo» enseña solo lo que viene.
-- Próximos: se abre en «Próximamente», solo con el próximo mes; lo de la última semana está en la pestaña «Recién estrenados».
-- Tele: Próximos en dos columnas, con «Tráiler» encima de «Avísame» para que las cajas no se rompan.
-- Próximos: cajas más bajas y limpias: sin descripción, logo de la plataforma arriba a la derecha y los botones «Avísame» y «Tráiler» uno al lado del otro.
-- Próximos: botones y logo de la plataforma más pequeños, título algo menor, tipo de estreno en mayúsculas y los géneros debajo, para que todo quepa aunque el título ocupe dos líneas.
-- Móvil, Próximos: las cajas ocupan todo el ancho, la fecha va encima como título y el botón del tráiler se ve bien.
-- Tele, reproductor: izquierda y derecha avanzan o retroceden 10 s; si vuelves a pulsar seguido, 20, 50 y 100 s (se ve cuánto en pantalla). La flecha abajo abre los controles y la barra de progreso ya no se selecciona con el mando.
-- Móvil, Próximos: los géneros van pegados al tipo de estreno y «Serie nueva» pasa a «Nueva serie».
-- Directo: salen todas las versiones de cada canal (HD, FHD, 4K, bajas conexiones…) seguidas, por si alguna no funciona.
-- Directo: carpeta nueva «Movistar+» junto a Favoritos, con los canales ordenados como el dial de Movistar (La 1 en el 1…) y, de cada uno, la versión que arranca más rápido (se mide sola una vez por semana).
-- Directo se abre siempre en la carpeta Movistar+. Ahí, manteniendo pulsado un canal puedes cambiarlo por otra versión del mismo (HD, FHD, 4K…), por si una falla; se queda guardado.
-- Al volver atrás vuelves a donde estabas (la misma fila, la misma película y los mismos filtros), sin volver al principio.
-- Móvil en horizontal: ya no queda una franja negra arriba ni se corta la pantalla.
-- Más estabilidad: mientras ves algo ya no se mide la velocidad de los canales (no se abre una segunda conexión al proveedor), la medición va poco a poco (60 por vez, primero los primeros del dial) y si una pantalla no puede cargar se queda con lo que tenía en vez de cerrarse.
+- Inicio nuevo, al estilo de las plataformas: películas y series en tendencia en España, series con capítulos nuevos, películas recién llegadas y filas de Netflix, Max, Prime Video, Disney+, Apple TV+, Movistar Plus+, SkyShowtime y Filmin. Ya no salen las carpetas del proveedor.
+- Las novedades de cada actualización ya solo enseñan lo nuevo de esa versión (antes se repetían los puntos de versiones anteriores).

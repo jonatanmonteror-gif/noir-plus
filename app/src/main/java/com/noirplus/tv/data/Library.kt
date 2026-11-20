@@ -11,6 +11,8 @@ object Library {
     const val NO_PLAT = "__noplat"
     /** Lo último subido al servidor en los últimos N días (aunque sean títulos antiguos). */
     const val NEW = "__new:"
+    /** Lo más visto ahora en plataformas en España que hay en tu lista, en orden. */
+    const val TREND = "__trend"
 
     fun isVirtual(catId: String) = catId.startsWith("__")
     fun isPlatformList(catId: String) = catId.startsWith(PLAT) || catId == NO_PLAT
@@ -36,6 +38,14 @@ object Library {
                     .mapNotNull { p -> c.match(p)?.let { _ -> p to Tmdb.releaseDate(p.item) } }
                     .distinctBy { it.first.key }
                     .sortedByDescending { it.second }
+                    .map { it.first.item }.toList()
+            }
+            catId == TREND -> {
+                val c = Tmdb.catalog(kind, Tmdb.TRENDING) ?: return@withContext emptyList()
+                visibleAll(kind).asSequence().map { Tmdb.prep(it) }
+                    .mapNotNull { p -> c.rankOf(p).takeIf { it > 0 }?.let { p to it } }
+                    .distinctBy { it.first.key }
+                    .sortedBy { it.second }
                     .map { it.first.item }.toList()
             }
             catId.startsWith(NEW) -> {
