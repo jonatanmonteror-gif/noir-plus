@@ -155,6 +155,11 @@ object Store {
         set(v) { o.put("lastListRefresh", v); save() }
 
     /** Última versión cuyas novedades ya se han enseñado. */
+    /** Ya se vio la bienvenida a la versión 2.0. */
+    var seen20: Boolean
+        get() = o.optBoolean("seen20", false)
+        set(v) { o.put("seen20", v); save() }
+
     var notesSeen: Int
         get() = o.optInt("notesSeen", 0)
         set(v) { o.put("notesSeen", v); save() }

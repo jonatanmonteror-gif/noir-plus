@@ -68,6 +68,20 @@ object NotesHost {
 fun WhatsNewAfterUpdate() {
     LaunchedEffect(Unit) {
         val cur = Updater.currentCode
+        // Llegada a la 2.0: una sola vez, la bienvenida a la versión estable
+        if (com.noirplus.desktop.BuildInfo.VERSION.startsWith("2.") && !Store.seen20) {
+            delay(1500)
+            NotesHost.show("¡Bienvenido a Noir+ 2.0!", listOf(Updater.Notes("2.0", "", listOf(
+                "Bienvenido a Noir+ 2.0. Ya es la versión estable: todo lo que necesitas para ver películas, series y canales, en una sola app.",
+                "Inicio como el de las plataformas: tendencias en España, series con capítulos nuevos, lo recién llegado y filas de Netflix, Max, Prime Video, Disney+ y más.",
+                "Películas y series por plataforma y por género, con filtros combinados, fecha de estreno, tráiler en español y orden por últimos estrenos.",
+                "Próximos estrenos: lo que llega el próximo mes y lo recién estrenado, con avisos cuando tu proveedor lo sube y cuando sale un capítulo nuevo de lo que sigues.",
+                "Directo por temáticas, con la carpeta Movistar+ ordenada como su dial y todas las versiones de cada canal para elegir la que mejor va.",
+                "Listas guardadas en tu aparato y actualizadas solas a horas fijas: entra al momento y carga menos al proveedor.",
+                "Más rápida y más estable, y vuelves siempre a donde estabas.",
+            )))) { Store.seen20 = true; Store.notesSeen = cur }
+            return@LaunchedEffect
+        }
         val seen = Store.notesSeen
         if (seen >= cur) return@LaunchedEffect
         delay(2500)

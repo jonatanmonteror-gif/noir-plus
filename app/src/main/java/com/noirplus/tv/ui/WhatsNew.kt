@@ -106,6 +106,21 @@ fun WhatsNewAfterUpdate() {
     var notes by remember { mutableStateOf<List<Updater.Notes>?>(null) }
     val tv = LocalDims.current.tv
     LaunchedEffect(Unit) {
+        // Llegada a la 2.0: una sola vez, la bienvenida a la versión estable
+        if (com.noirplus.tv.BuildConfig.VERSION_NAME.startsWith("2.") && !prefs.seen20) {
+            delay(1500)
+            notes = listOf(Updater.Notes("2.0", "", listOf(
+            "Bienvenido a Noir+ 2.0. Ya es la versión estable: todo lo que necesitas para ver películas, series y canales, en una sola app.",
+            "Inicio como el de las plataformas: tendencias en España, series con capítulos nuevos, lo recién llegado y filas de Netflix, Max, Prime Video, Disney+ y más.",
+            "Películas y series por plataforma y por género, con filtros combinados, fecha de estreno, tráiler en español y orden por últimos estrenos.",
+            "Próximos estrenos: lo que llega el próximo mes y lo recién estrenado, con avisos cuando tu proveedor lo sube y cuando sale un capítulo nuevo de lo que sigues.",
+            "Directo por temáticas, con la carpeta Movistar+ ordenada como su dial y todas las versiones de cada canal para elegir la que mejor va.",
+            "Tele: reproductor pensado para el mando, con audio y subtítulos en la flecha arriba y avance continuo con izquierda y derecha.",
+            "Listas guardadas en tu aparato y actualizadas solas a horas fijas: entra al momento y carga menos al proveedor.",
+            "Más rápida y más estable, y vuelves siempre a donde estabas.",
+            )))
+            return@LaunchedEffect
+        }
         val seen = prefs.notesSeen
         if (seen >= cur) return@LaunchedEffect
         delay(2500)
@@ -115,5 +130,9 @@ fun WhatsNewAfterUpdate() {
         if (mine.isEmpty()) prefs.notesSeen = cur else notes = mine
     }
     val n = notes ?: return
-    NotesDialog("Novedades de esta versión", n) { prefs.notesSeen = cur; notes = null }
+    val is20 = n.firstOrNull()?.version == "2.0"
+    NotesDialog(if (is20) "¡Bienvenido a Noir+ 2.0!" else "Novedades de esta versión", n) {
+        if (is20) prefs.seen20 = true
+        prefs.notesSeen = cur; notes = null
+    }
 }

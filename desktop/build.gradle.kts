@@ -7,7 +7,7 @@ plugins {
 }
 
 // Versión: 1.0.<número de compilación de GitHub>
-val appVersion = "1.0." + (System.getenv("RUN_NUMBER") ?: "0")
+val appVersion = "2.0." + (System.getenv("RUN_NUMBER") ?: "0")
 version = appVersion
 
 dependencies {

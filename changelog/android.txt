@@ -13,3 +13,4 @@ Novedades de la próxima versión de Android (tele y móvil). Una línea por pun
 - Tele, reproductor: el avance continuo empieza en 10 s y con OK sube a 20, 50, 100, 200 y 300 s cada segundo.
 - Tele, reproductor: la flecha arriba abre Audio y Subtítulos juntos en el mismo panel.
 - Sin la pantalla de saludo («Buenas tardes, …»): la app entra directa al inicio, en la tele y en el móvil.
+- Noir+ 2.0: la versión estable, con todo lo que necesitas. Al actualizar verás la bienvenida con lo más importante.

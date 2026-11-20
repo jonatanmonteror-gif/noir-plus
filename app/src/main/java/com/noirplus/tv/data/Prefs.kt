@@ -85,6 +85,11 @@ class Prefs(ctx: Context) {
         set(v) { sp.edit().putLong("lastListRefresh", v).apply() }
 
     /** Última versión cuyas novedades ya se han enseñado. */
+    /** Ya se vio la bienvenida a la versión 2.0. */
+    var seen20: Boolean
+        get() = sp.getBoolean("seen20", false)
+        set(v) { sp.edit().putBoolean("seen20", v).apply() }
+
     var notesSeen: Int
         get() = sp.getInt("notesSeen", 0)
         set(v) { sp.edit().putInt("notesSeen", v).apply() }
