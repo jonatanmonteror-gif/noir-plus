@@ -239,11 +239,18 @@ fun Logo(size: Int = 24) {
             Text("PLUS", color = silver, fontFamily = Inter, fontWeight = FontWeight.Medium, fontSize = (size * 0.26f).sp,
                 letterSpacing = (size * 0.12f).sp, modifier = Modifier.padding(top = (size * 0.14f).dp))
         }
+    } else if (LocalDims.current.tv) {
+        // Tele: «Noir» con el «+» plateado arriba a la derecha (con «PLUS» al lado se montaba)
+        Row(verticalAlignment = Alignment.Top) {
+            Text("Noir", color = Col.Text, fontFamily = playfair, fontSize = (size * 1.25f).sp, lineHeight = (size * 1.4f).sp)
+            PlusMark(Modifier.padding(start = (size * 0.08f).dp, top = (size * 0.22f).dp).size((size * 0.42f).dp))
+        }
     } else {
-        Row(verticalAlignment = Alignment.Bottom) {
-            Text("Noir", color = Col.Text, fontFamily = playfair, fontSize = (size * 1.25f).sp, lineHeight = (size * 1.3f).sp)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Noir", color = Col.Text, fontFamily = playfair, fontSize = (size * 1.25f).sp, lineHeight = (size * 1.4f).sp)
             Text("PLUS", color = silver, fontFamily = Inter, fontWeight = FontWeight.Medium, fontSize = (size * 0.42f).sp,
-                letterSpacing = (size * 0.12f).sp, modifier = Modifier.padding(start = (size * 0.3f).dp, bottom = (size * 0.24f).dp))
+                letterSpacing = (size * 0.12f).sp, lineHeight = (size * 0.5f).sp,
+                modifier = Modifier.padding(start = (size * 0.3f).dp, top = (size * 0.18f).dp))
         }
     }
 }
