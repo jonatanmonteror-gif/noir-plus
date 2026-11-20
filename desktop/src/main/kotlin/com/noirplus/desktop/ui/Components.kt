@@ -69,6 +69,9 @@ val LocalNav = staticCompositionLocalOf<Nav> { error("sin Nav") }
 /** Logo de Noir+ (misma familia que Noir Books): «Noir» en Playfair y «PLUS» en mayúsculas espaciadas. */
 @Composable
 fun Logo(size: Int = 26) {
+    // Oculto desde Ajustes: no sale en ningún sitio
+    Store.changes.intValue
+    if (!Store.showLogo) return
     val silver = Color(0xFFAAAAAF)
     if (size >= 40) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {

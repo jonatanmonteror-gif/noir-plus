@@ -110,6 +110,11 @@ class Prefs(ctx: Context) {
 
     fun hasAccount() = type.isNotEmpty()
 
+    /** Mostrar el logo de Noir+ en la app (se puede ocultar para no hacer referencia a la app). */
+    var showLogo: Boolean
+        get() = sp.getBoolean("showLogo", true)
+        set(v) { sp.edit().putBoolean("showLogo", v).apply(); bump() }
+
     /** Ya se ha metido el código de acceso en este aparato (los que tenían cuenta cuentan como dentro). */
     var accessOk: Boolean
         get() = sp.getBoolean("accessOk", false) || hasAccount()

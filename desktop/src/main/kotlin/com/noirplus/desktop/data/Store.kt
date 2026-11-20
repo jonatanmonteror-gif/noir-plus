@@ -67,6 +67,10 @@ object Store {
     val pass: String get() = s("pass")
     val m3u: String get() = s("m3u")
     val hasAccount: Boolean get() = type == "xtream" || (type == "m3u" && m3u.isNotBlank())
+    /** Mostrar el logo de Noir+ (se puede ocultar para no hacer referencia a la app). */
+    var showLogo: Boolean
+        get() = o.optBoolean("showLogo", true)
+        set(v) { o.put("showLogo", v); save() }
     /** Ya se metió el código de acceso en este PC (si ya había cuenta, cuenta como dentro). */
     var accessOk: Boolean
         get() = o.optBoolean("accessOk", false) || hasAccount

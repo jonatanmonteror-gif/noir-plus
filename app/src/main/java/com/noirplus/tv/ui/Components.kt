@@ -230,6 +230,9 @@ fun Focusable(
  */
 @Composable
 fun Logo(size: Int = 24) {
+    // Oculto desde Ajustes: no sale en ningún sitio
+    Repo.prefs.changes.intValue
+    if (!runCatching { Repo.prefs.showLogo }.getOrDefault(true)) return
     val playfair = androidx.compose.ui.text.font.FontFamily(androidx.compose.ui.text.font.Font(com.noirplus.tv.R.font.playfair_regular))
     val silver = Color(0xFFAAAAAF)
     if (size >= 34) {

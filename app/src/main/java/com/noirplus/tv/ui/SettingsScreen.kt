@@ -197,6 +197,8 @@ fun SettingsContent() {
             if (changes < 0) Spacer(Modifier)
 
             Section("Perfil") {
+                ChoiceRow("Mostrar el logo de Noir+", listOf("Sí", "No"), if (prefs.showLogo) 0 else 1, "logo",
+                    note = "Si lo ocultas, no sale el logo en ninguna pantalla.") { prefs.showLogo = it == 0 }
                 if (d.tv) {
                     // En la tele: se abre una ventanita con el teclado ya preparado
                     LinkRow("Tu nombre", prefs.name.ifBlank { "Sin poner" }, key = "set-name") { nameDialog = true }

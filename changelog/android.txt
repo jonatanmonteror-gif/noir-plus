@@ -3,3 +3,4 @@ Novedades de la próxima versión de Android (tele y móvil). Una línea por pun
 - Las novedades de cada actualización ya solo enseñan lo nuevo de esa versión (antes se repetían los puntos de versiones anteriores).
 - Logo nuevo de Noir+, de la misma familia que Noir Books: «Noir» y debajo «PLUS» (icono, tarjeta de la tele, bienvenida y cabeceras).
 - App privada: la primera vez que se abre en un aparato pide un código de acceso (los aparatos que ya tenían cuenta no lo piden).
+- Ajustes → Perfil → «Mostrar el logo de Noir+»: si lo ocultas, el logo no sale en ninguna pantalla.
