@@ -5,3 +5,6 @@ Novedades de la próxima versión de Android (tele y móvil). Una línea por pun
 - App privada: la primera vez que se abre en un aparato pide un código de acceso (los aparatos que ya tenían cuenta no lo piden).
 - Tele: el logo de las cabeceras pasa a «Noir+» con el «+» plateado (con «PLUS» al lado se montaba).
 - Móvil: al volver de una ficha o de ver un capítulo sigues en la misma pestaña de arriba (por ejemplo, Próximos) en vez de volver a Todo.
+- Los subtítulos empiezan siempre desactivados; se activan desde Subtítulos.
+- Tele, reproductor: izquierda o derecha retroceden o avanzan 10 s y dejan seleccionada la rueda de 10 de los controles; cada OK sobre ella salta más (20, 50 y 100 s). Para parar, ve a la izquierda hasta la pausa.
+- Tele, reproductor: la flecha abajo abre los controles directamente en Audio / Subtítulos / opciones.

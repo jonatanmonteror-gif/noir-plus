@@ -120,6 +120,7 @@ fun PlayerScreen(req: PlayRequest) {
     var controlsVisible by remember { mutableStateOf(false) }
     // Avance rápido con el mando: 10 s, y si se vuelve a pulsar seguido 20, 50 y 100 s
     val seek = remember { LongArray(3) } // [última pulsación, paso, 1 = modo avance]
+    val firstBarBtn = remember { arrayOfNulls<View>(1) } // primer botón de opciones (Audio…) de la barra
     var seekLabel by remember { mutableStateOf<String?>(null) }
     var seekTick by remember { mutableIntStateOf(0) }
     var panelOpen by remember { mutableStateOf(false) }
@@ -292,39 +293,57 @@ fun PlayerScreen(req: PlayRequest) {
             }
             return false
         }
-        // Izquierda / derecha: siempre avanzar o retroceder (salvo si has entrado en los controles con la flecha abajo)
-        if (dims.tv && (ev.keyCode == KeyEvent.KEYCODE_DPAD_LEFT || ev.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) &&
-            (!view.isControllerFullyVisible || seek[2] == 1L)
-        ) {
-            if (down && ev.repeatCount % 3 == 0) {
-                val now = System.currentTimeMillis()
-                val steps = longArrayOf(10, 20, 50, 100)
-                val fwd = ev.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
-                val same = seek[2] == 1L && now - seek[0] < 1800 && (seek[1] > 0) == fwd
-                val i = if (same) (kotlin.math.abs(seek[1]).toInt() + 1).coerceAtMost(steps.size - 1) else 0
-                seek[0] = now; seek[1] = if (fwd) i.toLong() + 1 else -(i.toLong() + 1); seek[2] = 1L
-                if (!fwd) seek[1] = -(i.toLong() + 1)
-                val ms = steps[i] * 1000
-                val dur = exo.duration.takeIf { it > 0 } ?: Long.MAX_VALUE
-                exo.seekTo(if (fwd) (exo.currentPosition + ms).coerceAtMost(dur - 1000) else (exo.currentPosition - ms).coerceAtLeast(0))
-                seekLabel = (if (fwd) "» +" else "« −") + "${steps[i]} s"
-                seekTick++
-                view.showController()
-            }
-            return true
+        fun seekBtn(fwd: Boolean): View? = view.findViewById<View>(
+            if (fwd) androidx.media3.ui.R.id.exo_ffwd_with_amount else androidx.media3.ui.R.id.exo_rew_with_amount
+        ) ?: view.findViewById(if (fwd) androidx.media3.ui.R.id.exo_ffwd else androidx.media3.ui.R.id.exo_rew)
+        fun doSeek(fwd: Boolean, i: Int) {
+            val steps = longArrayOf(10, 20, 50, 100)
+            val k = i.coerceIn(0, steps.size - 1)
+            seek[0] = System.currentTimeMillis(); seek[1] = if (fwd) k + 1L else -(k + 1L); seek[2] = 1L
+            val ms = steps[k] * 1000
+            val dur = exo.duration.takeIf { it > 0 } ?: Long.MAX_VALUE
+            exo.seekTo(if (fwd) (exo.currentPosition + ms).coerceAtMost(dur - 1000) else (exo.currentPosition - ms).coerceAtLeast(0))
+            seekLabel = (if (fwd) "» +" else "« −") + "${steps[k]} s"
+            seekTick++
+            view.showController()
         }
-        // Flecha abajo: abre los controles (pausa, opciones…) y ahí las flechas ya se mueven por los botones
-        if (dims.tv && ev.keyCode == KeyEvent.KEYCODE_DPAD_DOWN && (!view.isControllerFullyVisible || seek[2] == 1L)) {
-            if (down && ev.repeatCount == 0) {
-                seek[2] = 0L
-                view.showController()
-                view.post { view.findViewById<View>(androidx.media3.ui.R.id.exo_play_pause)?.requestFocus() }
+        if (dims.tv) {
+            // Controles ocultos + izquierda/derecha: retrocede/avanza 10 s y deja el foco en la rueda de 10 (atrás/adelante)
+            if (!view.isControllerFullyVisible && (ev.keyCode == KeyEvent.KEYCODE_DPAD_LEFT || ev.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT)) {
+                if (down && ev.repeatCount == 0) {
+                    val fwd = ev.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
+                    doSeek(fwd, 0)
+                    view.post { seekBtn(fwd)?.requestFocus() }
+                }
+                return true
             }
-            return true
-        }
-        if (seek[2] == 1L && (ev.keyCode == KeyEvent.KEYCODE_DPAD_CENTER || ev.keyCode == KeyEvent.KEYCODE_ENTER)) {
-            if (down && ev.repeatCount == 0) { if (exo.isPlaying) exo.pause() else exo.play() }
-            return true
+            // OK sobre la rueda de 10: cada pulsación salta más (10 → 20 → 50 → 100 s)
+            if (view.isControllerFullyVisible && (ev.keyCode == KeyEvent.KEYCODE_DPAD_CENTER || ev.keyCode == KeyEvent.KEYCODE_ENTER)) {
+                val f = view.findFocus()
+                val fwd = when {
+                    f != null && f === seekBtn(true) -> true
+                    f != null && f === seekBtn(false) -> false
+                    else -> null
+                }
+                if (fwd != null) {
+                    if (down && ev.repeatCount == 0) {
+                        val same = seek[2] == 1L && System.currentTimeMillis() - seek[0] < 4000 && (seek[1] > 0) == fwd
+                        doSeek(fwd, if (same) kotlin.math.abs(seek[1]).toInt() else 0)
+                    }
+                    return true
+                }
+            }
+            // Flecha abajo con los controles ocultos: abre los controles con el foco en Audio / Subtítulos / opciones
+            if (!view.isControllerFullyVisible && ev.keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                if (down && ev.repeatCount == 0) {
+                    seek[2] = 0L
+                    view.showController()
+                    view.post {
+                        (firstBarBtn[0] ?: view.findViewById<View>(androidx.media3.ui.R.id.exo_play_pause))?.requestFocus()
+                    }
+                }
+                return true
+            }
         }
         if (!view.isControllerFullyVisible) {
             when (ev.keyCode) {
@@ -510,6 +529,7 @@ fun PlayerScreen(req: PlayRequest) {
                         bar.removeView(gear)
                         fun add(icon: Int, desc: String, onTap: () -> Unit) {
                             val b = android.widget.ImageButton(c, null, 0, androidx.media3.ui.R.style.ExoStyledControls_Button_Bottom)
+                            if (firstBarBtn[0] == null) firstBarBtn[0] = b
                             b.setImageResource(icon)
                             b.contentDescription = desc
                             b.setOnClickListener { onTap() }
@@ -869,6 +889,8 @@ private fun buildPlayer(ctx: Context, live: Boolean): ExoPlayer {
         .setPreferredAudioLanguages("es", "spa", "cat")
         .setPreferredTextLanguages("es", "spa")
         .setSelectUndeterminedTextLanguage(true)
+        // Subtítulos desactivados al empezar (se activan desde Subtítulos)
+        .setTrackTypeDisabled(MC.TRACK_TYPE_TEXT, true)
         .build()
     player.videoScalingMode = MC.VIDEO_SCALING_MODE_SCALE_TO_FIT
     return player
