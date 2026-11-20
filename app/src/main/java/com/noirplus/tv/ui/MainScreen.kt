@@ -192,7 +192,9 @@ private enum class Filter(val label: String) { ALL("Todo"), SERIES("Series"), MO
 private fun PhoneMain() {
     val d = LocalDims.current
     var section by PhoneTabs.section
-    var filter by rememberSaveable { mutableStateOf(Filter.ALL) }
+    // Fuera de la pantalla: al volver de una ficha o del reproductor sigues en la misma pestaña (p. ej. Próximos)
+    var filterName by PhoneTabs.filter
+    val filter = runCatching { Filter.valueOf(filterName) }.getOrDefault(Filter.ALL)
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
@@ -204,7 +206,7 @@ private fun PhoneMain() {
                     Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(start = d.edge, end = d.edge, top = 12.dp, bottom = 2.dp),
                     horizontalArrangement = Arrangement.spacedBy(22.dp),
                 ) {
-                    Filter.entries.forEach { f -> FilterTab(f.label, selected = f == filter) { filter = f } }
+                    Filter.entries.forEach { f -> FilterTab(f.label, selected = f == filter) { filterName = f.name } }
                 }
             } else {
                 Text(
@@ -239,6 +241,8 @@ private fun PhoneMain() {
 /** Sección elegida en la barra de abajo del móvil (compartida con las demás pantallas). */
 internal object PhoneTabs {
     val section = mutableStateOf(Section.HOME)
+    /** Pestaña de arriba (Todo, Series, Películas, Directo, Próximos): se guarda fuera para volver a la misma. */
+    val filter = mutableStateOf("ALL")
 }
 
 /** Barra de abajo en las pantallas que se abren encima (ficha, «Ver todo», carpetas…): vuelve a Inicio, Buscar, etc. */
