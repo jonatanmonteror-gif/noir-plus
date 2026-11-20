@@ -355,9 +355,9 @@ fun PlayerScreen(req: PlayRequest) {
                     }
                     return true
                 }
-                // Flecha arriba: elegir audio
+                // Flecha arriba: audio y subtítulos juntos
                 KeyEvent.KEYCODE_DPAD_UP -> {
-                    if (down && ev.repeatCount == 0) openPanel("audio")
+                    if (down && ev.repeatCount == 0) openPanel("av")
                     return true
                 }
                 // Flecha abajo (móvil con mando): elegir subtítulos
@@ -792,6 +792,7 @@ fun PlayerScreen(req: PlayRequest) {
                 Text(
                     when (sec) {
                         "cc" -> "Subtítulos"
+                        "av" -> "Audio y subtítulos"
                         "subopts" -> "Opciones de subtítulos"
                         "audio" -> "Audio"
                         "speed" -> "Velocidad"
@@ -807,6 +808,13 @@ fun PlayerScreen(req: PlayRequest) {
                 // Desde un botón: directamente esa sección abierta.
                 @Composable
                 fun section(key: String, label: String): Boolean {
+                    // Flecha arriba en la tele: audio y subtítulos juntos
+                    if (sec == "av") {
+                        if (key != "audio" && key != "cc") return false
+                        Text(label, color = Col.Sub, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(top = if (key == "cc") 6.dp else 0.dp))
+                        return true
+                    }
                     if (!all) return sec == key
                     if (prefs.quick(key)) return false
                     val open = expanded[key] == true
