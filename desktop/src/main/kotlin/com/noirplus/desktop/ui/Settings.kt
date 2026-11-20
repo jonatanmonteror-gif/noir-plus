@@ -108,13 +108,6 @@ fun SettingsScreen() {
             }
             if (sv < 0) Spacer(Modifier)
         }
-        Card("Logo") {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("Mostrar el logo de Noir+", color = Col.Text, fontSize = 14.sp, modifier = Modifier.weight(1f))
-                Seg(listOf("Sí" to "1", "No" to "0"), { if (Store.showLogo) "1" else "0" }) { Store.showLogo = it == "1" }
-            }
-            Text("Si lo ocultas, no sale el logo en ninguna pantalla.", color = Col.Sub, fontSize = 12.sp)
-        }
         Card("Pantalla") {
             Text("Cómo se abre Noir+", color = Col.Text, fontSize = 14.sp)
             Seg(listOf("Pantalla completa" to "full", "Inmersiva" to "immersive", "Ventana" to "window"), { Store.windowMode }) { Store.windowMode = it }

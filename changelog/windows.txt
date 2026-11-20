@@ -16,4 +16,3 @@ Novedades de la próxima versión de Windows. Una línea por punto, empezando po
 - Más estabilidad: mientras ves algo ya no se mide la velocidad de los canales (no se abre una segunda conexión al proveedor) y la medición va poco a poco (60 por vez, primero los primeros del dial).
 - Logo nuevo de Noir+, de la misma familia que Noir Books: «Noir» y debajo «PLUS» (icono del programa, instalador y cabeceras).
 - App privada: la primera vez que se abre en un aparato pide un código de acceso (los aparatos que ya tenían cuenta no lo piden).
-- Ajustes → Logo → «Mostrar el logo de Noir+»: si lo ocultas, el logo no sale en ninguna pantalla.
