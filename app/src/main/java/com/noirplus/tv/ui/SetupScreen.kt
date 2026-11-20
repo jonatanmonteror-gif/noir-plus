@@ -103,6 +103,12 @@ fun qrBitmap(text: String, px: Int = 360): ImageBitmap {
 @Composable
 fun SetupScreen() {
     val prefs = Repo.prefs
+    // App privada: la primera vez en cada aparato se pide el código de acceso
+    var accessOk by remember { mutableStateOf(prefs.accessOk) }
+    if (!accessOk) {
+        AccessGate { prefs.accessOk = true; accessOk = true }
+        return
+    }
     val nav = LocalNav.current
     val d = LocalDims.current
     val scope = rememberCoroutineScope()

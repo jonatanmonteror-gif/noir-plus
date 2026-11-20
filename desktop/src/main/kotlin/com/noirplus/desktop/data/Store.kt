@@ -67,6 +67,10 @@ object Store {
     val pass: String get() = s("pass")
     val m3u: String get() = s("m3u")
     val hasAccount: Boolean get() = type == "xtream" || (type == "m3u" && m3u.isNotBlank())
+    /** Ya se metió el código de acceso en este PC (si ya había cuenta, cuenta como dentro). */
+    var accessOk: Boolean
+        get() = o.optBoolean("accessOk", false) || hasAccount
+        set(v) { o.put("accessOk", v); save() }
 
     fun saveXtream(server: String, user: String, pass: String) {
         o.put("type", "xtream").put("server", server).put("user", user).put("pass", pass); save()

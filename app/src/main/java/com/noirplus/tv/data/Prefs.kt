@@ -110,6 +110,11 @@ class Prefs(ctx: Context) {
 
     fun hasAccount() = type.isNotEmpty()
 
+    /** Ya se ha metido el código de acceso en este aparato (los que tenían cuenta cuentan como dentro). */
+    var accessOk: Boolean
+        get() = sp.getBoolean("accessOk", false) || hasAccount()
+        set(v) { sp.edit().putBoolean("accessOk", v).apply() }
+
     /** Última vez que se entró a la app (ms), para contar novedades. */
     var lastVisit: Long
         get() = sp.getLong("lastVisit", 0L)

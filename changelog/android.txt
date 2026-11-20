@@ -2,3 +2,4 @@ Novedades de la próxima versión de Android (tele y móvil). Una línea por pun
 - Inicio nuevo, al estilo de las plataformas: películas y series en tendencia en España, series con capítulos nuevos, películas recién llegadas y filas de Netflix, Max, Prime Video, Disney+, Apple TV+, Movistar Plus+, SkyShowtime y Filmin. Ya no salen las carpetas del proveedor.
 - Las novedades de cada actualización ya solo enseñan lo nuevo de esa versión (antes se repetían los puntos de versiones anteriores).
 - Logo nuevo de Noir+, de la misma familia que Noir Books: «Noir» y debajo «PLUS» (icono, tarjeta de la tele, bienvenida y cabeceras).
+- App privada: la primera vez que se abre en un aparato pide un código de acceso (los aparatos que ya tenían cuenta no lo piden).

@@ -39,8 +39,45 @@ import kotlinx.coroutines.launch
 
 // ───────────────────────── Inicio de sesión ─────────────────────────
 
+/** Código de acceso: en el código solo hay una huella (PBKDF2), nunca el código. */
+object AccessCode {
+    private const val SALT = "yopWWOxpGgIFO9Fz8ZTz6Q=="
+    private const val HASH = "xrK5d5C0usTKZiP48+pHZ81zjG6qG4viJ74Z5hqE3z4="
+    fun check(input: String): Boolean = runCatching {
+        val norm = input.uppercase().filter { it.isLetterOrDigit() }
+        val spec = javax.crypto.spec.PBEKeySpec(norm.toCharArray(), java.util.Base64.getDecoder().decode(SALT), 60_000, 256)
+        val got = javax.crypto.SecretKeyFactory.getInstance("PBKDF2WithHmacSHA1").generateSecret(spec).encoded
+        java.security.MessageDigest.isEqual(got, java.util.Base64.getDecoder().decode(HASH))
+    }.getOrDefault(false)
+}
+
+/** App privada: la primera vez en este PC se pide el código de acceso. */
+@Composable
+fun AccessGate(onOk: () -> Unit) {
+    var code by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf<String?>(null) }
+    fun go() { if (AccessCode.check(code)) onOk() else error = "Código incorrecto" }
+    Box(Modifier.fillMaxSize().background(Brush.radialGradient(listOf(Color(0xFF1C1C20), Col.Bg), radius = 1400f)), contentAlignment = Alignment.Center) {
+        Column(Modifier.width(420.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Logo(46)
+            Text("Introduce el código de acceso", color = Col.Text, fontSize = 17.sp, modifier = Modifier.padding(top = 18.dp))
+            Text("Noir+ es una app privada. Solo se pide la primera vez en este PC.", color = Col.Sub, fontSize = 13.sp,
+                modifier = Modifier.padding(top = 6.dp, bottom = 20.dp))
+            Field("Código", code, onDone = { go() }) { code = it; error = null }
+            error?.let { Text(it, color = Col.Error, fontSize = 13.sp, modifier = Modifier.padding(top = 6.dp)) }
+            Spacer(Modifier.height(16.dp))
+            NButton("Entrar", primary = true, modifier = Modifier.fillMaxWidth()) { go() }
+        }
+    }
+}
+
 @Composable
 fun SetupScreen() {
+    var accessOk by remember { mutableStateOf(Store.accessOk) }
+    if (!accessOk) {
+        AccessGate { Store.accessOk = true; accessOk = true }
+        return
+    }
     var xtream by remember { mutableStateOf(true) }
     var name by remember { mutableStateOf(Store.name) }
     var server by remember { mutableStateOf(Store.server) }
